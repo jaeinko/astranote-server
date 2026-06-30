@@ -71,7 +71,7 @@ const handler = async (req, res) => {
     } catch (e) { console.log("API Fallback 활성화"); }
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash pro" });
 
     const prompt = `
     너는 40년 경력의 냉철하고 적중률 높은 서양 점성술사 및 심리 분석의 대가야. 
