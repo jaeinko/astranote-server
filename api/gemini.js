@@ -72,7 +72,7 @@ const handler = async (req, res) => {
 
     // 🚨 팩트 폭격: 모델 이름 완벽하게 정상화 완료
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const prompt = `
     너는 40년 경력의 냉철하고 적중률 높은 서양 점성술사 및 심리 분석의 대가야. 
