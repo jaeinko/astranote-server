@@ -1,6 +1,6 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-export const maxDuration = 60; // 800자 이상 대량 생성을 위해 타임아웃 60초 확보
+// 🚨 팩트: 에러를 유발할 수 있는 혼종 문법(export const) 완벽 제거 완료
 
 const allowCors = fn => async (req, res) => {
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -70,7 +70,6 @@ const handler = async (req, res) => {
       }
     } catch (e) { console.log("API Fallback 활성화"); }
 
-    // 🚨 팩트 폭격: 모델 이름 완벽하게 정상화 완료
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
@@ -115,7 +114,11 @@ const handler = async (req, res) => {
     const cleanJson = responseText.replace(/```json/gi, '').replace(/```/gi, '').trim();
     const parsedData = JSON.parse(cleanJson);
     res.status(200).json(parsedData);
-  } catch (error) { res.status(500).json({ error: '우주 데이터 동기화 중 오류 발생' }); }
+  } catch (error) { 
+    // 🚨 팩트: 여기서 에러 원인을 음소거하지 않고 그대로 카페24로 쏴버립니다.
+    console.error("🔥 진실의 방 에러 로그:", error);
+    res.status(500).json({ error: `[서버 비명소리] ${error.message}` }); 
+  }
 };
 
 module.exports = allowCors(handler);
