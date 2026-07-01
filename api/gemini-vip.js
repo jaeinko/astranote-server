@@ -73,7 +73,7 @@ const handler = async (req, res) => {
 
     console.log("✅ [2] Prokerala 완료, Gemini VIP 호출 시작");
 
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY, { apiVersion: "v1beta" });
     const model = genAI.getGenerativeModel({
       model: "gemini-1.5-pro-latest",
       generationConfig: {
