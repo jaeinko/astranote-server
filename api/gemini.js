@@ -77,7 +77,6 @@ const handler = async (req, res) => {
     const model = genAI.getGenerativeModel({
       model: "gemini-1.5-flash-latest",
       generationConfig: {
-        responseMimeType: "application/json",
         maxOutputTokens: 8192,
         temperature: 0.9
       }
@@ -94,7 +93,7 @@ const handler = async (req, res) => {
     1. 7하우스, 금성, 달, 토성을 중점 해석하고 구체적인 도수와 하우스 숫자를 텍스트에 노출해 전문성을 증명해.
     2. 중요한 문장은 반드시 HTML <b> 태그를 사용해. 마크다운(*) 금지.
     3. card2부터 card7까지는 항목당 최소 500자 이상으로 작성해.
-    4. 결과는 순수 JSON 객체로만 출력해.
+    4. 결과는 반드시 순수 JSON 객체로만 출력해. 앞뒤에 아무것도 붙이지 마.
 
     [출력 JSON 형식]
     {
