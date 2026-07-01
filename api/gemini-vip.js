@@ -1,8 +1,5 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// ✅ 수정: export const maxDuration 제거 (이게 즉사 원인이었음)
-// maxDuration은 vercel.json에서 설정합니다.
-
 const allowCors = fn => async (req, res) => {
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -80,7 +77,6 @@ const handler = async (req, res) => {
     const model = genAI.getGenerativeModel({
       model: "gemini-1.5-pro-latest",
       generationConfig: {
-        responseMimeType: "application/json",
         maxOutputTokens: 8192,
         temperature: 0.9
       }
@@ -99,7 +95,7 @@ const handler = async (req, res) => {
 3. 충분히 안아준 뒤, 무의식의 그림자(Shadow)와 결핍(4하우스, 달, 토성 위주)을 정확하게 짚어주어라.
 4. 고객의 상처와 예민함이 어떻게 진짜 부(富)를 끌어당기는 비즈니스 무기가 되는지 논리적이고 희망차게 설명하라.
 5. 핵심 깨달음은 반드시 HTML <b> 태그로 강조. 마크다운(*) 절대 금지.
-6. 결과는 순수 JSON 객체로만 출력해.
+6. 결과는 반드시 순수 JSON 객체로만 출력해. 앞뒤에 아무것도 붙이지 마.
 
 [출력 JSON 형식]
 {
