@@ -1,4 +1,4 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+// ✅ @google/generative-ai SDK 완전 제거 → fetch 직접 호출로 패키지 버전 문제 원천 차단
 
 const allowCors = fn => async (req, res) => {
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -36,17 +36,16 @@ const cityCoordinates = {
 const handler = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST 요청만 받습니다.' });
 
-  console.log("✅ [1] gemini.js 함수 진입 성공");
+  console.log("✅ [1] gemini.js 진입 성공");
 
   try {
     const { name, date, time, city, myGender, targetGender } = req.body;
 
     if (!name || !date || !time) {
-      return res.status(400).json({ error: '필수 입력값(name/date/time)이 누락되었습니다.' });
+      return res.status(400).json({ error: '필수 입력값 누락' });
     }
     if (!process.env.GEMINI_API_KEY) {
-      console.error("🔥 GEMINI_API_KEY 환경변수가 비어있음");
-      return res.status(500).json({ error: 'GEMINI_API_KEY 환경변수가 설정되지 않았습니다.' });
+      return res.status(500).json({ error: 'GEMINI_API_KEY 환경변수 없음' });
     }
 
     const location = cityCoordinates[city] || cityCoordinates["Seoul"];
@@ -69,18 +68,9 @@ const handler = async (req, res) => {
           if (astroResponse.ok) { const astroJson = await astroResponse.json(); astrologyDataText = JSON.stringify(astroJson.data); }
         }
       }
-    } catch (e) { console.log("⚠️ Prokerala Fallback 활성화:", e.message); }
+    } catch (e) { console.log("⚠️ Prokerala Fallback:", e.message); }
 
     console.log("✅ [2] Prokerala 완료, Gemini 호출 시작");
-
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY, { apiVersion: "v1beta" });
-    const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash-latest",
-      generationConfig: {
-        maxOutputTokens: 8192,
-        temperature: 0.9
-      }
-    });
 
     const prompt = `
     너는 40년 경력의 냉철하고 적중률 높은 서양 점성술사 및 심리 분석의 대가야.
@@ -111,10 +101,29 @@ const handler = async (req, res) => {
     }
     `;
 
-    const result = await model.generateContent(prompt);
+    // ✅ SDK 없이 fetch로 직접 Gemini v1beta 호출
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens: 8192, temperature: 0.9 }
+        })
+      }
+    );
+
+    if (!geminiRes.ok) {
+      const errText = await geminiRes.text();
+      console.error("🔥 Gemini 오류:", geminiRes.status, errText);
+      return res.status(500).json({ error: `Gemini ${geminiRes.status}: ${errText}` });
+    }
+
+    const geminiData = await geminiRes.json();
     console.log("✅ [3] Gemini 응답 수신 완료");
 
-    const responseText = result.response.text();
+    const responseText = geminiData.candidates[0].content.parts[0].text;
     const cleanJson = responseText.replace(/```json/gi, '').replace(/```/gi, '').trim();
     const parsedData = JSON.parse(cleanJson);
 
