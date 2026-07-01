@@ -1,4 +1,4 @@
-// ✅ @google/generative-ai SDK 완전 제거 → fetch 직접 호출
+// ✅ @google/generative-ai SDK 완전 제거 → fetch 직접 호출로 패키지 버전 문제 원천 차단
 
 const allowCors = fn => async (req, res) => {
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -36,7 +36,7 @@ const cityCoordinates = {
 const handler = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST 요청만 받습니다.' });
 
-  console.log("✅ [1] gemini-vip.js 진입 성공");
+  console.log("✅ [1] gemini.js 진입 성공");
 
   try {
     const { name, date, time, city, myGender, targetGender } = req.body;
@@ -68,36 +68,42 @@ const handler = async (req, res) => {
           if (astroResponse.ok) { const astroJson = await astroResponse.json(); astrologyDataText = JSON.stringify(astroJson.data); }
         }
       }
-    } catch (e) { console.log("⚠️ Prokerala Fallback (VIP):", e.message); }
+    } catch (e) { console.log("⚠️ Prokerala Fallback:", e.message); }
 
-    console.log("✅ [2] Prokerala 완료, Gemini VIP 호출 시작");
+    console.log("✅ [2] Prokerala 완료, Gemini 호출 시작");
 
     const prompt = `
-당신은 최고급 VVIP 고객의 영혼을 깊이 들여다보는 최고 권위의 운명 전략가이자, 융의 분석심리학(Analytical Psychology)과 점성술에 통달한 마스터다.
-고객의 서양 점성술 네이탈 차트(Natal Chart) 데이터를 기반으로 분석하되, 당신의 궁극적인 목적은 '고객이 그동안 겪은 고통에 대한 깊은 사랑과 수용, 그리고 진짜 부(富)와 행복으로의 압도적인 인도'다.
+    너는 40년 경력의 냉철하고 적중률 높은 서양 점성술사 및 심리 분석의 대가야.
+    Astro-seek 수준의 정밀한 트로피컬 황도대와 플라시두스 시스템을 기반으로 분석해.
 
-[실제 데이터] ${astrologyDataText}
-[고객 정보] 이름: ${name} / 성별: ${myGender} / 타겟 상대: ${targetGender} / 출생지: ${city} / 생년월일시: ${date} ${time}
+    [실제 데이터] ${astrologyDataText}
+    [고객 정보] 이름: ${name} / 성별: ${myGender} / 타겟 상대: ${targetGender} / 출생지: ${city} / 생년월일시: ${date} ${time}
 
-[분석 및 작문 지침]
-1. 각 항목(vip_card1, vip_card2, vip_card3)은 최소 1000자 이상으로 작성해.
-2. 고객이 그동안 얼마나 치열하게 고군분투해 왔는지 따뜻하게 위로하는 문장으로 시작하라.
-3. 무의식의 그림자(4하우스, 달, 토성)를 부드럽지만 예리하게 짚어주어라.
-4. 상처와 예민함이 부(富)를 끌어당기는 비즈니스 무기가 됨을 논리적으로 설명하라.
-5. 핵심 깨달음은 HTML <b> 태그로 강조. 마크다운(*) 절대 금지.
-6. 결과는 반드시 순수 JSON 객체로만 출력해. 앞뒤에 아무것도 붙이지 마.
+    [엄격 주의사항]
+    1. 7하우스, 금성, 달, 토성을 중점 해석하고 구체적인 도수와 하우스 숫자를 텍스트에 노출해 전문성을 증명해.
+    2. 중요한 문장은 반드시 HTML <b> 태그를 사용해. 마크다운(*) 금지.
+    3. card2부터 card7까지는 항목당 최소 500자 이상으로 작성해.
+    4. 결과는 반드시 순수 JSON 객체로만 출력해. 앞뒤에 아무것도 붙이지 마.
 
-[출력 JSON 형식]
-{
-  "vip_card1": "(최소 1000자) [CHAPTER 01: 무의식의 상처와 깊은 위로]",
-  "vip_card2": "(최소 1000자) [CHAPTER 02: 상처를 부(富)로 바꾸는 연금술]",
-  "vip_card3": "(최소 1000자) [CHAPTER 03: 골든 타이밍과 행동 지침. 레드플래그는 <span style='color:#ff3b30;font-weight:900;'>빨간색</span>으로]"
-}
+    [출력 JSON 형식]
+    {
+      "card1_title": "배우자의 느낌 요약 한 문장",
+      "guardian_symbol_1": "(신비로운 이모지 1개)", "guardian_name_1": "핵심 기운 1",
+      "guardian_symbol_2": "(이모지 1개)", "guardian_name_2": "핵심 기운 2",
+      "guardian_symbol_3": "(이모지 1개)", "guardian_name_3": "핵심 기운 3",
+      "card2_analysis": "(최소 500자) 고객(${name}) 본인의 네이탈 차트 기반 심층 분석.",
+      "card3_appearance": "(최소 500자) 미래 배우자의 외모 특징.",
+      "card4_career": "(최소 500자) 배우자의 직업군, 경제적 수준, 사회적 위치.",
+      "card5_timing": "(최소 500자) 만남의 방식, 시기, 장소와 그 근거.",
+      "card6_chemistry": "(최소 400자) 감정적/영적 케미스트리.",
+      "card7_destiny_guide": "(최소 500자) 행동지침과 레드플래그. 레드플래그는 <span style='color:#ff3b30;font-weight:900;'>태그로 강조.",
+      "card8_teaser": "(업셀링 미끼 3문장)"
+    }
     `;
 
-    // ✅ SDK 없이 fetch로 직접 Gemini v1beta 호출 (pro 모델)
+    // ✅ SDK 없이 fetch로 직접 Gemini v1beta 호출
     const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com//v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -110,23 +116,23 @@ const handler = async (req, res) => {
 
     if (!geminiRes.ok) {
       const errText = await geminiRes.text();
-      console.error("🔥 Gemini VIP 오류:", geminiRes.status, errText);
-      return res.status(500).json({ error: `Gemini VIP ${geminiRes.status}: ${errText}` });
+      console.error("🔥 Gemini 오류:", geminiRes.status, errText);
+      return res.status(500).json({ error: `Gemini ${geminiRes.status}: ${errText}` });
     }
 
     const geminiData = await geminiRes.json();
-    console.log("✅ [3] Gemini VIP 응답 수신 완료");
+    console.log("✅ [3] Gemini 응답 수신 완료");
 
     const responseText = geminiData.candidates[0].content.parts[0].text;
     const cleanJson = responseText.replace(/```json/gi, '').replace(/```/gi, '').trim();
     const parsedData = JSON.parse(cleanJson);
 
-    console.log("✅ [4] JSON 파싱 성공, VIP 응답 전송");
+    console.log("✅ [4] JSON 파싱 성공, 응답 전송");
     res.status(200).json(parsedData);
 
   } catch (error) {
-    console.error("🔥 gemini-vip.js 에러:", error);
-    res.status(500).json({ error: `[VIP 서버 에러] ${error.message}` });
+    console.error("🔥 gemini.js 에러:", error);
+    res.status(500).json({ error: `[서버 에러] ${error.message}` });
   }
 };
 
