@@ -1,10 +1,4 @@
-// 🚨 OpenAI로 교체: 별도 npm 패키지 설치 없이 fetch로 직접 호출합니다.
-// (package.json에 openai 라이브러리 안 깔려있어도 동작합니다)
-
-// 🚨 핵심 수정 1: maxDuration을 코드에서 export.
-// CJS(module.exports) 방식이라 Next.js의 `export const config`가 아니라
-// vercel.json 쪽에서 함수별로 maxDuration을 지정해야 합니다.
-// (이 파일 하단 + 프로젝트 루트 vercel.json 둘 다 확인하세요)
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const allowCors = fn => async (req, res) => {
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -42,8 +36,7 @@ const cityCoordinates = {
 const handler = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST 요청만 받습니다.' });
 
-  // 🚨 핵심 수정 2: 함수 진입 즉시 로그 → "어디까지 살아있었는지" 추적 가능
-  console.log("✅ [1] 함수 진입 성공");
+  console.log("✅ [1] gemini.js 함수 진입 성공");
 
   try {
     const { name, date, time, city, myGender, targetGender } = req.body;
@@ -51,9 +44,9 @@ const handler = async (req, res) => {
     if (!name || !date || !time) {
       return res.status(400).json({ error: '필수 입력값(name/date/time)이 누락되었습니다.' });
     }
-    if (!process.env.OPENAI_API_KEY) {
-      console.error("🔥 OPENAI_API_KEY 환경변수가 비어있음");
-      return res.status(500).json({ error: '[서버 설정 오류] OPENAI_API_KEY 환경변수가 설정되지 않았습니다.' });
+    if (!process.env.GEMINI_API_KEY) {
+      console.error("🔥 GEMINI_API_KEY 환경변수가 비어있음");
+      return res.status(500).json({ error: 'GEMINI_API_KEY 환경변수가 설정되지 않았습니다.' });
     }
 
     const location = cityCoordinates[city] || cityCoordinates["Seoul"];
@@ -65,11 +58,7 @@ const handler = async (req, res) => {
         const tokenResponse = await fetch('https://api.prokerala.com/token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({
-            grant_type: 'client_credentials',
-            client_id: process.env.PROKERALA_CLIENT_ID,
-            client_secret: process.env.PROKERALA_CLIENT_SECRET
-          })
+          body: new URLSearchParams({ grant_type: 'client_credentials', client_id: process.env.PROKERALA_CLIENT_ID, client_secret: process.env.PROKERALA_CLIENT_SECRET })
         });
         if (tokenResponse.ok) {
           const tokenData = await tokenResponse.json();
@@ -77,17 +66,22 @@ const handler = async (req, res) => {
             `https://api.prokerala.com/v2/astrology/planet-position?datetime=${encodeURIComponent(dateTimeIso)}&coordinates=${location.lat},${location.lon}&ayanamsa=1`,
             { headers: { 'Authorization': `Bearer ${tokenData.access_token}` } }
           );
-          if (astroResponse.ok) {
-            const astroJson = await astroResponse.json();
-            astrologyDataText = JSON.stringify(astroJson.data);
-          }
+          if (astroResponse.ok) { const astroJson = await astroResponse.json(); astrologyDataText = JSON.stringify(astroJson.data); }
         }
       }
-    } catch (e) {
-      console.log("⚠️ Prokerala Fallback 활성화:", e.message);
-    }
+    } catch (e) { console.log("⚠️ Prokerala Fallback 활성화:", e.message); }
 
-    console.log("✅ [2] Prokerala 단계 완료, OpenAI 호출 시작");
+    console.log("✅ [2] Prokerala 완료, Gemini 호출 시작");
+
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash-latest",
+      generationConfig: {
+        responseMimeType: "application/json",
+        maxOutputTokens: 8192,
+        temperature: 0.9
+      }
+    });
 
     const prompt = `
     너는 40년 경력의 냉철하고 적중률 높은 서양 점성술사 및 심리 분석의 대가야.
@@ -118,36 +112,10 @@ const handler = async (req, res) => {
     }
     `;
 
-    // 🚨 핵심: OpenAI Chat Completions API를 fetch로 직접 호출
-    // response_format: json_object → JSON 강제, 코드펜스(```json) 문제 자체가 사라짐
-    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini', // 비용 저렴 + 충분히 빠름. 품질 더 원하면 'gpt-4o'로 교체
-        messages: [
-          { role: 'user', content: prompt }
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.9,
-        max_tokens: 8192
-      })
-    });
+    const result = await model.generateContent(prompt);
+    console.log("✅ [3] Gemini 응답 수신 완료");
 
-    if (!openaiResponse.ok) {
-      const errBody = await openaiResponse.text();
-      console.error("🔥 OpenAI 응답 실패:", openaiResponse.status, errBody);
-      return res.status(500).json({ error: `[OpenAI 오류 ${openaiResponse.status}] ${errBody}` });
-    }
-
-    const openaiData = await openaiResponse.json();
-
-    console.log("✅ [3] OpenAI 응답 수신 완료");
-
-    const responseText = openaiData.choices[0].message.content;
+    const responseText = result.response.text();
     const cleanJson = responseText.replace(/```json/gi, '').replace(/```/gi, '').trim();
     const parsedData = JSON.parse(cleanJson);
 
@@ -155,9 +123,8 @@ const handler = async (req, res) => {
     res.status(200).json(parsedData);
 
   } catch (error) {
-    // 이제 SIGKILL이 아닌 진짜 JS 예외만 여기 도달함 (timeout 문제 해결 후 기준)
-    console.error("🔥 진실의 방 에러 로그:", error);
-    res.status(500).json({ error: `[서버 비명소리] ${error.message}` });
+    console.error("🔥 gemini.js 에러:", error);
+    res.status(500).json({ error: `[서버 에러] ${error.message}` });
   }
 };
 
