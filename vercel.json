@@ -1,10 +1,10 @@
 {
   "functions": {
     "api/gemini.js": {
-      "maxDuration": 90
+      "maxDuration": 300
     },
     "api/gemini-vip.js": {
-      "maxDuration": 90
+      "maxDuration": 300
     }
   }
 }
