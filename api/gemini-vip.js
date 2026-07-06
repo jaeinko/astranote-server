@@ -154,31 +154,60 @@ ${name}님의 차트를 근거로 20대/30대/40대/50대/60대/70대 각 시기
 }
     `;
 
-    // ✅ SDK 없이 fetch로 직접 Gemini v1beta 호출
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { maxOutputTokens: 65536, temperature: 0.95 }
-        })
-      }
-    );
+    // ✅ Gemini v1beta 직접 호출
+    // - thinkingBudget 0: '생각' 기능 OFF → 응답속도 10~25초로 단축 (504 타임아웃 해결)
+    // - responseMimeType JSON: 순수 JSON만 답하도록 강제 (500 파싱에러 해결)
+    // - 실패 시 자동 1회 재시도 + 깨진 JSON 복구 파싱
+    let parsedData = null;
+    let lastErr = "";
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const geminiRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                maxOutputTokens: 24576,
+                temperature: 0.95,
+                responseMimeType: "application/json",
+                thinkingConfig: { thinkingBudget: 0 }
+              }
+            })
+          }
+        );
 
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      console.error("🔥 Gemini VIP 오류:", geminiRes.status, errText);
-      return res.status(500).json({ error: `Gemini VIP ${geminiRes.status}: ${errText}` });
+        if (!geminiRes.ok) {
+          lastErr = `Gemini ${geminiRes.status}: ${await geminiRes.text()}`;
+          console.error(`🔥 [시도 ${attempt}]`, lastErr);
+          continue;
+        }
+
+        const geminiData = await geminiRes.json();
+        console.log(`✅ [3] Gemini 응답 수신 (시도 ${attempt})`);
+
+        const parts = (geminiData.candidates && geminiData.candidates[0] && geminiData.candidates[0].content && geminiData.candidates[0].content.parts) || [];
+        const responseText = parts.map(p => p.text || "").join("");
+        const s = responseText.indexOf("{");
+        const e = responseText.lastIndexOf("}");
+        if (s === -1 || e === -1) {
+          lastErr = "응답에 JSON 없음: " + responseText.slice(0, 200);
+          console.error(`🔥 [시도 ${attempt}]`, lastErr);
+          continue;
+        }
+        parsedData = JSON.parse(responseText.slice(s, e + 1));
+        break;
+      } catch (err) {
+        lastErr = err.message;
+        console.error(`🔥 [시도 ${attempt}] 실패:`, err.message);
+      }
     }
 
-    const geminiData = await geminiRes.json();
-    console.log("✅ [3] Gemini VIP 응답 수신 완료");
-
-    const responseText = geminiData.candidates[0].content.parts[0].text;
-    const cleanJson = responseText.replace(/```json/gi, '').replace(/```/gi, '').trim();
-    const parsedData = JSON.parse(cleanJson);
+    if (!parsedData) {
+      return res.status(500).json({ error: `[Gemini VIP 실패] ${lastErr}` });
+    }
 
     console.log("✅ [4] JSON 파싱 성공, VIP 응답 전송");
     res.status(200).json(parsedData);
