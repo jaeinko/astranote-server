@@ -1,8 +1,5 @@
 // ✅ @google/generative-ai SDK 완전 제거 → fetch 직접 호출로 패키지 버전 문제 원천 차단
 
-// 🔥 [수정] Next.js/Vercel Serverless Function 실행 시간을 Pro 플랜 최대치 수준인 90초로 강제 연장
-export const maxDuration = 90; 
-
 const allowCors = fn => async (req, res) => {
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -57,16 +54,13 @@ const cityCoordinates = {
 const handler = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST 요청만 받습니다.' });
 
-  // 🔥 [수정] 400 에러 디버깅을 위해 들어온 값 전체 로깅
-  console.log("✅ [1] gemini.js 진입 성공. req.body:", req.body);
+  console.log("✅ [1] gemini.js 진입 성공");
 
   try {
     const { name, date, time, city, myGender, targetGender } = req.body;
 
-    // 🔥 [수정] 어떤 필수값이 빠져서 400 에러를 유발했는지 로그에 명확히 명시
     if (!name || !date || !time) {
-      console.error(`❌ [400 에러 원인 발견] name: ${name}, date: ${date}, time: ${time}`);
-      return res.status(400).json({ error: '필수 입력값 누락(name, date, time 확인 필요)' });
+      return res.status(400).json({ error: '필수 입력값 누락' });
     }
     if (!process.env.GEMINI_API_KEY) {
       return res.status(500).json({ error: 'GEMINI_API_KEY 환경변수 없음' });
@@ -96,6 +90,7 @@ const handler = async (req, res) => {
 
     console.log("✅ [2] Prokerala 완료, Gemini 호출 시작");
 
+    // 🚨 오늘 날짜를 명시해서 AI가 과거 연도를 쓰는 버그 차단
     const now = new Date();
     const todayStr = `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일`;
 
@@ -112,6 +107,7 @@ const handler = async (req, res) => {
     [가장 중요한 무기: 7하우스]
     서양 점성술에서 7하우스는 '배우자와 결혼'을 관장하는 자리야.
     이 사람의 7하우스에 어떤 별자리와 행성이 들어있는지를 핵심 근거로 삼아서, 배우자의 성격/외모/직업을 확신 있게 짚어라.
+    (예: 7하우스에 어떤 기운이 있으니 → 당신의 배우자는 이런 사람이다, 라는 흐름)
 
     [실제 데이터] ${astrologyDataText}
     [고객 정보] 이름: ${name} / 성별: ${myGender} / 찾는 상대: ${targetGender} / 출생지: ${city} / 생년월일시: ${date} ${time}
@@ -119,12 +115,14 @@ const handler = async (req, res) => {
     [글 쓰는 방식 - 꼭 지켜]
     1. 🚨 [근거 제시 필수] 모든 카드에서, 해석을 말하기 전에 반드시 차트상의 근거를 먼저 밝혀라.
        형식: "<b>당신의 7하우스에는 OO자리가 자리하고 있고, 그 안에 OO(행성)이 OO도에 위치합니다.</b> 이것이 의미하는 바는..." 처럼
-    2. 단, 근거는 카드당 1~2개만 굵고 명확하게. 근거를 댄 후의 해석은 쉽고 따뜻한 일상 언어로 풀어라.
-    3. 뭉뚱그리지 마라. 딱 집어서 단정해라.
+       [차트 근거] → [해석] 순서로 써라. 근거 없이 해석만 나열하면 실패다.
+       위의 [실제 데이터]에 담긴 행성 위치 정보를 실제로 읽고 인용해라. 지어내지 마라.
+    2. 단, 근거는 카드당 1~2개만 굵고 명확하게. 용어를 줄줄이 나열하며 어렵게 쓰지 마라. 근거를 댄 후의 해석은 쉽고 따뜻한 일상 언어로 풀어라. "당신은~", "당신의 배우자는~" 처럼 눈앞에서 말을 거는 어조로.
+    3. 뭉뚱그리지 마. "좋은 사람일 수 있어요" (X) → "당신의 배우자는 말수가 적지만 한번 뱉은 약속은 반드시 지키는 사람입니다" (O) 처럼 딱 집어서 단정해라.
     4. 배우자의 특성은 최대한 구체적으로: 성격, 말투, 분위기, 외모 인상, 직업 느낌, 돈 씀씀이, 만났을 때의 첫 느낌까지.
-    5. 만나는 시기는 반드시 구체적인 "연도와 월(예: 2027년 봄, 3월~5월)"로 못 박고, 왜 그 시기인지도 차트 근거로 설명하라.
+    5. 만나는 시기는 반드시 구체적인 "연도와 월(예: 2027년 봄, 3월~5월)"로 못 박고, 왜 그 시기인지도 차트 근거(행성의 이동)로 설명하라. 절대 생략 금지.
     6. 강조할 문장은 <b> 태그로. 마크다운(*) 금지.
-    7. card2부터 card7까지 항목당 최소 400자 내외로 상세하게 작성하라.
+    7. card2부터 card7까지 항목당 최소 500자 이상.
     8. 결과는 순수 JSON 객체로만 출력. 앞뒤에 아무것도 붙이지 마.
 
     [출력 JSON 형식]
@@ -133,53 +131,76 @@ const handler = async (req, res) => {
       "guardian_symbol_1": "(신비로운 이모지 1개)", "guardian_name_1": "핵심 기운 1",
       "guardian_symbol_2": "(이모지 1개)", "guardian_name_2": "핵심 기운 2",
       "guardian_symbol_3": "(이모지 1개)", "guardian_name_3": "핵심 기운 3",
-      "card2_analysis": "당신은 어떤 사람인지. 태양/달 별자리 위치 근거 포함.",
-      "card3_appearance": "배우자의 외모. 7하우스 별자리/행성 근거 포함.",
-      "card4_career": "배우자의 직업과 성격. 7하우스 관련 근거 포함.",
-      "card5_timing": "[필수] 만나는 시기를 구체적인 연도와 월(예: 2027년 3월~5월)로 명시하고 행성 흐름 근거 포함.",
-      "card6_chemistry": "두 사람의 케미 분석. <b>강조</b> 필수.",
-      "card7_destiny_guide": "조언과 피해야 할 상대의 특징 <span style='color:#ff3b30;font-weight:900;'>빨간 글씨</span> 경고 포함.",
-      "card8_teaser": "더 깊은 리포트를 권하는 미끼 3문장"
+      "card2_analysis": "(최소 500자) 당신은 어떤 사람인지. 먼저 당신의 태양/달 별자리 위치를 근거로 밝히고, 성향과 연애에서 반복돼온 패턴을 따뜻하지만 정확하게 짚어라.",
+      "card3_appearance": "(최소 500자) 배우자의 외모. 먼저 7하우스의 별자리와 행성을 근거로 밝히고('당신의 7하우스에는 OO이...'), 그로부터 첫인상/눈빛/체형/분위기/스타일을 사진 보듯 생생하게. 곰돌이상, 여우상 같은 비유도 좋다.",
+      "card4_career": "(최소 500자) 배우자의 직업과 성격. 7하우스와 관련 행성을 근거로 먼저 밝히고, 어떤 일을 하는 사람인지, 돈은 어떻게 쓰는지, 당신을 어떻게 대할지를 구체적으로.",
+      "card5_timing": "(최소 600자) [필수] 만나는 시기를 반드시 구체적인 연도와 월(예: 2027년 3월~5월)로 못 박고, 왜 그 시기인지 행성 흐름을 근거로 설명하라. 어떻게 만나는지(소개/우연/이미 아는 사이 등)와 만나는 순간의 상황도 실감나게. 시기 생략 절대 금지.",
+      "card6_chemistry": "(최소 400자) 두 사람의 케미. 두 기운이 만나는 지점을 근거로 밝히고, 어떤 점이 잘 맞고 어떻게 끌리는지를 <b>강조</b> 섞어 감동적으로.",
+      "card7_destiny_guide": "(최소 500자) 좋은 인연을 잡기 위한 조언과 응원. 단, 만나면 힘들어지는 '피해야 할 상대의 특징(레드플래그)'은 <span style='color:#ff3b30;font-weight:900;'>빨간 글씨</span>로 분명하게 경고하라.",
+      "card8_teaser": "(더 깊은 리포트를 권하는 미끼 3문장)"
     }
     `;
 
-    // 🚨 [수정] 응답 속도 최적화를 위해 호출 구조 수정
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { 
-            maxOutputTokens: 4096, // 🔥 [수정] 65536은 불필요하게 서칭 자원을 고갈시켜 속도를 늦춥니다. 4096으로 제한.
-            temperature: 0.7,      // 🔥 [수정] 지나치게 높은 창의성(0.9)을 줄여서 문장 방황 시간 단축 및 고속 연산 유도
-            responseMimeType: "application/json" // 🔥 [수정] API 자체에 JSON 출력을 강제하여 백엔드 파싱 에러 원천 차단
+    // ✅ Gemini v1beta 직접 호출
+    // - thinkingBudget 0: '생각' 기능 OFF → 응답속도 10~25초로 단축 (504 타임아웃 해결)
+    // - responseMimeType JSON: 순수 JSON만 답하도록 강제 (500 파싱에러 해결)
+    // - 실패 시 자동 1회 재시도 + 깨진 JSON 복구 파싱
+    let parsedData = null;
+    let lastErr = "";
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const geminiRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                maxOutputTokens: 16384,
+                temperature: 0.9,
+                responseMimeType: "application/json",
+                thinkingConfig: { thinkingBudget: 0 }
+              }
+            })
           }
-        })
-      }
-    );
+        );
 
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      console.error("🔥 Gemini 오류:", geminiRes.status, errText);
-      return res.status(500).json({ error: `Gemini ${geminiRes.status}: ${errText}` });
+        if (!geminiRes.ok) {
+          lastErr = `Gemini ${geminiRes.status}: ${await geminiRes.text()}`;
+          console.error(`🔥 [시도 ${attempt}]`, lastErr);
+          continue;
+        }
+
+        const geminiData = await geminiRes.json();
+        console.log(`✅ [3] Gemini 응답 수신 (시도 ${attempt})`);
+
+        const parts = (geminiData.candidates && geminiData.candidates[0] && geminiData.candidates[0].content && geminiData.candidates[0].content.parts) || [];
+        const responseText = parts.map(p => p.text || "").join("");
+        const s = responseText.indexOf("{");
+        const e = responseText.lastIndexOf("}");
+        if (s === -1 || e === -1) {
+          lastErr = "응답에 JSON 없음: " + responseText.slice(0, 200);
+          console.error(`🔥 [시도 ${attempt}]`, lastErr);
+          continue;
+        }
+        parsedData = JSON.parse(responseText.slice(s, e + 1));
+        break;
+      } catch (err) {
+        lastErr = err.message;
+        console.error(`🔥 [시도 ${attempt}] 실패:`, err.message);
+      }
     }
 
-    const geminiData = await geminiRes.json();
-    console.log("✅ [3] Gemini 응답 수신 완료");
-
-    const responseText = geminiData.candidates[0].content.parts[0].text;
-    
-    // responseMimeType을 적용했으므로 마크다운 코드 블록 제거 로직 없이 바로 파싱 가능 가능성이 높지만 방어벽 유지
-    const cleanJson = responseText.replace(/```json/gi, '').replace(/```/gi, '').trim();
-    const parsedData = JSON.parse(cleanJson);
+    if (!parsedData) {
+      return res.status(500).json({ error: `[Gemini 실패] ${lastErr}` });
+    }
 
     console.log("✅ [4] JSON 파싱 성공, 응답 전송");
     res.status(200).json(parsedData);
 
   } catch (error) {
-    console.error("🔥 gemini.js 에러 심층 출력:", error);
+    console.error("🔥 gemini.js 에러:", error);
     res.status(500).json({ error: `[서버 에러] ${error.message}` });
   }
 };
