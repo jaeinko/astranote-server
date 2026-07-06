@@ -52,6 +52,53 @@ const cityCoordinates = {
   "Auckland": { lat: -36.8485, lon: 174.7633 }, "Overseas": { lat: 0, lon: 0 }
 };
 
+
+// ===== 🔬 차트 정밀 다이제스트 =====
+// Prokerala의 베딕(사이더리얼) 좌표를 서양 점성술(트로피컬)로 보정하고,
+// AI가 바로 이해할 수 있는 한국어 요약으로 변환합니다. 이게 리포트 품질의 핵심입니다.
+const SIGNS_KR = ['양자리','황소자리','쌍둥이자리','게자리','사자자리','처녀자리','천칭자리','전갈자리','사수자리','염소자리','물병자리','물고기자리'];
+const PLANET_KR = { Sun:'태양', Moon:'달', Mercury:'수성', Venus:'금성', Mars:'화성', Jupiter:'목성', Saturn:'토성', Ascendant:'상승점' };
+
+function lahiriAyanamsa(dateTimeIso) {
+  const d = new Date(dateTimeIso);
+  const y = d.getUTCFullYear() + (d.getUTCMonth() + 1) / 12;
+  return 23.853 + 0.013972 * (y - 2000); // 라히리 아야남샤 근사치
+}
+function signDeg(lon) {
+  const l = ((lon % 360) + 360) % 360;
+  return { sign: SIGNS_KR[Math.floor(l / 30)], deg: (l % 30).toFixed(1), abs: l };
+}
+function buildChartDigest(data, dateTimeIso) {
+  try {
+    const list = data.planet_position || data.planet_positions || [];
+    if (!list.length) return null;
+    const ay = lahiriAyanamsa(dateTimeIso);
+    const planets = {};
+    for (const p of list) {
+      const nameKr = PLANET_KR[p.name];
+      if (!nameKr || typeof p.longitude !== 'number') continue;
+      planets[nameKr] = signDeg(p.longitude + ay); // 사이더리얼 → 트로피컬 보정
+    }
+    const asc = planets['상승점'];
+    const lines = [];
+    if (asc) {
+      const dsc = signDeg(asc.abs + 180);
+      lines.push(`상승점(ASC): ${asc.sign} ${asc.deg}도`);
+      lines.push(`7하우스(배우자궁) 시작점: ${dsc.sign} ${dsc.deg}도 ← 배우자 해석의 최우선 근거`);
+    }
+    for (const n of ['태양','달','수성','금성','화성','목성','토성']) {
+      if (!planets[n]) continue;
+      let houseTxt = '';
+      if (asc) {
+        const h = Math.floor((((planets[n].abs - asc.abs) + 360) % 360) / 30) + 1;
+        houseTxt = ` (${h}하우스${h === 7 ? ' ← 배우자궁 안에 있음! 매우 중요' : ''})`;
+      }
+      lines.push(`${n}: ${planets[n].sign} ${planets[n].deg}도${houseTxt}`);
+    }
+    return lines.join('\n');
+  } catch (e) { return null; }
+}
+
 const handler = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST 요청만 받습니다.' });
 
@@ -84,7 +131,12 @@ const handler = async (req, res) => {
             `https://api.prokerala.com/v2/astrology/planet-position?datetime=${encodeURIComponent(dateTimeIso)}&coordinates=${location.lat},${location.lon}&ayanamsa=1`,
             { headers: { 'Authorization': `Bearer ${tokenData.access_token}` } }
           );
-          if (astroResponse.ok) { const astroJson = await astroResponse.json(); astrologyDataText = JSON.stringify(astroJson.data); }
+          if (astroResponse.ok) {
+            const astroJson = await astroResponse.json();
+            const digest = buildChartDigest(astroJson.data, dateTimeIso);
+            astrologyDataText = digest || JSON.stringify(astroJson.data);
+            console.log("📊 차트 다이제스트:\n" + astrologyDataText);
+          }
         }
       }
     } catch (e) { console.log("⚠️ Prokerala Fallback (VIP):", e.message); }
@@ -110,8 +162,17 @@ const handler = async (req, res) => {
 1편에서 상처를 어루만지고 → 2편에서 그 상처가 실은 재능이었다고 뒤집어주고 → 3편에서 앞으로 나아갈 길을 밝혀주고 → 마지막으로 인생 전체의 흐름을 조망하는,
 한 편의 영화처럼 감정이 흐르게 써라. 앞 챕터에서 한 말이 뒷 챕터에서 자연스럽게 이어져야 한다.
 
-[실제 데이터] ${astrologyDataText}
+[정밀 계산된 네이탈 차트 - 트로피컬(서양식) 기준]\n${astrologyDataText}\n위 좌표는 실제 천체 계산 결과다. 반드시 이 데이터의 별자리/도수/하우스를 그대로 인용하고, 없는 배치를 지어내지 마라.
 [손님 정보] 이름: ${name} / 성별: ${myGender} / 출생지: ${city} / 생년월일시: ${date} ${time}
+
+
+[중심 서사 규칙 - 리포트 품질의 생명]
+위 차트에서 이 사람의 인생·상처·재능과 가장 관련 깊은 강력한 배치 1~2개를 골라라 (우선순위: ① 달/토성의 위치 → ② 12하우스나 8하우스의 행성 → ③ 태양의 위치).
+그 배치 하나를 리포트 전체를 관통하는 '중심 스토리'로 삼아, 세 챕터가 하나의 인생 이야기로 이어지게 하라.
+
+[문체 기준 - 반드시 이 수준으로]
+좋은 예: "<b>${name}님의 차트에는 금성·화성·토성 세 별이 전부 12하우스, 숨겨진 방에 몰려 있습니다.</b> 좋아하는 사람이 생겨도 티를 내지 못하고, 힘들어도 괜찮다는 말로 덮어온 것은 성격이 아니라 이 배치가 만든 오래된 습관입니다."
+나쁜 예(절대 금지): "힘드셨을 겁니다", "긍정적으로 생각하세요", "좋은 일이 있을 겁니다" 같은 하나마나한 덕담 / "~일 수 있습니다" 발뺌 화법 / 근거 없는 위로.
 
 [글 쓰는 방식 - 꼭 지켜]
 1. 🚨 [차트 근거 필수] 각 챕터마다 최소 1번, 해석을 말하기 전에 반드시 차트상의 근거를 먼저 밝혀라.
