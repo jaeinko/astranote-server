@@ -1,6 +1,9 @@
 // ✅ @google/generative-ai SDK 완전 제거 → fetch 직접 호출
 // ✅ 인생 전체 풀이 + 연령대별 운세 점수표 추가 버전
 
+// 🔥 [추가] Vercel Pro 플랜의 실행 시간을 90초로 연장하여 장문 생성 타임아웃 차단
+export const maxDuration = 90; 
+
 const allowCors = fn => async (req, res) => {
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -52,17 +55,13 @@ const cityCoordinates = {
   "Auckland": { lat: -36.8485, lon: 174.7633 }, "Overseas": { lat: 0, lon: 0 }
 };
 
-
-// ===== 🔬 차트 정밀 다이제스트 =====
-// Prokerala의 베딕(사이더리얼) 좌표를 서양 점성술(트로피컬)로 보정하고,
-// AI가 바로 이해할 수 있는 한국어 요약으로 변환합니다. 이게 리포트 품질의 핵심입니다.
 const SIGNS_KR = ['양자리','황소자리','쌍둥이자리','게자리','사자자리','처녀자리','천칭자리','전갈자리','사수자리','염소자리','물병자리','물고기자리'];
 const PLANET_KR = { Sun:'태양', Moon:'달', Mercury:'수성', Venus:'금성', Mars:'화성', Jupiter:'목성', Saturn:'토성', Ascendant:'상승점' };
 
 function lahiriAyanamsa(dateTimeIso) {
   const d = new Date(dateTimeIso);
   const y = d.getUTCFullYear() + (d.getUTCMonth() + 1) / 12;
-  return 23.853 + 0.013972 * (y - 2000); // 라히리 아야남샤 근사치
+  return 23.853 + 0.013972 * (y - 2000);
 }
 function signDeg(lon) {
   const l = ((lon % 360) + 360) % 360;
@@ -77,7 +76,7 @@ function buildChartDigest(data, dateTimeIso) {
     for (const p of list) {
       const nameKr = PLANET_KR[p.name];
       if (!nameKr || typeof p.longitude !== 'number') continue;
-      planets[nameKr] = signDeg(p.longitude + ay); // 사이더리얼 → 트로피컬 보정
+      planets[nameKr] = signDeg(p.longitude + ay);
     }
     const asc = planets['상승점'];
     const lines = [];
@@ -102,12 +101,14 @@ function buildChartDigest(data, dateTimeIso) {
 const handler = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST 요청만 받습니다.' });
 
-  console.log("✅ [1] gemini-vip.js 진입 성공");
+  // 🔥 [수정] 400 Bad Request 방지용 디버깅 로그 강화
+  console.log("✅ [1] gemini-vip.js 진입 성공. req.body:", req.body);
 
   try {
     const { name, date, time, city, myGender, targetGender } = req.body;
 
     if (!name || !date || !time) {
+      console.error(`❌ [400 에러 누락] name: ${name}, date: ${date}, time: ${time}`);
       return res.status(400).json({ error: '필수 입력값 누락' });
     }
     if (!process.env.GEMINI_API_KEY) {
@@ -143,7 +144,6 @@ const handler = async (req, res) => {
 
     console.log("✅ [2] Prokerala 완료, Gemini VIP 호출 시작");
 
-    // 🚨 오늘 날짜를 명시해서 AI가 과거 연도를 쓰는 버그 차단
     const now = new Date();
     const todayStr = `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일`;
 
@@ -165,62 +165,49 @@ const handler = async (req, res) => {
 [정밀 계산된 네이탈 차트 - 트로피컬(서양식) 기준]\n${astrologyDataText}\n위 좌표는 실제 천체 계산 결과다. 반드시 이 데이터의 별자리/도수/하우스를 그대로 인용하고, 없는 배치를 지어내지 마라.
 [손님 정보] 이름: ${name} / 성별: ${myGender} / 출생지: ${city} / 생년월일시: ${date} ${time}
 
-
 [중심 서사 규칙 - 리포트 품질의 생명]
 위 차트에서 이 사람의 인생·상처·재능과 가장 관련 깊은 강력한 배치 1~2개를 골라라 (우선순위: ① 달/토성의 위치 → ② 12하우스나 8하우스의 행성 → ③ 태양의 위치).
 그 배치 하나를 리포트 전체를 관통하는 '중심 스토리'로 삼아, 세 챕터가 하나의 인생 이야기로 이어지게 하라.
 
 [문체 기준 - 반드시 이 수준으로]
 좋은 예: "<b>${name}님의 차트에는 금성·화성·토성 세 별이 전부 12하우스, 숨겨진 방에 몰려 있습니다.</b> 좋아하는 사람이 생겨도 티를 내지 못하고, 힘들어도 괜찮다는 말로 덮어온 것은 성격이 아니라 이 배치가 만든 오래된 습관입니다."
-나쁜 예(절대 금지): "힘드셨을 겁니다", "긍정적으로 생각하세요", "좋은 일이 있을 겁니다" 같은 하나마나한 덕담 / "~일 수 있습니다" 발뺌 화법 / 근거 없는 위로.
 
 [글 쓰는 방식 - 꼭 지켜]
 1. 🚨 [차트 근거 필수] 각 챕터마다 최소 1번, 해석을 말하기 전에 반드시 차트상의 근거를 먼저 밝혀라.
-   형식: "<b>${name}님의 차트를 보면, 달이 OO자리 OO도에 자리하고 있습니다.</b> 이것이 말해주는 것은..." 처럼
    [차트 근거] → [해석] 순서로 써라. 위의 [실제 데이터]에 담긴 실제 행성 위치를 읽고 인용해라. 지어내지 마라.
-   단, 근거는 챕터당 1~2개만 굵고 명확하게. 용어를 줄줄이 나열하며 어렵게 만들지 마라.
-2. 근거를 댄 후의 설명은 사람 마음에 닿는 쉬운 말로 풀어라. "${name}님은~" 하고 이름을 직접 부르며, 눈을 마주보고 이야기하듯 따뜻하게.
-3. 뭉뚱그리지 마라. "힘드셨을 거예요"(X) → "당신은 정작 당신이 힘들 때 아무에게도 기대지 못하고 혼자 삼켜왔습니다"(O)처럼 콕 집어서 마음을 읽어줘라.
+2. 근거를 댄 후의 설명은 사람 마음에 닿는 쉬운 말로 풀어라. "${name}님은~" 하고 이름을 직접 부르며 따뜻하게.
+3. 뭉뚱그리지 말고 콕 집어서 마음을 읽어줘라.
 4. 위로만 하고 끝내지 마라. 반드시 희망과 구체적인 방향을 함께 줘라.
 5. 강조할 문장은 <b> 태그로. 마크다운(*) 절대 금지.
-6. vip_card1~3은 각 최소 1000자 이상, 깊이 있고 풍성하게.
-7. 결과는 순수 JSON 객체로만 출력. 앞뒤에 아무것도 붙이지 마.
-
-[🚨 연령대별 운세 점수 - 매우 중요]
-${name}님의 차트를 근거로 20대/30대/40대/50대/60대/70대 각 시기의 운세를 100점 만점으로 평가하라.
-- 점수는 시기마다 뚜렷하게 차이 나게 매겨라 (전부 비슷한 점수 금지. 최저와 최고가 20점 이상 차이 나야 함).
-- 각 시기마다 그 점수의 이유를 한두 문장으로: 무엇이 열리고 무엇을 조심해야 하는지.
-- 가장 점수 높은 시기가 '인생의 황금기'다. best_age에 그 시기를 적어라.
-- 손님의 생년월일(${date})을 보고 이미 지난 시기는 "그 시절 어떤 씨앗이 뿌려졌는지" 관점으로, 앞으로 올 시기는 "무엇이 기다리는지" 관점으로 써라.
+6. vip_card1~3은 각 최소 1000자 내외로 풍성하게 작성하라.
+7. 결과는 순수 JSON 객체로만 출력하라.
+8. 🚨 [JSON 보호 규칙] 데이터 내부 문자열 안에서 쌍따옴표(")를 직접 쓰지 말고, 강조나 인용은 반드시 홑따옴표(')로만 처리하라. 또한 텍스트 한가운데에서 실제 엔터(줄바꿈)를 치지 말고 긴 한 줄의 문장으로 작성하라.
 
 [출력 JSON 형식]
 {
-  "vip_card1": "(최소 1000자) [CHAPTER 01. 그동안, 얼마나 외로우셨어요] 먼저 ${name}님의 달/토성 위치를 차트 근거로 밝히고, 그로부터 지금까지 삶에서 남몰래 견뎌온 외로움과 상처를 깊이 알아주고 위로하라. 가족이든 사랑이든 반복돼온 아픔의 진짜 뿌리를 부드럽지만 정확하게 짚어줘라. 마지막엔 <blockquote>태그로 가슴을 울리는 한 문장을 남겨라.",
-  "vip_card2": "(최소 1000자) [CHAPTER 02. 당신의 그 상처가, 사실은 가장 큰 재능입니다] 재능과 직업을 보여주는 하우스/행성을 근거로 먼저 밝히고, 앞 챕터에서 짚은 상처와 예민함이 실은 남들은 못 가진 강력한 재능임을 감동적으로 뒤집어줘라. ${name}님에게 어울리는 구체적인 일/사업 방향과 앞으로 만들어갈 부(富)의 크기를 <b>강조</b>하며 희망차게 제시하라.",
-  "vip_card3": "(최소 1000자) [CHAPTER 03. 이제, 당신의 시간이 옵니다] 진짜 행복해지기 위해 놓아줘야 할 것과, 붙잡아야 할 기회를 알려줘라. 🚨운이 크게 열리는 시기를 반드시 구체적인 연도와 월(예: 2027년 상반기, 3월~6월)로 명시하고, 왜 그 시기인지 행성의 흐름을 근거로 설명하라. 시기 생략 절대 금지. 곁에 두면 당신을 갉아먹는 사람(레드플래그)은 <span style='color:#ff3b30;font-weight:900;'>빨간 글씨</span>로 분명히 경고하고, 마지막은 ${name}님을 굳게 믿어주는 뜨거운 축복으로 끝내라.",
+  "vip_card1": "[CHAPTER 01. 그동안, 얼마나 외로우셨어요] 먼저 ${name}님의 달/토성 위치를 차트 근거로 밝히고, 그동안 삶에서 견뎌온 외로움을 위로하라. 마지막엔 <blockquote>태그로 한 문장을 남겨라.",
+  "vip_card2": "[CHAPTER 02. 당신의 그 상처가, 사실은 가장 큰 재능입니다] 재능과 직업 하우스/행성 근거를 먼저 밝히고, 이 상처가 강력한 재능임을 입증하라. 구체적인 사업 방향과 부(富)의 크기를 <b>강조</b>하라.",
+  "vip_card3": "[CHAPTER 03. 이제, 당신의 시간이 옵니다] 놓아야 할 것과 붙잡아야 할 기회. 🚨운이 크게 열리는 시기를 구체적인 연도와 월로 명시하고 행성 흐름 근거를 대라. 레드플래그는 <span style='color:#ff3b30;font-weight:900;'>빨간 글씨</span>로 경고하라.",
   "life_score_20": 점수숫자만,
-  "life_desc_20": "(1~2문장) 20대의 흐름과 핵심 조언",
+  "life_desc_20": "20대의 흐름과 핵심 조언",
   "life_score_30": 점수숫자만,
-  "life_desc_30": "(1~2문장) 30대의 흐름과 핵심 조언",
+  "life_desc_30": "30대의 흐름과 핵심 조언",
   "life_score_40": 점수숫자만,
-  "life_desc_40": "(1~2문장) 40대의 흐름과 핵심 조언",
+  "life_desc_40": "40대의 흐름과 핵심 조언",
   "life_score_50": 점수숫자만,
-  "life_desc_50": "(1~2문장) 50대의 흐름과 핵심 조언",
+  "life_desc_50": "50대의 흐름과 핵심 조언",
   "life_score_60": 점수숫자만,
-  "life_desc_60": "(1~2문장) 60대의 흐름과 핵심 조언",
+  "life_desc_60": "60대의 흐름과 핵심 조언",
   "life_score_70": 점수숫자만,
-  "life_desc_70": "(1~2문장) 70대의 흐름과 핵심 조언",
+  "life_desc_70": "70대의 흐름과 핵심 조언",
   "best_age": "가장 점수 높은 연령대 (예: 40대)",
-  "best_age_reason": "(2~3문장) 왜 그 시기가 인생의 황금기인지, 차트 근거와 함께"
+  "best_age_reason": "왜 그 시기가 황금기인지 차트 근거와 함께"
 }
     `;
 
-    // ✅ Gemini v1beta 직접 호출
-    // - thinkingBudget 0: '생각' 기능 OFF → 응답속도 10~25초로 단축 (504 타임아웃 해결)
-    // - responseMimeType JSON: 순수 JSON만 답하도록 강제 (500 파싱에러 해결)
-    // - 실패 시 자동 1회 재시도 + 깨진 JSON 복구 파싱
     let parsedData = null;
     let lastErr = "";
+    
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         const geminiRes = await fetch(
@@ -231,8 +218,8 @@ ${name}님의 차트를 근거로 20대/30대/40대/50대/60대/70대 각 시기
             body: JSON.stringify({
               contents: [{ parts: [{ text: prompt }] }],
               generationConfig: {
-                maxOutputTokens: 24576,
-                temperature: 0.95,
+                maxOutputTokens: 8192, // 🔥 [수정] 지나치게 큰 토큰(24576)은 추론 컨텍스트를 늘려 연산을 지연시키므로 8192로 현실화
+                temperature: 0.75,     // 🔥 [수정] 0.95는 형식을 망가뜨릴 확률이 극도로 높으므로 0.75로 낮춰 완벽한 JSON 구조 유지
                 responseMimeType: "application/json",
                 thinkingConfig: { thinkingBudget: 0 }
               }
@@ -250,24 +237,32 @@ ${name}님의 차트를 근거로 20대/30대/40대/50대/60대/70대 각 시기
         console.log(`✅ [3] Gemini 응답 수신 (시도 ${attempt})`);
 
         const parts = (geminiData.candidates && geminiData.candidates[0] && geminiData.candidates[0].content && geminiData.candidates[0].content.parts) || [];
-        const responseText = parts.map(p => p.text || "").join("");
+        let responseText = parts.map(p => p.text || "").join("");
+        
+        // 🔥 [추가] Bad control character (\n, \r) 에러 원천 차단 방어 로직
+        // 문자열 중간의 생줄바꿈을 JSON이 인식 가능한 안전한 형태로 정제합니다.
         const s = responseText.indexOf("{");
         const e = responseText.lastIndexOf("}");
         if (s === -1 || e === -1) {
-          lastErr = "응답에 JSON 없음: " + responseText.slice(0, 200);
-          console.error(`🔥 [시도 ${attempt}]`, lastErr);
+          lastErr = "응답에 JSON 구조가 잡히지 않았습니다.";
           continue;
         }
-        parsedData = JSON.parse(responseText.slice(s, e + 1));
-        break;
+        
+        let targetString = responseText.slice(s, e + 1);
+        
+        // 제어 문자 및 누수된 줄바꿈 기호 정화
+        targetString = targetString.replace(/[\u0000-\u0019]+/g, " "); 
+        
+        parsedData = JSON.parse(targetString);
+        break; // 파싱 성공 시 루프 탈출
       } catch (err) {
         lastErr = err.message;
-        console.error(`🔥 [시도 ${attempt}] 실패:`, err.message);
+        console.error(`🔥 [시도 ${attempt}] 파싱 에러 복구 실패:`, err.message);
       }
     }
 
     if (!parsedData) {
-      return res.status(500).json({ error: `[Gemini VIP 실패] ${lastErr}` });
+      return res.status(500).json({ error: `[Gemini VIP 최종 실패] ${lastErr}` });
     }
 
     console.log("✅ [4] JSON 파싱 성공, VIP 응답 전송");
