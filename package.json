@@ -1,7 +1,6 @@
 {
-  "name": "astralog-server",
+  "name": "astranote-server",
   "version": "1.0.0",
-  "dependencies": {
-    "@google/generative-ai": "^0.2.1"
-  }
+  "description": "Astranote - Western astrology spouse report API",
+  "private": true
 }
