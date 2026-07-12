@@ -1,5 +1,7 @@
 // ✅ @google/generative-ai SDK 완전 제거 → fetch 직접 호출로 패키지 버전 문제 원천 차단
 
+const { kv } = require('@vercel/kv');
+
 const allowCors = fn => async (req, res) => {
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -99,6 +101,20 @@ function buildChartDigest(data, dateTimeIso) {
 }
 
 const handler = async (req, res) => {
+  // 🚨 [다시보기 기능] GET + orderId → 이미 저장된 리포트를 KV에서 즉시 조회
+  // 회원/비회원, 어느 기기로 접속하든 주문번호만 있으면 리포트를 다시 볼 수 있다.
+  if (req.method === 'GET') {
+    const orderId = req.query && req.query.orderId;
+    if (!orderId) return res.status(400).json({ error: 'orderId 필요' });
+    try {
+      const saved = await kv.get(`report:${orderId}`);
+      if (saved) return res.status(200).json(saved);
+      return res.status(404).json({ error: '저장된 리포트 없음' });
+    } catch (e) {
+      return res.status(500).json({ error: 'KV 조회 실패: ' + e.message });
+    }
+  }
+
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST 요청만 받습니다.' });
 
   console.log("✅ [1] gemini.js 진입 성공");
@@ -195,7 +211,7 @@ const handler = async (req, res) => {
       "card2_analysis": "(최소 500자) 당신은 어떤 사람인지. 먼저 당신의 태양/달 별자리 위치를 근거로 밝히고, 성향과 연애에서 반복돼온 패턴을 따뜻하지만 정확하게 짚어라.",
       "card3_appearance": "(최소 500자) 배우자의 외모. 먼저 7하우스의 별자리와 행성을 근거로 밝히고('당신의 7하우스에는 OO이...'), 그로부터 첫인상/눈빛/체형/분위기/스타일을 사진 보듯 생생하게. 곰돌이상, 여우상 같은 비유도 좋다.",
       "card4_career": "(최소 500자) 배우자의 직업과 성격. 7하우스와 관련 행성을 근거로 먼저 밝히고, 어떤 일을 하는 사람인지, 돈은 어떻게 쓰는지, 당신을 어떻게 대할지를 구체적으로.",
-      "card5_timing": "(최소 700자) [필수] 만나는 시기를 반드시 서로 다른 3개의 구간으로 제시하라. 형식: '① 첫 번째 인연의 신호가 오는 시기(가장 가까운 미래) → ② 가장 강력한 결정적 만남의 시기 → ③ 관계가 결실(약속/결혼)로 무르익는 시기'. 세 시기 모두 반드시 구체적인 연도와 월(예: 2026년 하반기 10~12월 / 2027년 5~9월 / 2028년 봄 3~5월)로 못 박아라. 🚨오늘 날짜 이후의 미래 시점만 써라. 각 시기마다 왜 그때인지 행성의 흐름(목성/토성의 이동 등)을 근거로 짧게 설명하라. 그리고 어떻게 만나는지(소개/우연/이미 아는 사이 등)와 첫 만남의 순간을 영화처럼 실감나게 그려라. 시기 생략이나 뭉뚱그리기 절대 금지.",
+      "card5_timing": "(최소 700자) [필수] 만나는 시기를 반드시 서로 다른 3개의 구간으로 제시하라. 형식: '① 첫 번째 인연의 신호가 오는 시기(가장 가까운 미래) → ② 가장 강력한 결정적 만남의 시기 → ③ 관계가 결실(약속/결혼)로 무르익는 시기'. 🚨🚨 [연도 계산 절대 규칙] 절대로 2026/2027/2028년을 기본값으로 쓰지 마라. 반드시 위에 제공된 이 사람의 실제 목성·토성 위치와 7하우스 각도를 근거로, 목성이 12년 주기로 언제 이 사람의 7하우스나 배우자 관련 별자리에 도달하는지 실제로 계산하라. 그 결과 시기는 사람마다 완전히 달라야 하며, 2029년, 2030년, 2031년 이후가 나오는 것도 지극히 정상이고 오히려 바람직하다. 모든 리포트가 비슷한 연도로 나오면 치명적 실패다. 세 시기 모두 구체적인 연도와 월로 못 박되, 그 연도는 반드시 이 사람 고유의 계산 결과여야 한다. 🚨오늘 날짜 이후의 미래 시점만 써라. 각 시기마다 왜 그때인지 행성의 흐름을 근거로 짧게 설명하라. 그리고 어떻게 만나는지와 첫 만남의 순간을 영화처럼 실감나게 그려라. 시기 생략이나 뭉뚱그리기 절대 금지.",
       "card6_chemistry": "(최소 400자) 두 사람의 케미. 두 기운이 만나는 지점을 근거로 밝히고, 어떤 점이 잘 맞고 어떻게 끌리는지를 <b>강조</b> 섞어 감동적으로.",
       "card7_destiny_guide": "(최소 500자) 좋은 인연을 잡기 위한 조언과 응원. 단, 만나면 힘들어지는 '피해야 할 상대의 특징(레드플래그)'은 <span style='color:#ff3b30;font-weight:900;'>빨간 글씨</span>로 분명하게 경고하라.",
       "card8_teaser": "(더 깊은 리포트를 권하는 미끼 3문장)"
@@ -258,6 +274,18 @@ const handler = async (req, res) => {
     }
 
     console.log("✅ [4] JSON 파싱 성공, 응답 전송");
+
+    // 🚨 [다시보기 기능] 주문번호가 함께 왔으면 KV에 30일간 저장
+    // → 이후 GET ?orderId=... 로 언제 어디서든 재조회 가능
+    if (req.body.orderId) {
+      try {
+        await kv.set(`report:${req.body.orderId}`, parsedData, { ex: 60 * 60 * 24 * 30 });
+        console.log("💾 KV 저장 완료: report:" + req.body.orderId);
+      } catch (e) {
+        console.log("⚠️ KV 저장 실패(리포트 전송은 정상 진행):", e.message);
+      }
+    }
+
     res.status(200).json(parsedData);
 
   } catch (error) {
