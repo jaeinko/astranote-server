@@ -1,6 +1,8 @@
 // ✅ @google/generative-ai SDK 완전 제거 → fetch 직접 호출
 // ✅ 인생 전체 풀이 + 연령대별 운세 점수표 추가 버전
 
+const { kv } = require('@vercel/kv');
+
 const allowCors = fn => async (req, res) => {
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -100,6 +102,19 @@ function buildChartDigest(data, dateTimeIso) {
 }
 
 const handler = async (req, res) => {
+  // 🚨 [다시보기 기능] GET + orderId → 저장된 VIP 리포트 즉시 조회
+  if (req.method === 'GET') {
+    const orderId = req.query && req.query.orderId;
+    if (!orderId) return res.status(400).json({ error: 'orderId 필요' });
+    try {
+      const saved = await kv.get(`vip-report:${orderId}`);
+      if (saved) return res.status(200).json(saved);
+      return res.status(404).json({ error: '저장된 리포트 없음' });
+    } catch (e) {
+      return res.status(500).json({ error: 'KV 조회 실패: ' + e.message });
+    }
+  }
+
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST 요청만 받습니다.' });
 
   console.log("✅ [1] gemini-vip.js 진입 성공");
@@ -197,7 +212,7 @@ ${name}님의 차트를 근거로 20대/30대/40대/50대/60대/70대 각 시기
 {
   "vip_card1": "(최소 1000자) [CHAPTER 01. 그동안, 얼마나 외로우셨어요] 먼저 ${name}님의 달/토성 위치를 차트 근거로 밝히고, 그로부터 지금까지 삶에서 남몰래 견뎌온 외로움과 상처를 깊이 알아주고 위로하라. 가족이든 사랑이든 반복돼온 아픔의 진짜 뿌리를 부드럽지만 정확하게 짚어줘라. 마지막엔 <blockquote>태그로 가슴을 울리는 한 문장을 남겨라.",
   "vip_card2": "(최소 1000자) [CHAPTER 02. 당신의 그 상처가, 사실은 가장 큰 재능입니다] 재능과 직업을 보여주는 하우스/행성을 근거로 먼저 밝히고, 앞 챕터에서 짚은 상처와 예민함이 실은 남들은 못 가진 강력한 재능임을 감동적으로 뒤집어줘라. ${name}님에게 어울리는 구체적인 일/사업 방향과 앞으로 만들어갈 부(富)의 크기를 <b>강조</b>하며 희망차게 제시하라.",
-  "vip_card3": "(최소 1000자) [CHAPTER 03. 이제, 당신의 시간이 옵니다] 진짜 행복해지기 위해 놓아줘야 할 것과, 붙잡아야 할 기회를 알려줘라. 🚨운이 크게 열리는 시기를 반드시 구체적인 연도와 월(예: 2027년 상반기, 3월~6월)로 명시하고, 왜 그 시기인지 행성의 흐름을 근거로 설명하라. 시기 생략 절대 금지. 곁에 두면 당신을 갉아먹는 사람(레드플래그)은 <span style='color:#ff3b30;font-weight:900;'>빨간 글씨</span>로 분명히 경고하고, 마지막은 ${name}님을 굳게 믿어주는 뜨거운 축복으로 끝내라.",
+  "vip_card3": "(최소 1000자) [CHAPTER 03. 이제, 당신의 시간이 옵니다] 진짜 행복해지기 위해 놓아줘야 할 것과, 붙잡아야 할 기회를 알려줘라. 🚨🚨[연도 계산 절대 규칙] 운이 크게 열리는 시기를 반드시 구체적인 연도와 월로 명시하되, 절대로 2026~2028년을 기본값처럼 쓰지 마라. 위에 제공된 이 사람의 실제 목성·토성 위치를 근거로 실제 계산하라. 사람마다 시기가 완전히 달라야 하며 2029년, 2030년 이후가 나오는 것도 정상이다. 모든 사람이 비슷한 연도로 나오면 치명적 실패다. 왜 그 시기인지 행성의 흐름을 근거로 설명하라. 시기 생략 절대 금지. 곁에 두면 당신을 갉아먹는 사람(레드플래그)은 <span style='color:#ff3b30;font-weight:900;'>빨간 글씨</span>로 분명히 경고하고, 마지막은 ${name}님을 굳게 믿어주는 뜨거운 축복으로 끝내라.",
   "life_score_20": 점수숫자만,
   "life_desc_20": "(1~2문장) 20대의 흐름과 핵심 조언",
   "life_score_30": 점수숫자만,
@@ -271,6 +286,16 @@ ${name}님의 차트를 근거로 20대/30대/40대/50대/60대/70대 각 시기
     }
 
     console.log("✅ [4] JSON 파싱 성공, VIP 응답 전송");
+
+    if (req.body.orderId) {
+      try {
+        await kv.set(`vip-report:${req.body.orderId}`, parsedData, { ex: 60 * 60 * 24 * 30 });
+        console.log("💾 KV 저장 완료: vip-report:" + req.body.orderId);
+      } catch (e) {
+        console.log("⚠️ KV 저장 실패(리포트 전송은 정상 진행):", e.message);
+      }
+    }
+
     res.status(200).json(parsedData);
 
   } catch (error) {
