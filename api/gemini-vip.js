@@ -87,18 +87,116 @@ function buildChartDigest(data, dateTimeIso) {
       const dsc = signDeg(asc.abs + 180);
       lines.push(`상승점(ASC): ${asc.sign} ${asc.deg}도`);
       lines.push(`7하우스(배우자궁) 시작점: ${dsc.sign} ${dsc.deg}도 ← 배우자 해석의 최우선 근거`);
+
+      // 🪐 실제 계산된 목성 트랜짓 (사람마다 달라야 하는 만남 시기의 유일한 근거)
+      const jupiterWindows = findJupiterTransitWindows(dsc.abs);
+      if (jupiterWindows) {
+        lines.push(`\n[실제 계산된 목성 트랜짓 - 이 시기만 만남 시기로 사용하라]`);
+        jupiterWindows.forEach((w, i) => lines.push(`${i+1}순위 시기: ${w}`));
+      } else {
+        lines.push(`\n[실제 계산 결과] 향후 8년간(~2034년) 목성이 배우자궁과 뚜렷한 각을 맺는 시기가 없다. 이 경우 만남 시기를 단정하지 말고, "현재는 특별히 두드러진 트랜짓이 없어 시기보다 태도와 만남의 자리를 넓히는 데 집중할 시점"이라고 정직하게 안내하라. 없는 시기를 지어내지 마라.`);
+      }
     }
+    // 하우스별 인생 영역 의미 (리포트 깊이의 핵심 재료)
+    const HOUSE_MEANING = {
+      1: '자아·타고난 기질·첫인상',
+      2: '돈·자존감·타고난 재능',
+      3: '소통·형제자매·초년 학습환경',
+      4: '부모·가정·뿌리·마음의 안식처',
+      5: '연애·자녀·창조성·즐거움',
+      6: '일상·건강·직장생활·성실함',
+      7: '배우자·결혼·1:1 관계 ★핵심',
+      8: '깊은 결속·상처·타인의 자원·변형',
+      9: '배움·여행·먼 곳·신념',
+      10: '커리어·사회적 지위·명예',
+      11: '인간관계·인맥·꿈과 소망',
+      12: '무의식·숨겨진 상처·혼자만의 세계'
+    };
+
+    const houseMap = {};  // 하우스별 행성 모음 (스텔리움 탐지용)
     for (const n of ['태양','달','수성','금성','화성','목성','토성']) {
       if (!planets[n]) continue;
       let houseTxt = '';
       if (asc) {
         const h = Math.floor((((planets[n].abs - asc.abs) + 360) % 360) / 30) + 1;
-        houseTxt = ` (${h}하우스${h === 7 ? ' ← 배우자궁 안에 있음! 매우 중요' : ''})`;
+        houseMap[h] = houseMap[h] || [];
+        houseMap[h].push(n);
+        houseTxt = ` (${h}하우스 = ${HOUSE_MEANING[h]}${h === 7 ? ' ★배우자궁 안! 최우선 근거' : ''})`;
       }
       lines.push(`${n}: ${planets[n].sign} ${planets[n].deg}도${houseTxt}`);
     }
+
+    // 🔬 이 사람만의 '특이 배치' 자동 탐지 → AI가 중심 스토리로 삼을 재료
+    const highlights = [];
+    for (const [h, ps] of Object.entries(houseMap)) {
+      if (ps.length >= 2) {
+        highlights.push(`【스텔리움】 ${h}하우스(${HOUSE_MEANING[h]})에 ${ps.join('·')} ${ps.length}개가 몰려 있다 → 이 사람 인생의 최대 화두. 반드시 깊게 다뤄라.`);
+      }
+    }
+    if (houseMap[7]) highlights.push(`【배우자궁의 행성】 7하우스 안에 ${houseMap[7].join('·')}이 있다 → 배우자 해석의 결정적 단서.`);
+    if (houseMap[12]) highlights.push(`【숨겨진 상처】 12하우스에 ${houseMap[12].join('·')}이 있다 → 남에게 말 못 한 감정·억눌린 패턴이 있다. 이걸 짚으면 소름 돋는다.`);
+    if (houseMap[4]) highlights.push(`【부모·뿌리】 4하우스에 ${houseMap[4].join('·')}이 있다 → 가정환경과 부모와의 관계가 이 사람 성격 형성에 결정적이었다.`);
+    if (houseMap[11]) highlights.push(`【인간관계】 11하우스에 ${houseMap[11].join('·')}이 있다 → 인맥·모임·친구 관계가 인생에서 큰 비중을 차지한다.`);
+    if (houseMap[8]) highlights.push(`【깊은 상처와 변형】 8하우스에 ${houseMap[8].join('·')}이 있다 → 얕은 관계로는 만족 못 하는 사람. 깊은 결속을 갈망한다.`);
+
+    if (highlights.length) {
+      lines.push('\n[🔬 이 사람만의 특이 배치 - 중심 스토리로 반드시 활용하라]');
+      highlights.forEach(h => lines.push(h));
+    }
     return lines.join('\n');
   } catch (e) { return null; }
+}
+
+
+// ===== 🪐 실제 목성 트랜짓 계산 (2026.08 ~ 2034.12, 매달) =====
+// 사람마다 배우자궁을 지나는 진짜 시기가 다르도록, 실제 천문 계산값을 표로 저장해두고 조회한다.
+// 이렇게 해야 모든 손님의 만남 시기가 2026~2028로 획일화되는 문제가 사라진다.
+const JUPITER_TABLE_START = { year: 2026, month: 8 };
+const JUPITER_LON_TABLE = [126.96,133.7,139.59,144.32,146.79,146.44,143.35,139.75,137.23,137.49,140.41,145.13,151.2,157.84,164.27,170.28,174.81,177.31,176.9,174.08,170.18,167.79,168.03,170.79,175.57,181.59,187.99,194.6,200.38,204.96,207.28,206.89,203.95,200.22,197.76,197.94,200.73,205.53,211.39,218.07,224.54,230.57,235.17,237.39,237.11,234.33,230.5,228.06,228.19,231.01,235.72,241.9,248.52,255.37,261.56,265.92,268.66,268.61,265.9,262.17,259.5,259.53,262.23,267.17,273.31,280.36,287.44,293.49,298.64,301.6,301.9,299.51,295.63,292.76,292.59,295.31,300.16,306.66,313.91,320.52,327.3,332.71,336.34,337.28,335.32,331.47,328.28,327.59,329.89,334.74,341.23,347.82,355.28,2.1,8.1,12.22,13.94,12.61,9.06,5.35,4.03];
+
+function angleDiff(a, b) {
+  let d = Math.abs(a - b) % 360;
+  return d > 180 ? 360 - d : d;
+}
+
+function findJupiterTransitWindows(targetDeg) {
+  // 합(0도, orb 6도) 우선 탐색 → 없으면 삼각(120도)/육각(60도) 약한 신호로 대체
+  const aspects = [
+    { name: '합(강력)', angle: 0, orb: 6 },
+    { name: '삼각(우호적)', angle: 120, orb: 5 },
+    { name: '삼각(우호적)', angle: 240, orb: 5 },
+    { name: '육각(가벼운 기회)', angle: 60, orb: 4 },
+    { name: '육각(가벼운 기회)', angle: 300, orb: 4 }
+  ];
+
+  for (const asp of aspects) {
+    const hits = [];
+    let inWindow = false;
+    let windowStart = null;
+    for (let i = 0; i < JUPITER_LON_TABLE.length; i++) {
+      const diff = angleDiff(JUPITER_LON_TABLE[i], (targetDeg + asp.angle) % 360);
+      const within = diff <= asp.orb;
+      if (within && !inWindow) { inWindow = true; windowStart = i; }
+      if (!within && inWindow) {
+        inWindow = false;
+        hits.push([windowStart, i - 1]);
+      }
+    }
+    if (inWindow) hits.push([windowStart, JUPITER_LON_TABLE.length - 1]);
+
+    if (hits.length > 0) {
+      // 아직 안 지난(미래) 구간만, 최대 3개까지
+      const results = hits.slice(0, 3).map(([s, e]) => {
+        const sy = JUPITER_TABLE_START.year + Math.floor((JUPITER_TABLE_START.month - 1 + s) / 12);
+        const sm = ((JUPITER_TABLE_START.month - 1 + s) % 12) + 1;
+        const ey = JUPITER_TABLE_START.year + Math.floor((JUPITER_TABLE_START.month - 1 + e) / 12);
+        const em = ((JUPITER_TABLE_START.month - 1 + e) % 12) + 1;
+        return ;
+      });
+      return results;
+    }
+  }
+  return null; // 8년 내 뚜렷한 트랜짓 없음
 }
 
 const handler = async (req, res) => {
@@ -212,7 +310,7 @@ ${name}님의 차트를 근거로 20대/30대/40대/50대/60대/70대 각 시기
 {
   "vip_card1": "(최소 1000자) [CHAPTER 01. 그동안, 얼마나 외로우셨어요] 먼저 ${name}님의 달/토성 위치를 차트 근거로 밝히고, 그로부터 지금까지 삶에서 남몰래 견뎌온 외로움과 상처를 깊이 알아주고 위로하라. 가족이든 사랑이든 반복돼온 아픔의 진짜 뿌리를 부드럽지만 정확하게 짚어줘라. 마지막엔 <blockquote>태그로 가슴을 울리는 한 문장을 남겨라.",
   "vip_card2": "(최소 1000자) [CHAPTER 02. 당신의 그 상처가, 사실은 가장 큰 재능입니다] 재능과 직업을 보여주는 하우스/행성을 근거로 먼저 밝히고, 앞 챕터에서 짚은 상처와 예민함이 실은 남들은 못 가진 강력한 재능임을 감동적으로 뒤집어줘라. ${name}님에게 어울리는 구체적인 일/사업 방향과 앞으로 만들어갈 부(富)의 크기를 <b>강조</b>하며 희망차게 제시하라.",
-  "vip_card3": "(최소 1000자) [CHAPTER 03. 이제, 당신의 시간이 옵니다] 진짜 행복해지기 위해 놓아줘야 할 것과, 붙잡아야 할 기회를 알려줘라. 🚨🚨[연도 계산 절대 규칙] 운이 크게 열리는 시기를 반드시 구체적인 연도와 월로 명시하되, 절대로 2026~2028년을 기본값처럼 쓰지 마라. 위에 제공된 이 사람의 실제 목성·토성 위치를 근거로 실제 계산하라. 사람마다 시기가 완전히 달라야 하며 2029년, 2030년 이후가 나오는 것도 정상이다. 모든 사람이 비슷한 연도로 나오면 치명적 실패다. 왜 그 시기인지 행성의 흐름을 근거로 설명하라. 시기 생략 절대 금지. 곁에 두면 당신을 갉아먹는 사람(레드플래그)은 <span style='color:#ff3b30;font-weight:900;'>빨간 글씨</span>로 분명히 경고하고, 마지막은 ${name}님을 굳게 믿어주는 뜨거운 축복으로 끝내라.",
+  "vip_card3": "(최소 1000자) [CHAPTER 03. 이제, 당신의 시간이 옵니다] 진짜 행복해지기 위해 놓아줘야 할 것과, 붙잡아야 할 기회를 알려줘라. 🚨🚨 [연도는 반드시 계산된 값 그대로] 위 [정밀 계산된 네이탈 차트]에 있는 \'실제 계산된 목성 트랜짓\' 항목을 그대로 인용하라. 절대로 임의의 연도(2026~2028 등)로 바꾸지 마라. 트랜짓이 여러 개면 순서대로 언급하고, \'뚜렷한 트랜짓이 없다\'는 결과라면 그 사실을 정직하게 인정하며 시기보다 태도·행동에 집중하라는 방향으로 안내하라. 왜 그 시기인지(목성이 배우자궁과 이루는 각도)를 짧게 설명하라. 시기 생략이나 임의 변경 절대 금지. 곁에 두면 당신을 갉아먹는 사람(레드플래그)은 <span style=\'color:#ff3b30;font-weight:900;\'>빨간 글씨</span>로 분명히 경고하고, 마지막은 ${name}님을 굳게 믿어주는 뜨거운 축복으로 끝내라.",
   "life_score_20": 점수숫자만,
   "life_desc_20": "(1~2문장) 20대의 흐름과 핵심 조언",
   "life_score_30": 점수숫자만,
@@ -236,7 +334,7 @@ ${name}님의 차트를 근거로 20대/30대/40대/50대/60대/70대 각 시기
     // - 실패 시 자동 1회 재시도 + 깨진 JSON 복구 파싱
     let parsedData = null;
     let lastErr = "";
-    for (let attempt = 1; attempt <= 2; attempt++) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         const geminiRes = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
@@ -258,6 +356,10 @@ ${name}님의 차트를 근거로 20대/30대/40대/50대/60대/70대 각 시기
         if (!geminiRes.ok) {
           lastErr = `Gemini ${geminiRes.status}: ${await geminiRes.text()}`;
           console.error(`🔥 [시도 ${attempt}]`, lastErr);
+          // 🚨 503(일시적 과부하)이면 살짝 기다렸다가 재시도 → 구글 서버 회복 시간 확보
+          if (geminiRes.status === 503) {
+            await new Promise(r => setTimeout(r, 1500 * attempt));
+          }
           continue;
         }
 
