@@ -390,7 +390,8 @@ ${name}님의 차트를 근거로 20대/30대/40대/50대/60대/70대 각 시기
     `;
 
     // ✅ Gemini v1beta 직접 호출
-    // - thinkingBudget 0: '생각' 기능 OFF → 응답속도 10~25초로 단축 (504 타임아웃 해결)
+    // - thinkingBudget 6144: '생각' 기능 ON → 차트를 깊이 분석해 리포트 품질 대폭 상승
+    //   (vercel.json에서 실행시간 300초 확보했으므로 타임아웃 걱정 없음)
     // - responseMimeType JSON: 순수 JSON만 답하도록 강제 (500 파싱에러 해결)
     // - 실패 시 자동 1회 재시도 + 깨진 JSON 복구 파싱
     let parsedData = null;
@@ -408,7 +409,7 @@ ${name}님의 차트를 근거로 20대/30대/40대/50대/60대/70대 각 시기
                 maxOutputTokens: 24576,
                 temperature: 0.95,
                 responseMimeType: "application/json",
-                thinkingConfig: { thinkingBudget: 0 }
+                thinkingConfig: { thinkingBudget: 6144 }
               }
             })
           }
