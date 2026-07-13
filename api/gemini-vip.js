@@ -90,9 +90,13 @@ function buildChartDigest(data, dateTimeIso) {
 
       // 🪐 실제 계산된 목성 트랜짓 (사람마다 달라야 하는 만남 시기의 유일한 근거)
       const jupiterWindows = findJupiterTransitWindows(dsc.abs);
-      if (jupiterWindows) {
+      // 🚨 안전장치: 결과가 비었거나 undefined가 섞이면 '없음'으로 처리 (리포트에 undefined 노출 방지)
+      const validWindows = (jupiterWindows || []).filter(function(w) {
+        return typeof w === 'string' && w.length > 0 && w.indexOf('undefined') === -1;
+      });
+      if (validWindows.length > 0) {
         lines.push(`\n[실제 계산된 목성 트랜짓 - 이 시기만 만남 시기로 사용하라]`);
-        jupiterWindows.forEach((w, i) => lines.push(`${i+1}순위 시기: ${w}`));
+        validWindows.forEach((w, i) => lines.push((i+1) + '순위 시기: ' + w));
       } else {
         lines.push(`\n[실제 계산 결과] 향후 8년간(~2034년) 목성이 배우자궁과 뚜렷한 각을 맺는 시기가 없다. 이 경우 만남 시기를 단정하지 말고, "현재는 특별히 두드러진 트랜짓이 없어 시기보다 태도와 만남의 자리를 넓히는 데 집중할 시점"이라고 정직하게 안내하라. 없는 시기를 지어내지 마라.`);
       }
@@ -180,17 +184,17 @@ function angleDiff(a, b) {
 }
 
 function findJupiterTransitWindows(targetDeg) {
-  // 합(0도, orb 6도) 우선 탐색 → 없으면 삼각(120도)/육각(60도) 약한 신호로 대체
+  // 여러 각도를 모두 수집한 뒤 시간순 정렬 → 가까운 미래부터 제시
   const aspects = [
-    { name: '합(강력)', angle: 0, orb: 6 },
-    { name: '삼각(우호적)', angle: 120, orb: 5 },
-    { name: '삼각(우호적)', angle: 240, orb: 5 },
-    { name: '육각(가벼운 기회)', angle: 60, orb: 4 },
-    { name: '육각(가벼운 기회)', angle: 300, orb: 4 }
+    { name: '합 · 강력', angle: 0, orb: 6, weight: 3 },
+    { name: '삼각 · 우호적', angle: 120, orb: 5, weight: 2 },
+    { name: '삼각 · 우호적', angle: 240, orb: 5, weight: 2 },
+    { name: '육각 · 기회', angle: 60, orb: 4, weight: 1 },
+    { name: '육각 · 기회', angle: 300, orb: 4, weight: 1 }
   ];
 
+  const all = [];
   for (const asp of aspects) {
-    const hits = [];
     let inWindow = false;
     let windowStart = null;
     for (let i = 0; i < JUPITER_LON_TABLE.length; i++) {
@@ -199,24 +203,29 @@ function findJupiterTransitWindows(targetDeg) {
       if (within && !inWindow) { inWindow = true; windowStart = i; }
       if (!within && inWindow) {
         inWindow = false;
-        hits.push([windowStart, i - 1]);
+        all.push({ start: windowStart, end: i - 1, name: asp.name, weight: asp.weight });
       }
     }
-    if (inWindow) hits.push([windowStart, JUPITER_LON_TABLE.length - 1]);
-
-    if (hits.length > 0) {
-      // 아직 안 지난(미래) 구간만, 최대 3개까지
-      const results = hits.slice(0, 3).map(([s, e]) => {
-        const sy = JUPITER_TABLE_START.year + Math.floor((JUPITER_TABLE_START.month - 1 + s) / 12);
-        const sm = ((JUPITER_TABLE_START.month - 1 + s) % 12) + 1;
-        const ey = JUPITER_TABLE_START.year + Math.floor((JUPITER_TABLE_START.month - 1 + e) / 12);
-        const em = ((JUPITER_TABLE_START.month - 1 + e) % 12) + 1;
-        return ;
-      });
-      return results;
+    if (inWindow) {
+      all.push({ start: windowStart, end: JUPITER_LON_TABLE.length - 1, name: asp.name, weight: asp.weight });
     }
   }
-  return null; // 8년 내 뚜렷한 트랜짓 없음
+
+  if (all.length === 0) return null;
+
+  // 시간순 정렬 (가까운 미래부터)
+  all.sort(function(a, b) { return a.start - b.start; });
+
+  return all.slice(0, 3).map(function(w) {
+    const sy = JUPITER_TABLE_START.year + Math.floor((JUPITER_TABLE_START.month - 1 + w.start) / 12);
+    const sm = ((JUPITER_TABLE_START.month - 1 + w.start) % 12) + 1;
+    const ey = JUPITER_TABLE_START.year + Math.floor((JUPITER_TABLE_START.month - 1 + w.end) / 12);
+    const em = ((JUPITER_TABLE_START.month - 1 + w.end) % 12) + 1;
+    const period = (sy === ey)
+      ? sy + '년 ' + sm + '월~' + em + '월'
+      : sy + '년 ' + sm + '월 ~ ' + ey + '년 ' + em + '월';
+    return period + ' (목성 ' + w.name + ')';
+  });
 }
 
 
@@ -308,6 +317,10 @@ const handler = async (req, res) => {
     const todayStr = `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일`;
 
     const prompt = `
+[🚨🚨 절대 금지 - 최우선]
+'undefined', 'null', 'NaN', '트랜짓 항목', '데이터에 없음' 같은 개발자/시스템 용어를 리포트 본문에 절대 쓰지 마라.
+손님은 일반인이다. 시스템 내부 사정을 손님에게 설명하지 마라. 만약 어떤 정보가 계산되지 않았다면, 그 사실을 언급하지 말고 자연스럽게 다른 근거로 서술하라.
+
 [🚨 시간 기준 - 최우선 규칙]
 오늘은 ${todayStr}이다. 너의 학습 데이터 기준 연도가 아니라 이 날짜가 진짜 현재다.
 만남/기회/운이 열리는 시기 등 모든 미래 예측 시기는 반드시 오늘(${todayStr}) 이후의 연도와 월로만 써라.
