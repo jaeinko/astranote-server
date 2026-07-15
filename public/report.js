@@ -109,13 +109,13 @@ let ASTRO_USER_DATA = null;
     function runAnalysis() {
         isRendered = false;
 
-        // 60초 내 응답 없으면 재시도 화면 표시
+        // 280초 내 응답 없으면 재시도 화면 표시 (긴 리포트 생성 대비)
         safetyTimer = setTimeout(() => {
             if (!isRendered) {
                 console.warn("서버 타임아웃 → 재시도 안내 표시");
                 showRetryScreen();
             }
-        }, 60000);
+        }, 290000);
 
         fetch('https://astranote-server.vercel.app/api/gemini', {
             method: 'POST',
