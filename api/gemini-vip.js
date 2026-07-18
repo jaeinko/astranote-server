@@ -262,7 +262,7 @@ function buildChartDigest(data, dateTimeIso) {
       if (!planets[n]) continue;
       let houseTxt = '';
       if (asc) {
-        const h = Math.floor((((planets[n].abs - asc.abs) + 360) % 360) / 30) + 1;
+        const h = ((Math.floor((((planets[n].abs)%360+360)%360)/30) - Math.floor(((asc.abs%360+360)%360)/30)) % 12 + 12) % 12 + 1;
         houseMap[h] = houseMap[h] || [];
         houseMap[h].push(n);
         houseTxt = ` (${h}하우스 = ${HOUSE_MEANING[h]}${h === 7 ? ' ★배우자궁 안! 최우선 근거' : ''})`;
@@ -289,11 +289,11 @@ function buildChartDigest(data, dateTimeIso) {
     if (houseMap[6]) moneyLines.push(`6하우스(일하는 방식·기술)에 ${houseMap[6].join('·')} → 이 사람이 실제로 일하는 스타일과 강점.`);
     if (houseMap[10]) moneyLines.push(`10하우스(커리어·명예)에 ${houseMap[10].join('·')} → 사회적으로 이름을 얻는 분야.`);
     if (planets['목성']) {
-      const jh = asc ? Math.floor((((planets['목성'].abs - asc.abs) + 360) % 360) / 30) + 1 : 0;
+      const jh = asc ? ((Math.floor((((planets['목성'].abs)%360+360)%360)/30) - Math.floor(((asc.abs%360+360)%360)/30)) % 12 + 12) % 12 + 1 : 0;
       moneyLines.push(`목성(확장·행운)이 ${planets['목성'].sign} ${jh}하우스 → 부가 불어나는 영역. 여기에 투자하면 커진다.`);
     }
     if (planets['토성']) {
-      const sh = asc ? Math.floor((((planets['토성'].abs - asc.abs) + 360) % 360) / 30) + 1 : 0;
+      const sh = asc ? ((Math.floor((((planets['토성'].abs)%360+360)%360)/30) - Math.floor(((asc.abs%360+360)%360)/30)) % 12 + 12) % 12 + 1 : 0;
       moneyLines.push(`토성(축적·인내)이 ${planets['토성'].sign} ${sh}하우스 → 시간을 들여 단단히 쌓아야 하는 영역. 조급하면 무너진다.`);
     }
     if (moneyLines.length) {
@@ -319,7 +319,7 @@ function buildChartDigest(data, dateTimeIso) {
         lines.push(`→ 이번 생에 반드시 배워야 할 것: ${meaning.north}`);
       }
       if (asc) {
-        const nh = Math.floor((((nnLon - asc.abs) + 360) % 360) / 30) + 1;
+        const nh = ((Math.floor((((nnLon)%360+360)%360)/30) - Math.floor(((asc.abs%360+360)%360)/30)) % 12 + 12) % 12 + 1;
         const sh = ((nh + 5) % 12) + 1;
         lines.push(`노스노드가 ${nh}하우스, 사우스노드가 ${sh}하우스에 있다 → 이번 생의 성장은 ${nh}하우스 영역에서 일어난다.`);
       }
