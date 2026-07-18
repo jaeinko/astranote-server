@@ -261,7 +261,11 @@ function buildChartDigest(data, dateTimeIso) {
       if (!planets[n]) continue;
       let houseTxt = '';
       if (asc) {
-        const h = Math.floor((((planets[n].abs - asc.abs) + 360) % 360) / 30) + 1;
+        // 🔧 홀사인(Whole Sign) 방식: 상승점이 '속한 별자리' 기준으로 하우스 배정.
+        // (상승점의 도수가 아니라 별자리로 나눠야 astro-seek/mizar 등 표준 사이트와 일치함)
+        const ascSign = Math.floor((((asc.abs % 360) + 360) % 360) / 30);
+        const planetSign = Math.floor((((planets[n].abs % 360) + 360) % 360) / 30);
+        const h = (((planetSign - ascSign) % 12) + 12) % 12 + 1;
         houseMap[h] = houseMap[h] || [];
         houseMap[h].push(n);
         houseTxt = ` (${h}하우스 = ${HOUSE_MEANING[h]}${h === 7 ? ' ★배우자궁 안! 최우선 근거' : ''})`;
