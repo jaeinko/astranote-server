@@ -141,6 +141,10 @@ ${correction}
 ` : ''}
 [🚨🚨 최우선 절대 금지]
 'undefined', 'null', 'NaN', '데이터 없음', '어스펙트 목록', '차트 다이제스트' 같은 시스템 용어를 본문에 절대 쓰지 마라.
+🚨 마크다운을 쓰지 마라. **굵게**, *기울임*, # 제목 전부 금지다. 이 글은 HTML로 그대로 출력되므로 별표가 화면에 그대로 보인다.
+   강조가 필요하면 <b>강조할 말</b> 만 써라.
+🚨 '합성 태양', '합성 달' 같은 합성차트 도수를 손님에게 그대로 읽어주지 마라. 손님에게는 암호로 보인다.
+   대신 그 배치가 뜻하는 관계의 성격만 평범한 말로 풀어써라.
 손님은 일반인이다. 계산되지 않은 항목이 있으면 그 사실을 언급하지 말고 다른 근거로 자연스럽게 서술하라.
 
 [🚨 이름 혼용 절대 금지 — 이 리포트에서 가장 치명적인 사고]
@@ -235,11 +239,14 @@ const REQUIRED_KEYS = [
   'headline','card1_overview','card2_first_meet','card3_emotion','card4_attraction',
   'card5_conflict','card6_bond_type','card7_timing','card8_manual','card9_verdict'
 ];
-const BANNED = /undefined|null|NaN|어스펙트 목록|다이제스트|차트 데이터에/i;
+const BANNED = /undefined|null|NaN|어스펙트 목록|다이제스트|차트 데이터에|합성 태양|합성 달|합성 금성|합성 화성|확정 점수|정보 완전도/i;
 
 /* 발뺌 화법 패턴 — 프롬프트만으로는 못 막아서 코드로 센다 */
-const HEDGE = /(수 있습니다|수 있어요|수도 있습니다|수 있음|여지가 있습니다|위험이 있습니다|것입니다|겠습니다)/g;
-const HEDGE_LIMIT = 8;   // 리포트 전체 허용치
+/* '~것입니다'는 한국어에서 자연스러운 미래형이라 제외하고, 순수 발뺌만 센다.
+   기준을 비현실적으로 낮게 잡으면 매번 3회 재생성이 걸려 비용만 3배가 되고
+   정작 마지막 시도는 무조건 통과시키므로 아무것도 못 거른다. (v3~v4에서 실제로 발생) */
+const HEDGE = /(수 있습니다|수 있어요|수도 있습니다|수 있고|수 있으며|여지가 있습니다|위험이 있습니다)/g;
+const HEDGE_LIMIT = 12;
 
 /* 비유로 카드를 여는 패턴 */
 const METAPHOR_OPEN = /^.{0,40}(마치|같은 관계|듯한|처럼 느껴지는)/;
@@ -253,7 +260,13 @@ function sanitize(data) {
   for (const k of Object.keys(data)) {
     if (typeof data[k] !== 'string') continue;
     data[k] = data[k]
+      /* 브랜드 밖 색상 → 금색 */
       .replace(/color:\s*#(?!ff3b30\b)[0-9a-fA-F]{3,8}/gi, 'color:#d4af37')
+      /* 🚨 마크다운이 새어나오면 손님 화면에 별표가 그대로 보인다. HTML로 변환. */
+      .replace(/\*\*\*(.+?)\*\*\*/g, '<b>$1</b>')
+      .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+      .replace(/(^|[^*])\*([^*\n]+?)\*(?!\*)/g, '$1<b>$2</b>')
+      .replace(/^#{1,6}\s+/gm, '')
       .replace(/\u00a0/g, ' ')
       .trim();
   }
@@ -277,9 +290,12 @@ function validate(data, A, B, isLastAttempt) {
     const hedges = (body.match(HEDGE) || []).length;
     if (hedges > HEDGE_LIMIT) return `발뺌 화법 과다 (${hedges}회 / 허용 ${HEDGE_LIMIT}회)`;
 
-    for (const k of ['card1_overview', 'card2_first_meet', 'card5_conflict']) {
-      if (METAPHOR_OPEN.test(String(data[k]))) return `${k} 비유로 시작함`;
+    for (const k of REQUIRED_KEYS) {
+      if (METAPHOR_OPEN.test(String(data[k]))) return `${k} 카드가 비유로 시작함`;
     }
+    /* 사물에 빗대는 상투적 비유는 위치와 무관하게 잡는다 */
+    const CLICHE = /(잃어버[린렸]|반쪽|자석|우물|나침반|퍼즐 조각)/;
+    if (CLICHE.test(body)) return '상투적 비유 사용 (잃어버린/반쪽/자석 등)';
   }
   return null;
 }
