@@ -176,7 +176,11 @@ ${digest}
    [[🚨 비유로 시작 금지]] "마치 ~와 같아서", "~에 비유하자면" 으로 카드를 열지 마라.
    첫 문장은 반드시 두 사람에게 실제로 벌어지는 장면이나 단정으로 시작하라.
    나쁜 예: "두 분의 관계는 마치 깊은 우물과 같아서..."
+   나쁜 예: "서로에게 이끌릴 수밖에 없는 강력한 자석 같은 관계입니다."
+   나쁜 예: "마치 잃어버렸던 집을 찾은 듯한 안도감을 느꼈을 것입니다."
    좋은 예: "두 분은 같은 문제로 세 번 이상 싸웠을 겁니다."
+   좋은 예: "수진님은 민준님 앞에서만 목소리가 작아집니다."
+   🚨 '마치', '~같은', '~듯한' 으로 카드의 첫 문장을 열면 그 리포트는 폐기된다.
    대신 두 사람이 실제로 겪었을 법한 구체적 장면으로 써라.
    예: "${A.name}님이 서운한 걸 삼키고 말을 아끼는 동안, ${B.name}님은 아무 문제 없다고 믿고 넘어갑니다. 이 어긋남이 반복됩니다."
 2. 어스펙트(두 차트 사이의 각도)를 리포트 전체에서 최소 3개 이상 직접 근거로 인용하라.
@@ -187,6 +191,10 @@ ${digest}
    손님이 이미 겪은 일을 서술할 때는 단정형으로 써라.
    나쁜 예: "수진님은 답답해할 수 있습니다" → 좋은 예: "수진님은 그 순간 답답해집니다"
    나쁜 예: "서로에게 실망할 수 있습니다" → 좋은 예: "이 대화는 매번 같은 자리에서 멈춥니다"
+   나쁜 예: "제동을 걸 수 있습니다" → 좋은 예: "제동을 겁니다"
+   나쁜 예: "상처를 줄 수 있습니다" → 좋은 예: "이때 상처가 남습니다"
+   나쁜 예: "느꼈을 것입니다" → 좋은 예: "느꼈습니다"
+   🚨 이 표현들은 자동으로 세어진다. 8회를 넘기면 리포트가 반려되어 처음부터 다시 쓰게 된다.
    [[🚨 '~편입니다' 오용 금지]] 이 어미는 '현재의 성향'에만 붙는다.
    "직감했을 편입니다", "느꼈을 편입니다" 같은 과거 추측형에 붙이면 비문이다. 과거는 "직감했습니다"로 단정하라.
 4. 두 사람 모두를 다뤄라. 한 사람만 분석하고 끝내면 실패다. 분량을 비슷하게 배분하라.
@@ -212,7 +220,7 @@ ${digest}
   "card5_conflict": "(500자 이상) 🚨 점수 언급으로 시작하지 마라. 첫 문장은 두 사람이 싸우는 장면 그 자체로 열어라. 반복되는 갈등 패턴. 마찰각을 근거로 '이 커플이 싸우는 방식'을 대사가 들릴 만큼 구체적으로 그려라. 특히 위험한 지점 한 가지는 <span style='color:#ff3b30;font-weight:900;'>빨간 글씨</span>로 분명히 경고하라.",
   "card6_bond_type": "(400자 이상) 이 인연의 종류. 토성·8하우스·12하우스 접촉을 근거로 '쉽게 못 놓는 인연인지, 편안한 인연인지, 배울 게 있어 만난 인연인지'를 규정하라.",
   "card7_timing": "(400자 이상) 관계의 분기점 시기. 위에 계산된 시기만 사용하고, 각 시기에 무슨 일이 벌어지기 쉬운지를 구체적으로. 계산된 시기가 없다고 나왔으면 그 사실을 정직하게 다루되 시스템 용어는 쓰지 마라.",
-  "card8_manual": "(500자 이상) 실전 사용법. '${B.name}님과 잘 지내려면 ${A.name}님이 무엇을 하면 되는가' 3가지, 그 반대 3가지를 각각 행동 단위로 구체적으로. '소통하세요' 같은 뻔한 조언 금지.",
+  "card8_manual": "(500자 이상) 실전 사용법.\n     🚨 아래 두 소제목을 그대로 쓰고 한 글자도 바꾸지 마라. 순서도 바꾸지 마라. 뒤집으면 리포트 전체가 실패다.\n     첫 번째 소제목: '${A.name}님이 ${B.name}님에게 해야 할 3가지' → 그 아래는 전부 ${A.name}님이 하는 행동만 쓴다.\n     두 번째 소제목: '${B.name}님이 ${A.name}님에게 해야 할 3가지' → 그 아래는 전부 ${B.name}님이 하는 행동만 쓴다.\n     각 항목은 행동 단위로 구체적으로. '소통하세요' 같은 뻔한 조언 금지.\n     🚨 색상 지정 금지. 강조가 필요하면 <b>만 써라.",
   "card9_verdict": "(400자 이상) 결론. 이 관계를 어떻게 다룰 것인가. 단정적 예언이 아니라 '무엇을 지키면 무엇이 가능한가'의 조건부로. 읽고 나서 힘이 나게 끝내라.",
   "card10_teaser": "(3문장) 궁합은 '두 사람 사이'만 본 것이다. 이 관계에서 손님이 반복하는 패턴이 어디서 왔는지는 손님 개인 차트에만 적혀 있다는 점을 짚어라.\n     이번 리포트에서 실제로 드러난 갈등 축 하나를 직접 지목하고, 그 뿌리를 알려면 개인 차트를 봐야 한다는 흐름으로 자연스럽게 이어라.\n     강매 톤·가격 언급 금지. 마지막 문장은 질문으로 끝내 궁금증을 남겨라."
 }`;
@@ -227,7 +235,30 @@ const REQUIRED_KEYS = [
 ];
 const BANNED = /undefined|null|NaN|어스펙트 목록|다이제스트|차트 데이터에/i;
 
-function validate(data, A, B) {
+/* 발뺌 화법 패턴 — 프롬프트만으로는 못 막아서 코드로 센다 */
+const HEDGE = /(수 있습니다|수 있어요|수도 있습니다|수 있음|여지가 있습니다|위험이 있습니다|것입니다|겠습니다)/g;
+const HEDGE_LIMIT = 8;   // 리포트 전체 허용치
+
+/* 비유로 카드를 여는 패턴 */
+const METAPHOR_OPEN = /^.{0,40}(마치|같은 관계|듯한|처럼 느껴지는)/;
+
+/**
+ * 브랜드 밖 색상을 강제 교정한다.
+ * AI가 파란색(#007aff) 등을 멋대로 넣는 사례가 있어, 경고용 빨강 외에는 전부 금색으로 통일.
+ * 재생성 없이 결정론적으로 고치므로 비용이 들지 않는다.
+ */
+function sanitize(data) {
+  for (const k of Object.keys(data)) {
+    if (typeof data[k] !== 'string') continue;
+    data[k] = data[k]
+      .replace(/color:\s*#(?!ff3b30\b)[0-9a-fA-F]{3,8}/gi, 'color:#d4af37')
+      .replace(/\u00a0/g, ' ')
+      .trim();
+  }
+  return data;
+}
+
+function validate(data, A, B, isLastAttempt) {
   if (!data || typeof data !== 'object') return '응답이 객체가 아님';
   for (const k of REQUIRED_KEYS) {
     if (!data[k] || String(data[k]).trim().length < 10) return `필수 항목 누락/부실: ${k}`;
@@ -237,6 +268,17 @@ function validate(data, A, B) {
   // 두 사람 이름이 모두 등장해야 한다 (한 명만 분석하고 끝낸 경우 차단)
   if (!body.includes(A.name)) return `${A.name} 이름 누락`;
   if (!body.includes(B.name)) return `${B.name} 이름 누락`;
+
+  /* ── 아래는 '품질' 검사. 마지막 시도에서는 통과시킨다.
+        완벽을 고집하다 손님에게 아무것도 못 주는 게 더 큰 실패이기 때문. ── */
+  if (!isLastAttempt) {
+    const hedges = (body.match(HEDGE) || []).length;
+    if (hedges > HEDGE_LIMIT) return `발뺌 화법 과다 (${hedges}회 / 허용 ${HEDGE_LIMIT}회)`;
+
+    for (const k of ['card1_overview', 'card2_first_meet', 'card5_conflict']) {
+      if (METAPHOR_OPEN.test(String(data[k]))) return `${k} 비유로 시작함`;
+    }
+  }
   return null;
 }
 
@@ -353,8 +395,8 @@ const handler = async (req, res) => {
     let data = null, lastErr = '';
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        const candidate = await callGemini(prompt);
-        const bad = validate(candidate, A, B);
+        const candidate = sanitize(await callGemini(prompt));
+        const bad = validate(candidate, A, B, attempt === 3);
         if (bad) { lastErr = bad; console.error(`🔥 [시도 ${attempt}] 검증 실패: ${bad}`); continue; }
         data = candidate;
         break;
