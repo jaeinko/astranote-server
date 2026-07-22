@@ -427,7 +427,9 @@ const handler = async (req, res) => {
       } catch (err) {
         lastErr = err.message;
         console.error(`🔥 [시도 ${attempt}]`, err.message);
-        if (err.status === 503 || err.status === 429) await new Promise(r => setTimeout(r, 1500 * attempt));
+        /* 503(과부하)·429(한도)는 보통 수십 초 지속된다. 짧게 두드리면 같은 답만 받는다.
+           8초 → 16초로 물러서서 기다린다. (Vercel 함수 한도 안에서 최대한) */
+        if (err.status === 503 || err.status === 429) await new Promise(r => setTimeout(r, 8000 * attempt));
       }
     }
 
