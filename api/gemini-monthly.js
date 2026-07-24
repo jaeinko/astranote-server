@@ -193,13 +193,16 @@ ${digest}
 
 위 좌표·각도·날짜·점수는 전부 실제 천체 계산 결과다. 이것만 인용하고 없는 것을 지어내지 마라.
 
-[🚨 점수 규칙]
-위에 '확정 점수'로 주어진 숫자를 단 1점도 바꾸지 마라.
-🚨 카드를 점수 언급으로 시작하지 마라. "애정운은 81점으로 높은 편입니다" 같은 첫 문장은 금지다.
-   여섯 장이 전부 같은 방식으로 열리면 성의 없어 보인다.
-   첫 문장은 그 영역에서 실제 벌어지는 장면이나 단정으로 열고, 점수는 중간이나 끝에서 근거와 함께 한 번만 언급하라.
+[🚨🚨 점수 절대 금지 — 이 상품에서 가장 중요한 규칙]
+이 리포트에는 점수가 없다. 한 달을 몇 점이라고 매기면 손님에게 낙인이 된다.
+매달 보는 상품이라 낮은 점수가 반복되면 "나는 원래 안 되는 사람"이라는 인상만 남는다.
+🚨 "74점", "70점대", "점수가 높은 편" 같은 표현을 **어떤 형태로도 쓰지 마라.** 숫자·등급·별점 전부 금지다.
+   위 '내부 참고용 강약'은 네가 톤을 정하는 데만 쓰는 것이고, 본문에 옮기면 리포트가 폐기된다.
+🚨 대신 그 영역이 **무엇을 하고 있는지**를 써라. 평가가 아니라 서술이다.
    나쁜 예: "금전운은 74점으로 다소 주의가 필요합니다."
    좋은 예: "이번 30일은 들어오는 돈보다 나가는 돈의 속도가 빠릅니다."
+   나쁜 예: "컨디션이 낮은 편입니다."
+   좋은 예: "하고 싶은 건 늘어나는데 몸이 그만큼 안 따라옵니다."
 🚨 각 카드가 서로 다른 방식으로 시작해야 한다. 같은 문장 구조를 반복하지 마라.
 
 [🚨 서술 규칙 — 이 리포트의 생명]
@@ -222,11 +225,10 @@ ${digest}
   "keyword_1": "(6자 이내) 이 30일의 키워드. 셋 중 최소 하나는 불편한 진실이어야 한다.",
   "keyword_2": "(6자 이내)",
   "keyword_3": "(6자 이내)",
-  "score_total": (확정 점수의 종합 숫자만),
-  "score_love": (숫자만),
-  "score_money": (숫자만),
-  "score_work": (숫자만),
-  "score_body": (숫자만),
+  "label_love": "(8자 이내) 이번 30일 애정 영역이 무엇을 하고 있는지. 평가 금지, 서술만. 예: '관계가 열리는 달' / '혼자 정리하는 달'",
+  "label_money": "(8자 이내) 금전 영역의 상태. 예: '나가는 쪽이 빠른 달' / '들어올 자리가 생기는 달'",
+  "label_work": "(8자 이내) 일·성취 영역의 상태. 예: '밀어붙일 수 있는 달' / '정리가 먼저인 달'",
+  "label_body": "(8자 이내) 컨디션 영역의 상태. 예: '체력 관리가 필요한 달' / '회복이 빠른 달'",
   "card1_overview": "(400자 이상) 이 30일의 전체 흐름. 어떤 기조로 흘러가는지, 그 안에서 ${P.name}님이 무엇을 붙잡고 무엇을 놓아야 하는지. 종합 점수의 의미도 여기서 설명하라.",
   "card2_love": "(350자 이상) 애정운. 지금 만나는 사람이 있든 없든 읽히게 써라. 계산된 날짜를 최소 1개 인용하고, 그날 무슨 일이 벌어지기 쉬운지 장면으로.",
   "card3_money": "(350자 이상) 금전운. 들어오는 흐름과 새는 구멍을 함께 짚어라. 막연한 '재물운이 좋다' 금지. 어디서 벌고 어디서 빠져나가는지 구체적으로.",
@@ -235,6 +237,7 @@ ${digest}
   "card6_gooddays": "(300자 이상) 🚨 계산된 '좋은 날'만 써라. 각 날짜에 무엇을 하면 좋은지 행동 단위로 구체적으로. '좋은 일이 생깁니다' 같은 뭉뚱그림 금지.",
   "card7_caredays": "(300자 이상) 🚨 계산된 '조심할 날'만 써라. 무엇을 조심해야 하는지, 그리고 그날을 어떻게 넘길지까지. 공포만 주고 끝내면 실패다.",
   "card8_action": "(350자 이상) 이 30일 동안 해야 할 것 3가지와 하지 말아야 할 것 3가지.\n     🚨 서식을 반드시 아래 구조 그대로 지켜라. 줄바꿈 없이 붙여 쓰면 읽을 수가 없다.\n     <b>해야 할 것</b><br>1. ...<br>2. ...<br>3. ...<br><br><b>하지 말아야 할 것</b><br>1. ...<br>2. ...<br>3. ...\n     각 항목은 계산된 날짜를 최소 1개 포함하고 행동 단위로 구체적으로. '긍정적으로 생각하세요' 같은 뻔한 조언 금지.",
+  "card_planet": "(250자 이상) 위 '이번 달의 행성'으로 지정된 행성 이야기.\n     그 기운이 왜 이번 30일에 눌리는지 실제 흐름으로 설명하고, 계산된 '채우는 날'에 무엇을 하면 채워지는지를 행동 단위로 써라.\n     🚨 '행운을 부른다', '액운을 막는다', '지니면 좋아진다' 같은 효험 표현은 절대 금지다. 상태를 설명하고 행동을 제안하는 선에서 멈춰라.",
   "card9_teaser": "(3문장) 이 30일의 흐름은 ${P.name}님의 타고난 차트 위에서 벌어지는 일이라는 점을 짚어라.\\n     이번 리포트에서 실제로 드러난 흐름 하나를 지목하고, 그 뿌리는 개인 차트에 있다는 방향으로 자연스럽게 이어라.\\n     강매 톤·가격 언급 금지. 마지막은 질문으로 끝내 궁금증을 남겨라."
 }`;
 }
@@ -244,12 +247,14 @@ ${digest}
 ------------------------------------------------------------------------- */
 const REQUIRED_KEYS = [
   'headline', 'card1_overview', 'card2_love', 'card3_money', 'card4_work',
-  'card5_body', 'card6_gooddays', 'card7_caredays', 'card8_action'
+  'card5_body', 'card6_gooddays', 'card7_caredays', 'card8_action', 'card_planet'
 ];
 
 /* 🚨 '금성 양자리 4.4도' 같은 좌표 표기가 실제로 손님에게 나간 사례가 있었다.
    일반인에게는 암호로 읽히므로 도수 표기를 통째로 차단한다. */
-const BANNED = /undefined|null|NaN|트랜짓 목록|다이제스트|확정 점수|정보 완전도|오차 \d|[가-힣]+자리\s*\d+(\.\d+)?\s*도|\d+하우스\s*\d+도/i;
+/* 🚨 점수 표기를 차단한다. 프롬프트로만 막았더니 실제로 새어나왔다. */
+/* 효험 주장은 표시광고법·광고 심사에 걸린다. 상태 설명만 허용한다. */
+const BANNED = /undefined|null|NaN|트랜짓 목록|다이제스트|확정 점수|정보 완전도|오차 \d|[가-힣]+자리\s*\d+(\.\d+)?\s*도|\d+하우스\s*\d+도|\d{2}\s*점|\d{2}점대|점수(가|는|를|로)|액운|부적|지니면|행운을 부르/i;
 const HEDGE = /(수 있습니다|수 있어요|수도 있습니다|수 있고|수 있으며|여지가 있습니다|위험이 있습니다)/g;
 const HEDGE_LIMIT = 12;
 const METAPHOR_OPEN = /^.{0,40}(마치|같은 |듯한|처럼 느껴지는)/;
@@ -293,13 +298,7 @@ function validate(data, P, isLastAttempt) {
     }
     if (CLICHE.test(body)) return '상투적 비유 사용';
 
-    let scoreOpens = 0;
-    for (const k of REQUIRED_KEYS) {
-      if (SCORE_OPEN.test(String(data[k]))) scoreOpens++;
-    }
-    if (scoreOpens > SCORE_OPEN_LIMIT) {
-      return `${scoreOpens}개 카드가 점수 언급으로 시작함 (허용 ${SCORE_OPEN_LIMIT}개). 각 카드를 다른 방식으로 열어라`;
-    }
+    /* 점수 자체를 없앴으므로 오프닝 검사는 BANNED가 대신 처리한다 */
   }
   return null;
 }
@@ -452,12 +451,9 @@ const handler = async (req, res) => {
       return res.status(500).json({ error: '리포트 생성에 실패했습니다. 잠시 후 다시 시도해주세요.', detail: lastErr });
     }
 
-    /* ---------- 점수는 코드값으로 덮어쓴다 (AI가 바꿨을 가능성 차단) ---------- */
-    data.score_total = built.score.total;
-    data.score_love  = built.score.love;
-    data.score_money = built.score.money;
-    data.score_work  = built.score.work;
-    data.score_body  = built.score.body;
+    /* 🚨 점수는 손님에게 나가지 않는다. 혹시 AI가 넣었더라도 지운다. */
+    delete data.score_total; delete data.score_love; delete data.score_money;
+    delete data.score_work;  delete data.score_body;
 
     const payload = {
       status: 'completed',
@@ -469,7 +465,16 @@ const handler = async (req, res) => {
         periodStart: todayStr,
         periodEnd: endStr,
         goodDays: built.dates.good.map(d => d.peak),
-        careDays: built.dates.care.map(d => d.peak)
+        careDays: built.dates.care.map(d => d.peak),
+        /* 이번 달의 행성 (행운 카드) */
+        planet: built.lucky.planet,
+        planetEn: built.lucky.en,
+        planetGlyph: built.lucky.glyph,
+        planetNeed: built.lucky.need,
+        planetDesc: built.lucky.desc,
+        planetDay: built.lucky.day,
+        /* 점수 대신 화면 주인공이 될 30일 흐름 곡선 (31개 지점, 이 달 안에서의 상대 높이) */
+        flow: built.flow.norm
       },
       report: data
     };
