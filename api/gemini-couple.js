@@ -20,6 +20,10 @@ const SYN = require('../lib/astro-synastry.js');
 //    lib/cities.js 로 옮기고 module.exports = cityCoordinates 한 줄만 붙이세요.
 //    (좌표 목록이 두 상품에서 어긋나면 출생지가 조용히 서울로 대체되는 사고가 납니다)
 const cityCoordinates = require('../lib/cities.js');
+// 🚨 출생시각 → ISO 변환도 공용 모듈을 씁니다.
+//    예전에는 아래에서 '+09:00' 을 하드코딩하면서 좌표는 뉴욕·런던을 넘겨,
+//    시각은 한국인데 장소는 해외가 되어 상승점이 최대 157도 어긋났습니다.
+const { buildBirthIso, dayRangeIso } = require('../lib/time.js');
 
 const KEY_PREFIX = 'couple-report:';
 const LOCK_PREFIX = 'couple-lock:';
@@ -113,14 +117,13 @@ async function fetchChart(person, token) {
   const loc = cityCoordinates[person.city] || cityCoordinates['Seoul'];
 
   if (!person.timeUnknown) {
-    const iso = `${person.date}T${person.time}:00+09:00`;
+    const iso = buildBirthIso(person.date, person.time, person.city);
     const chart = SYN.parseChart(await rawChart(iso, loc, token), iso);
     if (!chart) throw new Error(`차트 파싱 실패 (${person.name})`);
     return chart;
   }
 
-  const isoStart = `${person.date}T00:01:00+09:00`;
-  const isoEnd   = `${person.date}T23:59:00+09:00`;
+  const [isoStart, isoEnd] = dayRangeIso(person.date, person.city);
   const [ds, de] = await Promise.all([
     rawChart(isoStart, loc, token),
     rawChart(isoEnd,   loc, token)
@@ -308,7 +311,7 @@ async function callGemini(prompt) {
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
-        maxOutputTokens: 24576,
+        maxOutputTokens: 49152,
         temperature: 0.92,
         responseMimeType: 'application/json',
         thinkingConfig: { thinkingBudget: 5120 }
