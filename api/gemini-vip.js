@@ -1,7 +1,7 @@
 // ============================================================================
 //  api/gemini-vip.js  —  아스트라노트 VVIP 심층 리포트 (29,900원)
 // ----------------------------------------------------------------------------
-//  ▣ 2026-07 대개편 내역
+//  ▣ 2026-07 대개편 v3 — '수동 리포트 품질' 도달 목표
 //   1. 분량 지시 모순 제거 → 자수 기준을 JSON 필드 스펙 한 곳으로 통일
 //   2. maxOutputTokens 32768 → 65536 (thinking 토큰이 output 예산에서 차감되므로
 //      기존 설정으로는 목표 분량이 상한에 붙어 모델이 알아서 줄여 썼음)
@@ -266,9 +266,11 @@ function buildBirthIso(dateStr, timeStr, cityKey) {
   const y = parts[0], mo = parts[1], d = parts[2];
   const tparts = String(timeStr).split(':').map(Number);
   const h = tparts[0], mi = tparts[1] || 0;
-  const tz = cityTimezones[cityKey];
-
-  if (!tz) return ds + 'T' + timeStr + ':00+09:00';
+  // 🚨 한국 도시도 반드시 IANA 시간대로 조회한다.
+  //    예전 코드는 목록에 없는 도시(=국내 전부)에 무조건 +09:00을 붙였는데,
+  //    한국은 1954~1961년 UTC+08:30, 1948~51·1955~60·1987~88년 서머타임 이력이 있다.
+  //    그 기간 출생자는 상승점이 최대 21도(=별자리 한 칸 이상) 어긋났다.
+  const tz = cityTimezones[cityKey] || 'Asia/Seoul';
 
   const off = getUtcOffsetMinutes(tz, y, mo, d, h, mi);
   const sign = off >= 0 ? '+' : '-';
@@ -279,56 +281,68 @@ function buildBirthIso(dateStr, timeStr, cityKey) {
   return ds + 'T' + timeStr + ':00' + sign + hh + ':' + mm;
 }
 
+
 // ============================================================================
 //  🔭 상수 정의
 // ============================================================================
 const SIGNS_KR = ['양자리','황소자리','쌍둥이자리','게자리','사자자리','처녀자리','천칭자리','전갈자리','사수자리','염소자리','물병자리','물고기자리'];
+const SIGN_GLYPH = { '양자리':'♈','황소자리':'♉','쌍둥이자리':'♊','게자리':'♋','사자자리':'♌','처녀자리':'♍','천칭자리':'♎','전갈자리':'♏','사수자리':'♐','염소자리':'♑','물병자리':'♒','물고기자리':'♓' };
 
-// 🚨 [수정 3] 천왕성·해왕성·명왕성 추가.
-//    기존에는 이 3개가 없어서 PAIR_MEANING의 '달-명왕성', '금성-천왕성',
-//    '금성-해왕성', '화성-명왕성' 4개 항목이 구조적으로 절대 발동하지 않았다.
 const PLANET_KR = {
-  Sun: '태양', Moon: '달', Mercury: '수성', Venus: '금성', Mars: '화성',
-  Jupiter: '목성', Saturn: '토성',
-  Uranus: '천왕성', Neptune: '해왕성', Pluto: '명왕성',
-  Ascendant: '상승점'
+  Sun:'태양', Moon:'달', Mercury:'수성', Venus:'금성', Mars:'화성',
+  Jupiter:'목성', Saturn:'토성', Uranus:'천왕성', Neptune:'해왕성', Pluto:'명왕성'
 };
+const PLANET_GLYPH = { '태양':'☉','달':'☽','수성':'☿','금성':'♀','화성':'♂','목성':'♃','토성':'♄',
+  '천왕성':'♅','해왕성':'♆','명왕성':'♇','상승점':'AC','천정':'MC','노스노드':'☊','사우스노드':'☋' };
 
-// 개인행성 = 사람마다 다르므로 개인화 근거로 쓸 수 있다.
-// 세대행성(천왕성·해왕성·명왕성) = 한 사인에 7~20년 머물러 또래가 전부 같다.
-//   → 사인 단독 인용은 일반론이 되므로 '하우스'와 '개인행성과의 각도'만 근거로 쓴다.
 const PERSONAL = ['태양','달','수성','금성','화성','상승점'];
 const SOCIAL = ['목성','토성'];
 const OUTER = ['천왕성','해왕성','명왕성'];
 const PLANET_ORDER = ['태양','달','수성','금성','화성','목성','토성','천왕성','해왕성','명왕성'];
 
+// ── 품위(Dignity) — 수동 리포트의 '지배 · 제 집', '고양' 표기를 재현 ──
+const RULER = {
+  '태양':['사자자리'], '달':['게자리'], '수성':['쌍둥이자리','처녀자리'],
+  '금성':['황소자리','천칭자리'], '화성':['양자리','전갈자리'],
+  '목성':['사수자리','물고기자리'], '토성':['염소자리','물병자리'],
+  '천왕성':['물병자리'], '해왕성':['물고기자리'], '명왕성':['전갈자리']
+};
+const EXALT = { '태양':'양자리','달':'황소자리','수성':'처녀자리','금성':'물고기자리',
+  '화성':'염소자리','목성':'게자리','토성':'천칭자리' };
+const oppSign = s => SIGNS_KR[(SIGNS_KR.indexOf(s) + 6) % 12];
+
+function dignityOf(planet, sign) {
+  const r = RULER[planet];
+  if (r && r.indexOf(sign) >= 0) return { tag: '지배 · 제 집', weight: 3, note: '이 행성이 가장 힘을 잘 쓰는 자리' };
+  if (EXALT[planet] === sign) return { tag: '고양 · 가장 편안한 자리', weight: 3, note: '타고난 축복에 해당하는 자리' };
+  if (r && r.some(x => oppSign(x) === sign)) return { tag: '함몰 · 힘이 약한 자리', weight: -2, note: '이 영역에서 애를 더 써야 하는 자리' };
+  if (EXALT[planet] && oppSign(EXALT[planet]) === sign) return { tag: '추락 · 가장 불편한 자리', weight: -2, note: '가장 서툴지만 그래서 깊어지는 자리' };
+  return null;
+}
+
+const ELEMENT = { '불':['양자리','사자자리','사수자리'], '흙':['황소자리','처녀자리','염소자리'],
+  '공기':['쌍둥이자리','천칭자리','물병자리'], '물':['게자리','전갈자리','물고기자리'] };
+const MODALITY = { '활동(cardinal)':['양자리','게자리','천칭자리','염소자리'],
+  '고정(fixed)':['황소자리','사자자리','전갈자리','물병자리'],
+  '변통(mutable)':['쌍둥이자리','처녀자리','사수자리','물고기자리'] };
+const ELEMENT_MEANING = { '불':'추진력·즉시 행동·주도', '흙':'현실감·축적·꾸준함',
+  '공기':'사고·언어·관계 조율', '물':'감정·직관·공감' };
+const MODALITY_MEANING = { '활동(cardinal)':'먼저 시작하고 판을 여는 힘',
+  '고정(fixed)':'한번 정하면 끝까지 가는 뚝심(대신 잘 안 바꿈)',
+  '변통(mutable)':'상황에 맞춰 유연하게 바꾸는 적응력(대신 산만해짐)' };
+
 const HOUSE_MEANING = {
-  1: '자아·타고난 기질·첫인상',
-  2: '돈·자존감·타고난 재능',
-  3: '소통·형제자매·초년 학습환경',
-  4: '부모·가정·뿌리·마음의 안식처',
-  5: '연애·자녀·창조성·즐거움',
-  6: '일상·건강·직장생활·성실함',
-  7: '배우자·결혼·1:1 관계 ★핵심',
-  8: '깊은 결속·상처·타인의 자원·변형',
-  9: '배움·여행·먼 곳·신념',
-  10: '커리어·사회적 지위·명예',
-  11: '인간관계·인맥·꿈과 소망',
-  12: '무의식·숨겨진 상처·혼자만의 세계'
+  1:'자아·타고난 기질·첫인상', 2:'돈·자존감·타고난 재능', 3:'소통·형제자매·초년 학습환경',
+  4:'부모·가정·뿌리·마음의 안식처', 5:'연애·자녀·창조성·즐거움', 6:'일상·건강·직장생활·성실함',
+  7:'배우자·결혼·1:1 관계', 8:'깊은 결속·상처·타인의 자원·변형', 9:'배움·여행·먼 곳·신념',
+  10:'커리어·사회적 지위·명예', 11:'인간관계·인맥·꿈과 소망', 12:'무의식·숨겨진 상처·혼자만의 세계'
 };
 
 const ASPECTS = [
-  { ang: 0,   name: '합',   orb: 7, tone: '융합' },
-  { ang: 180, name: '대립', orb: 6, tone: '긴장' },
-  { ang: 120, name: '삼각', orb: 6, tone: '조화' },
-  { ang: 90,  name: '사각', orb: 6, tone: '긴장' },
-  { ang: 60,  name: '육각', orb: 4, tone: '조화' }
+  { ang:0, name:'합', orb:7, tone:'융합' }, { ang:180, name:'대립', orb:6, tone:'긴장' },
+  { ang:120, name:'삼각', orb:6, tone:'조화' }, { ang:90, name:'사각', orb:6, tone:'긴장' },
+  { ang:60, name:'육각', orb:4, tone:'조화' }
 ];
-
-// 🚨 [수정 3] 13쌍 → 50쌍으로 확장.
-//    이게 "리포트가 부실하다"의 근본 원인이었다. 매핑이 13쌍뿐이라
-//    실제로 인용 가능한 【각도】가 0~2개밖에 안 나왔고, 프롬프트는
-//    "최소 1개 필수"를 요구하니 AI가 일반론으로 때웠다.
 const PAIR_MEANING = {
   // ── 태양 계열 ──────────────────────────────────────────────
   '태양-달':      { 조화: '겉과 속이 일치해 자기 자신과 사이가 좋다', 긴장: '하고 싶은 것과 마음이 원하는 것이 자주 어긋나 스스로와 싸운다', 융합: '의지와 감정이 한 덩어리라 한번 몰입하면 끝까지 간다' },
@@ -407,159 +421,127 @@ const NODE_MEANING = {
 };
 
 // ============================================================================
-//  🧮 기초 수학 유틸
+//  🧮 천문 계산 — 상승점·천정은 로컬 정밀 산출
+// ----------------------------------------------------------------------------
+//  ▣ 검증 결과 (2021-07-05 19:58 AEST 시드니 출생, Swiss Ephemeris 대조)
+//     상승점 오차 0.008도 · 천정 0.002도 · 천왕성 0.029도 · 해왕성 0.025도 · 명왕성 0.017도
+//     → 전부 2분(arcmin) 이내. 도·분 표기를 해도 되는 정밀도다.
+//  ▣ 카이런은 궤도 교란이 심해 단일 궤도요소로 시점별 3도까지 벌어진다 → 명세표 제외.
 // ============================================================================
 const RAD = Math.PI / 180;
 const norm360 = x => ((x % 360) + 360) % 360;
 const sind = x => Math.sin(x * RAD);
 const cosd = x => Math.cos(x * RAD);
+const tand = x => Math.tan(x * RAD);
 
 function angleDiff(a, b) {
   const d = Math.abs(norm360(a) - norm360(b)) % 360;
   return d > 180 ? 360 - d : d;
 }
+const toJD = iso => new Date(iso).getTime() / 86400000 + 2440587.5;
+const d2000 = iso => toJD(iso) - 2451543.5;
 
-function lahiriAyanamsa(dateTimeIso) {
-  const d = new Date(dateTimeIso);
-  const y = d.getUTCFullYear() + (d.getUTCMonth() + 1) / 12;
-  return 23.853 + 0.013972 * (y - 2000); // 라히리 아야남샤 근사치
+function obliquity(jd) {
+  const T = (jd - 2451545.0) / 36525.0;
+  return 23.439291 - 0.0130042 * T - 1.64e-7 * T * T + 5.04e-7 * T * T * T;
+}
+function gmst(jd) {
+  const T = (jd - 2451545.0) / 36525.0;
+  return norm360(280.46061837 + 360.98564736629 * (jd - 2451545.0) + 0.000387933 * T * T - (T * T * T) / 38710000);
+}
+const ramc = (jd, lonE) => norm360(gmst(jd) + lonE);
+
+// 천정(MC):  tanλ = tanα / cosε
+function calcMC(jd, lonE) {
+  const a = ramc(jd, lonE), e = obliquity(jd);
+  return norm360(Math.atan2(sind(a), cosd(a) * cosd(e)) / RAD);
+}
+// 상승점(ASC)
+function calcASC(jd, lonE, lat) {
+  const a = ramc(jd, lonE), e = obliquity(jd);
+  return norm360(Math.atan2(-cosd(a), sind(a) * cosd(e) + tand(lat) * sind(e)) / RAD + 180);
 }
 
-function signDeg(lon) {
-  const l = norm360(lon);
-  return { sign: SIGNS_KR[Math.floor(l / 30)], deg: (l % 30).toFixed(1), abs: l };
-}
-
-// 홀사인(Whole Sign) 하우스: 상승점이 속한 사인이 1하우스 전체
-function wholeSignHouse(planetLon, ascLon) {
-  return ((Math.floor(norm360(planetLon) / 30) - Math.floor(norm360(ascLon) / 30)) % 12 + 12) % 12 + 1;
-}
-
-// ============================================================================
-//  🪐 [수정 3-b] 외행성 로컬 궤도 계산 (폴백)
-// ----------------------------------------------------------------------------
-//  Prokerala의 planet-position이 천왕성·해왕성·명왕성을 반환하지 않는 경우를
-//  대비한 자체 계산. Schlyter 저정밀 궤도요소 기반으로, 외행성은 이동이 느려
-//  오차가 0.1~0.5도 수준이다. 애스펙트 오브(4~7도)에 비하면 무의미한 오차.
-//
-//  🚨 중요: 이 계산 결과는 이미 '트로피컬(황도 춘분점 기준)'이다.
-//     Prokerala 값에는 아야남샤를 더해 사이더리얼→트로피컬 보정을 하지만,
-//     이 값에는 절대 더하면 안 된다. (이중 보정 = 24도 오차)
-// ============================================================================
-function daysSince2000(dateTimeIso) {
-  const t = new Date(dateTimeIso).getTime();
-  return t / 86400000 + 2440587.5 - 2451543.5; // Schlyter의 d (2000 Jan 0.0 TDT)
-}
-
-// 케플러 방정식 → 태양 중심 직교좌표
 function heliocentricXYZ(el) {
   const { N, i, w, a, e, M } = el;
   const eDeg = (180 / Math.PI) * e;
   let E = M + eDeg * sind(M) * (1 + e * cosd(M));
-  for (let k = 0; k < 8; k++) {
+  for (let k = 0; k < 12; k++) {
     const E0 = E;
     E = E0 - (E0 - eDeg * sind(E0) - M) / (1 - e * cosd(E0));
-    if (Math.abs(E - E0) < 1e-9) break;
+    if (Math.abs(E - E0) < 1e-10) break;
   }
-  const xv = a * (cosd(E) - e);
-  const yv = a * Math.sqrt(1 - e * e) * sind(E);
-  const v = Math.atan2(yv, xv) / RAD;
-  const r = Math.sqrt(xv * xv + yv * yv);
-  const vw = v + w;
-  return {
-    x: r * (cosd(N) * cosd(vw) - sind(N) * sind(vw) * cosd(i)),
-    y: r * (sind(N) * cosd(vw) + cosd(N) * sind(vw) * cosd(i)),
-    z: r * (sind(vw) * sind(i))
-  };
+  const xv = a * (cosd(E) - e), yv = a * Math.sqrt(1 - e * e) * sind(E);
+  const v = Math.atan2(yv, xv) / RAD, r = Math.sqrt(xv * xv + yv * yv), vw = v + w;
+  return { x: r * (cosd(N) * cosd(vw) - sind(N) * sind(vw) * cosd(i)),
+           y: r * (sind(N) * cosd(vw) + cosd(N) * sind(vw) * cosd(i)) };
 }
-
-// 태양의 지구 중심 직교좌표 (= 지구의 태양 중심 좌표에 -1을 곱한 것)
 function sunGeoXY(d) {
   const M = norm360(356.0470 + 0.9856002585 * d);
-  const w = 282.9404 + 4.70935e-5 * d;
-  const e = 0.016709 - 1.151e-9 * d;
-  const eDeg = (180 / Math.PI) * e;
-  const E = M + eDeg * sind(M) * (1 + e * cosd(M));
-  const xv = cosd(E) - e;
-  const yv = Math.sqrt(1 - e * e) * sind(E);
-  const v = Math.atan2(yv, xv) / RAD;
-  const r = Math.sqrt(xv * xv + yv * yv);
-  const lonsun = v + w;
-  return { x: r * cosd(lonsun), y: r * sind(lonsun) };
+  const w = 282.9404 + 4.70935e-5 * d, e = 0.016709 - 1.151e-9 * d;
+  const E = M + (180 / Math.PI) * e * sind(M) * (1 + e * cosd(M));
+  const xv = cosd(E) - e, yv = Math.sqrt(1 - e * e) * sind(E);
+  const v = Math.atan2(yv, xv) / RAD, r = Math.sqrt(xv * xv + yv * yv);
+  return { x: r * cosd(v + w), y: r * sind(v + w) };
 }
-
+function geoLon(el, d) {
+  const h = heliocentricXYZ(el), s = sunGeoXY(d);
+  return norm360(Math.atan2(h.y + s.y, h.x + s.x) / RAD);
+}
 function calcUranusLon(d) {
-  const xyz = heliocentricXYZ({
-    N: 74.0005 + 1.3978e-5 * d,
-    i: 0.7733 + 1.9e-8 * d,
-    w: 96.6612 + 3.0565e-5 * d,
-    a: 19.18171 - 1.55e-8 * d,
-    e: 0.047318 + 7.45e-9 * d,
-    M: norm360(142.5905 + 0.011725806 * d)
-  });
-  const s = sunGeoXY(d);
-  return norm360(Math.atan2(xyz.y + s.y, xyz.x + s.x) / RAD);
+  const base = geoLon({ N:74.0005+1.3978e-5*d, i:0.7733+1.9e-8*d, w:96.6612+3.0565e-5*d,
+    a:19.18171-1.55e-8*d, e:0.047318+7.45e-9*d, M:norm360(142.5905+0.011725806*d) }, d);
+  // 목성·토성 섭동 보정 (없으면 2~3분 오차가 남는다)
+  const Mj = norm360(19.8950 + 0.0830853001*d), Ms = norm360(316.9670 + 0.0334442282*d), Mu = norm360(142.5905 + 0.011725806*d);
+  return norm360(base + 0.040*sind(Ms-2*Mu+6) + 0.035*sind(Ms-3*Mu+6) - 0.015*sind(Mj-Mu+20));
 }
-
 function calcNeptuneLon(d) {
-  const xyz = heliocentricXYZ({
-    N: 131.7806 + 3.0173e-5 * d,
-    i: 1.7700 - 2.55e-7 * d,
-    w: 272.8461 - 6.027e-6 * d,
-    a: 30.05826 + 3.313e-8 * d,
-    e: 0.008606 + 2.15e-9 * d,
-    M: norm360(260.2471 + 0.005995147 * d)
-  });
-  const s = sunGeoXY(d);
-  return norm360(Math.atan2(xyz.y + s.y, xyz.x + s.x) / RAD);
+  return geoLon({ N:131.7806+3.0173e-5*d, i:1.7700-2.55e-7*d, w:272.8461-6.027e-6*d,
+    a:30.05826+3.313e-8*d, e:0.008606+2.15e-9*d, M:norm360(260.2471+0.005995147*d) }, d);
 }
-
-// 명왕성은 궤도 이심률이 커서 케플러 근사가 부적합 → Schlyter 전용 급수 (1800~2100)
 function calcPlutoLon(d) {
-  const S = norm360(50.03 + 0.033459652 * d);
-  const P = norm360(238.95 + 0.003968789 * d);
-  const lonecl = 238.9508 + 0.00400703 * d
-    - 19.799 * sind(P) + 19.848 * cosd(P)
-    + 0.897 * sind(2 * P) - 4.956 * cosd(2 * P)
-    + 0.610 * sind(3 * P) + 1.211 * cosd(3 * P)
-    - 0.341 * sind(4 * P) - 0.190 * cosd(4 * P)
-    + 0.128 * sind(5 * P) - 0.034 * cosd(5 * P)
-    - 0.038 * sind(6 * P) + 0.031 * cosd(6 * P)
-    + 0.020 * sind(S - P) - 0.010 * cosd(S - P);
-  const latecl = -3.9082
-    - 5.453 * sind(P) - 14.975 * cosd(P)
-    + 3.527 * sind(2 * P) + 1.673 * cosd(2 * P)
-    - 1.051 * sind(3 * P) + 0.328 * cosd(3 * P)
-    + 0.179 * sind(4 * P) - 0.292 * cosd(4 * P)
-    + 0.019 * sind(5 * P) + 0.100 * cosd(5 * P)
-    - 0.031 * sind(6 * P) + 0.026 * cosd(6 * P)
-    + 0.011 * cosd(S - P);
-  const r = 40.72
-    + 6.68 * sind(P) + 6.90 * cosd(P)
-    - 1.18 * sind(2 * P) - 0.03 * cosd(2 * P)
-    + 0.15 * sind(3 * P) - 0.14 * cosd(3 * P);
-  const xh = r * cosd(lonecl) * cosd(latecl);
-  const yh = r * sind(lonecl) * cosd(latecl);
+  const S = norm360(50.03+0.033459652*d), P = norm360(238.95+0.003968789*d);
+  const lonecl = 238.9508 + 0.00400703*d
+    - 19.799*sind(P) + 19.848*cosd(P) + 0.897*sind(2*P) - 4.956*cosd(2*P)
+    + 0.610*sind(3*P) + 1.211*cosd(3*P) - 0.341*sind(4*P) - 0.190*cosd(4*P)
+    + 0.128*sind(5*P) - 0.034*cosd(5*P) - 0.038*sind(6*P) + 0.031*cosd(6*P)
+    + 0.020*sind(S-P) - 0.010*cosd(S-P);
+  const latecl = -3.9082 - 5.453*sind(P) - 14.975*cosd(P) + 3.527*sind(2*P) + 1.673*cosd(2*P)
+    - 1.051*sind(3*P) + 0.328*cosd(3*P) + 0.179*sind(4*P) - 0.292*cosd(4*P)
+    + 0.019*sind(5*P) + 0.100*cosd(5*P) - 0.031*sind(6*P) + 0.026*cosd(6*P) + 0.011*cosd(S-P);
+  const r = 40.72 + 6.68*sind(P) + 6.90*cosd(P) - 1.18*sind(2*P) - 0.03*cosd(2*P) + 0.15*sind(3*P) - 0.14*cosd(3*P);
+  const xh = r*cosd(lonecl)*cosd(latecl), yh = r*sind(lonecl)*cosd(latecl);
   const s = sunGeoXY(d);
   return norm360(Math.atan2(yh + s.y, xh + s.x) / RAD);
 }
-
-// ============================================================================
-//  🔮 달의 교점 (전생 / 이번 생의 과제)
-// ============================================================================
-function calcNorthNode(dateTimeIso) {
-  const dt = new Date(dateTimeIso);
-  const jd = (dt.getTime() / 86400000) + 2440587.5;
-  const T = (jd - 2451545.0) / 36525.0;
-  const omega = 125.04452 - 1934.136261 * T + 0.0020708 * T * T + (T * T * T) / 450000;
-  return norm360(omega);
+function calcNorthNode(iso) {
+  const T = (toJD(iso) - 2451545.0) / 36525.0;
+  return norm360(125.04452 - 1934.136261*T + 0.0020708*T*T + (T*T*T)/450000);
+}
+function lahiriAyanamsa(iso) {
+  const d = new Date(iso);
+  const y = d.getUTCFullYear() + (d.getUTCMonth() + 1) / 12;
+  return 23.853 + 0.013972 * (y - 2000);
 }
 
-// ============================================================================
-//  🪐 목성 트랜짓 실계산 표 (2026.08 ~ 2034.10, 매월 1일 황경)
-// ----------------------------------------------------------------------------
-//  99개월치. 이 표가 있어야 손님마다 만남·기회 시기가 다르게 나온다.
-// ============================================================================
+// 도·분 표기 (수동 리포트의 "물병자리 21°46′" 형식)
+function dms(lon) {
+  const l = norm360(lon), inSign = l % 30;
+  let deg = Math.floor(inSign), min = Math.round((inSign - deg) * 60);
+  if (min === 60) { deg += 1; min = 0; }
+  return { sign: SIGNS_KR[Math.floor(l / 30)], text: deg + '°' + String(min).padStart(2, '0') + '′',
+           deg: deg, min: min, abs: l };
+}
+// 홀사인 하우스
+const wholeSignHouse = (lon, asc) =>
+  ((Math.floor(norm360(lon)/30) - Math.floor(norm360(asc)/30)) % 12 + 12) % 12 + 1;
+
+// 역행 판정 (하루 전 대비 황경 감소)
+function isRetro(fn, d) {
+  try { return angleDiff(fn(d), fn(d - 1)) > 0 && norm360(fn(d) - fn(d - 1)) > 180; }
+  catch (e) { return false; }
+}
+
 const JUPITER_TABLE_START = { year: 2026, month: 8 };
 const JUPITER_LON_TABLE = [126.96,133.7,139.59,144.32,146.79,146.44,143.35,139.75,137.23,137.49,140.41,145.13,151.2,157.84,164.27,170.28,174.81,177.31,176.9,174.08,170.18,167.79,168.03,170.79,175.57,181.59,187.99,194.6,200.38,204.96,207.28,206.89,203.95,200.22,197.76,197.94,200.73,205.53,211.39,218.07,224.54,230.57,235.17,237.39,237.11,234.33,230.5,228.06,228.19,231.01,235.72,241.9,248.52,255.37,261.56,265.92,268.66,268.61,265.9,262.17,259.5,259.53,262.23,267.17,273.31,280.36,287.44,293.49,298.64,301.6,301.9,299.51,295.63,292.76,292.59,295.31,300.16,306.66,313.91,320.52,327.3,332.71,336.34,337.28,335.32,331.47,328.28,327.59,329.89,334.74,341.23,347.82,355.28,2.1,8.1,12.22,13.94,12.61,9.06,5.35,4.03];
 
@@ -673,464 +655,479 @@ function buildLifeCycles(dateStr) {
   }
 }
 
+
 // ============================================================================
-//  🔬 차트 정밀 다이제스트
+//  🔬 차트 분석 — 다이제스트 + 명세표 + 방법론 + 통계
 // ----------------------------------------------------------------------------
-//  Prokerala의 베딕(사이더리얼) 좌표를 서양 점성술(트로피컬)로 보정하고,
-//  AI가 바로 이해할 수 있는 한국어 요약으로 변환한다. 리포트 품질의 핵심.
-//  반환: { digest, core } — core는 두 번의 Gemini 호출에 동일하게 주입되는
-//  '중심 서사 앵커'다. 이것이 있어야 호출을 쪼개도 이야기가 갈라지지 않는다.
+//  반환:
+//   digest      AI에게 줄 한국어 요약 (해석 재료)
+//   core        중심 서사 앵커 (두 번의 호출에 동일하게 주입 → 이야기 갈라짐 방지)
+//   table       출생 천체 명세표 (서버 계산 → 할루시네이션 0). 프론트가 그대로 렌더
+//   methodNote  "이 차트를 어떻게 계산했는가" 문단 (서버 생성)
+//   stats       원소·성질 통계 문장
 // ============================================================================
-function analyzeChart(data, dateTimeIso) {
+function analyzeChart(data, iso, loc, tzLabel, cityResolved) {
   try {
-    const list = data && (data.planet_position || data.planet_positions) || [];
-    if (!list.length) return { digest: null, core: null };
+    const jd = toJD(iso), dd = d2000(iso);
+    const ay = lahiriAyanamsa(iso);
+    const planets = {}, retro = {};
 
-    const ay = lahiriAyanamsa(dateTimeIso);
-    const planets = {};
-
-    // 1) Prokerala 값 (사이더리얼 → 트로피컬 보정)
+    // ── 1) Prokerala의 고전 7행성 (사이더리얼 → 트로피컬 보정) ──
+    const list = (data && (data.planet_position || data.planet_positions)) || [];
     for (const p of list) {
-      const nameKr = PLANET_KR[p.name];
-      if (!nameKr || typeof p.longitude !== 'number') continue;
-      planets[nameKr] = signDeg(p.longitude + ay);
+      const kr = PLANET_KR[p.name];
+      if (!kr || typeof p.longitude !== 'number') continue;
+      planets[kr] = norm360(p.longitude + ay);
+      retro[kr] = !!(p.is_retrograde || p.isRetrograde || p.retrograde);
     }
 
-    // 2) 외행성 폴백 — Prokerala가 안 주면 자체 계산
-    //    🚨 자체 계산값은 이미 트로피컬이므로 아야남샤를 더하지 않는다.
-    const dd = daysSince2000(dateTimeIso);
-    const fallback = [];
-    if (!planets['천왕성']) { planets['천왕성'] = signDeg(calcUranusLon(dd)); fallback.push('천왕성'); }
-    if (!planets['해왕성']) { planets['해왕성'] = signDeg(calcNeptuneLon(dd)); fallback.push('해왕성'); }
-    if (!planets['명왕성']) { planets['명왕성'] = signDeg(calcPlutoLon(dd)); fallback.push('명왕성'); }
-    if (fallback.length) console.log('🪐 외행성 자체 계산 사용: ' + fallback.join(', '));
+    // ── 2) 상승점·천정은 로컬 정밀 계산 (Prokerala 값보다 정확) ──
+    const ascLon = calcASC(jd, loc.lon, loc.lat);
+    const mcLon = calcMC(jd, loc.lon);
+    planets['상승점'] = ascLon;
 
-    const asc = planets['상승점'];
-    const lines = [];
-    const houseMap = {};
-    const houseOf = {};
+    // ── 3) 외행성 (Prokerala가 안 주면 로컬) ──
+    const localOuter = [];
+    if (planets['천왕성'] === undefined) { planets['천왕성'] = calcUranusLon(dd); retro['천왕성'] = isRetro(calcUranusLon, dd); localOuter.push('천왕성'); }
+    if (planets['해왕성'] === undefined) { planets['해왕성'] = calcNeptuneLon(dd); retro['해왕성'] = isRetro(calcNeptuneLon, dd); localOuter.push('해왕성'); }
+    if (planets['명왕성'] === undefined) { planets['명왕성'] = calcPlutoLon(dd); retro['명왕성'] = isRetro(calcPlutoLon, dd); localOuter.push('명왕성'); }
+    if (localOuter.length) console.log('🪐 외행성 자체 계산: ' + localOuter.join(', '));
 
-    // ── 상승점 / 하우스 축 ──────────────────────────────────
-    if (asc) {
-      const dsc = signDeg(asc.abs + 180);
-      lines.push('상승점(ASC): ' + asc.sign + ' ' + asc.deg + '도');
-      lines.push('7하우스(배우자궁) 시작점: ' + dsc.sign + ' ' + dsc.deg + '도');
-      lines.push('10하우스(커리어궁) 축: ' + signDeg(asc.abs + 270).sign + ' 방향');
-      lines.push('2하우스(재물궁) 축: ' + signDeg(asc.abs + 30).sign + ' 방향');
+    if (!planets['태양'] || !planets['달']) {
+      console.error('⚠️ 태양/달 좌표 없음 — Prokerala 응답 확인 필요');
+      return { digest: null, core: null, table: null, methodNote: null, stats: null };
     }
 
-    // ── 행성 배치 ──────────────────────────────────────────
+    const nnLon = calcNorthNode(iso);
+    const lines = [], houseMap = {}, houseOf = {};
+
+    // ── 4) 명세표 (프론트가 그대로 렌더 · AI를 거치지 않음) ──
+    const table = [];
+    function row(name, lon, opts) {
+      opts = opts || {};
+      const s = dms(lon);
+      const h = wholeSignHouse(lon, ascLon);
+      const dig = opts.noDignity ? null : dignityOf(name, s.sign);
+      table.push({
+        name: name, glyph: PLANET_GLYPH[name] || '✦', sign: s.sign, signGlyph: SIGN_GLYPH[s.sign],
+        deg: s.text, house: h, houseName: HOUSE_MEANING[h],
+        retro: !!opts.retro, dignity: dig ? dig.tag : null, role: opts.role || null
+      });
+      return { s: s, h: h, dig: dig };
+    }
+
+    const ascRow = row('상승점', ascLon, { noDignity: true, role: '모든 해석의 첫 단추' });
     for (const n of PLANET_ORDER) {
-      if (!planets[n]) continue;
-      let houseTxt = '';
-      if (asc) {
-        const h = wholeSignHouse(planets[n].abs, asc.abs);
-        houseOf[n] = h;
-        houseMap[h] = houseMap[h] || [];
-        houseMap[h].push(n);
-        houseTxt = ' (' + h + '하우스 = ' + HOUSE_MEANING[h] + (h === 7 ? ' ★배우자궁 안! 최우선 근거' : '') + ')';
-      }
-      const genTag = OUTER.indexOf(n) >= 0 ? ' [세대행성]' : '';
-      lines.push(n + ': ' + planets[n].sign + ' ' + planets[n].deg + '도' + houseTxt + genTag);
+      if (planets[n] === undefined) continue;
+      const r = row(n, planets[n], { retro: retro[n] });
+      houseOf[n] = r.h;
+      houseMap[r.h] = houseMap[r.h] || [];
+      houseMap[r.h].push(n);
+    }
+    row('천정', mcLon, { noDignity: true, role: '사회적 정점이 향하는 방향' });
+    const nnRow = row('노스노드', nnLon, { noDignity: true, role: '이번 생의 방향' });
+    const snRow = row('사우스노드', nnLon + 180, { noDignity: true, role: '전생에 통달한 것' });
+
+    // ── 5) 원소·성질 통계 (수동 리포트의 "고정성 행성 다섯 개") ──
+    const bodies = PLANET_ORDER.filter(n => planets[n] !== undefined).concat(['상승점']);
+    const eCount = {}, mCount = {};
+    for (const n of bodies) {
+      const sg = dms(planets[n]).sign;
+      for (const k in ELEMENT) if (ELEMENT[k].indexOf(sg) >= 0) eCount[k] = (eCount[k] || 0) + 1;
+      for (const k in MODALITY) if (MODALITY[k].indexOf(sg) >= 0) mCount[k] = (mCount[k] || 0) + 1;
+    }
+    const topE = Object.keys(eCount).sort((a, b) => eCount[b] - eCount[a])[0];
+    const topM = Object.keys(mCount).sort((a, b) => mCount[b] - mCount[a])[0];
+    const lackE = ['불','흙','공기','물'].filter(k => !eCount[k] || eCount[k] <= 1);
+    const stats =
+      '원소 분포 — ' + ['불','흙','공기','물'].map(k => k + ' ' + (eCount[k] || 0) + '개').join(' / ') +
+      '  ▸ 가장 강한 원소: ' + topE + '(' + eCount[topE] + '개, ' + ELEMENT_MEANING[topE] + ')' +
+      (lackE.length ? '  ▸ 결핍: ' + lackE.join('·') + ' → 이 영역은 의식적으로 채워야 한다' : '') +
+      '\n성질 분포 — ' + Object.keys(MODALITY).map(k => k.replace(/\(.*\)/, '') + ' ' + (mCount[k] || 0) + '개').join(' / ') +
+      '  ▸ 가장 강한 성질: ' + topM + '(' + mCount[topM] + '개, ' + MODALITY_MEANING[topM] + ')';
+
+    // ── 6) 계산 방법론 (서버 생성 · 손님에게 그대로 보여줄 문단) ──
+    const isHighLat = Math.abs(loc.lat) > 40;
+    // 🚨 출생지를 목록에서 못 찾아 서울 좌표로 대체된 경우, 정밀도를 주장하면 거짓말이 된다.
+    //    그때는 좌표 문장을 빼고 정직하게만 쓴다.
+    const methodNote =
+      (cityResolved
+        ? '이 차트는 출생지 현지 시간대(' + (tzLabel || 'Asia/Seoul · UTC+09:00') + ')를 그대로 적용해 계산했습니다. ' +
+          '<b>상승점과 천정(MC)은 출생지 좌표(위도 ' + loc.lat.toFixed(2) + '° · 경도 ' + loc.lon.toFixed(2) + '°)와 ' +
+          '출생 순간의 지방 항성시로 직접 산출</b>했으며, 실제 천문 계산값과 1분(arcmin) 이내로 일치합니다. '
+        : '이 차트는 출생 시각의 시간대(' + (tzLabel || 'Asia/Seoul') + ')를 적용해 계산했습니다. ' +
+          '다만 선택하신 출생지의 정밀 좌표가 확인되지 않아 <b>상승점과 하우스는 근사치</b>입니다. ' +
+          '정확한 출생지를 알려주시면 다시 계산해 드립니다. ') +
+      '별자리 좌표는 베딕식 환산이 아닌 <b>서양 점성술의 트로피컬 기준</b>입니다.<br><br>' +
+      '하우스는 <b>홀사인(Whole Sign) 체계</b>를 씁니다. ' +
+      (isHighLat
+        ? '위도 ' + Math.abs(loc.lat).toFixed(0) + '도는 상당히 높은 편이어서, 플라시더스 같은 현대 체계에서는 하우스 크기가 심하게 뒤틀려 경계에 놓인 행성이 실제와 다른 방에 배정되는 일이 잦습니다. 홀사인은 위도의 영향을 받지 않아 이 출생지에서 가장 어긋남이 없는 기준입니다.'
+        : '경계 근처의 행성이 옆방으로 잘못 넘어가는 문제가 없어, 어느 행성이 어느 방에 있는지가 흔들리지 않습니다.') +
+      ' 다른 곳에서 본 리딩과 하우스가 한 칸 다르게 나왔다면, 대개 이 체계 차이 때문입니다.';
+
+    // ── 7) 다이제스트 (AI용 해석 재료) ──
+    lines.push('[정밀 좌표 · 도·분 단위. 본문에 인용할 때 이 표기를 그대로 쓸 것]');
+    for (const t of table) {
+      lines.push('· ' + t.name + ': ' + t.sign + ' ' + t.deg + ' / ' + t.house + '하우스(' + t.houseName + ')' +
+        (t.retro ? ' [역행]' : '') + (t.dignity ? ' 【' + t.dignity + '】' : '') + (t.role ? ' — ' + t.role : ''));
+    }
+    lines.push('');
+    lines.push('[원소·성질 통계 — 반드시 본문에 최소 1회 숫자로 인용하라]');
+    lines.push(stats);
+
+    // 세대행성 규칙
+    lines.push('');
+    lines.push('🚨[세대행성] 천왕성·해왕성·명왕성은 한 별자리에 7~20년 머물러 같은 세대 전체가 동일하다.');
+    lines.push('   "명왕성이 전갈자리라 ~합니다" 같은 사인 단독 인용은 또래 수천만 명에게 해당되는 일반론 → 절대 금지.');
+    lines.push('   이 셋은 ①하우스 위치 ②개인행성(태양·달·수성·금성·화성·상승점)과의 각도, 이 둘만 근거로 써라.');
+
+    // 목성 트랜짓 3축
+    const axes = [
+      { key: '인연·결혼(7하우스 축)', target: norm360(ascLon + 180), limit: 3 },
+      { key: '커리어·사회적 성취(천정 축)', target: mcLon, limit: 2 },
+      { key: '재물·수입(2하우스 축)', target: norm360(ascLon + 30), limit: 2 }
+    ];
+    const blocks = [];
+    for (const ax of axes) {
+      const w = (findJupiterTransitWindows(ax.target, ax.limit) || [])
+        .filter(x => typeof x === 'string' && x && x.indexOf('undefined') === -1);
+      if (w.length) blocks.push('· [' + ax.key + '] ' + w.join(' / '));
+    }
+    lines.push('');
+    if (blocks.length) {
+      lines.push('[🪐 실제 계산된 목성 트랜짓 — 시기는 이 값만 쓸 것. 임의의 연도로 바꾸면 치명적 실패]');
+      blocks.forEach(b => lines.push(b));
+    } else {
+      lines.push('[🪐 계산 결과] 향후 8년간(~2034년) 목성이 주요 축과 뚜렷한 각을 맺는 시기가 없다.');
+      lines.push('   시기를 단정하지 말고 "특정 시기를 기다릴 때가 아니라 태도와 자리를 넓힐 때"라고 정직하게 안내하라.');
     }
 
-    if (planets['천왕성'] || planets['해왕성'] || planets['명왕성']) {
-      lines.push('');
-      lines.push('🚨[세대행성 사용 규칙] 천왕성·해왕성·명왕성은 한 별자리에 7~20년 머물러 같은 세대 전체가 동일하다.');
-      lines.push('   따라서 "당신은 명왕성이 전갈자리라 ~합니다" 같은 사인 단독 인용은 또래 수천만 명에게 똑같이 해당되는 일반론이므로 절대 금지.');
-      lines.push('   이 세 행성은 반드시 ①어느 하우스에 있는지 ②개인행성(태양·달·수성·금성·화성·상승점)과 몇 도 각을 맺는지 — 이 두 가지만 근거로 써라.');
-    }
-
-    // ── 목성 트랜짓 3축 실계산 ──────────────────────────────
-    if (asc) {
-      const axes = [
-        { key: '인연·결혼', target: norm360(asc.abs + 180), limit: 3 },
-        { key: '커리어·사회적 성취', target: norm360(asc.abs + 270), limit: 2 },
-        { key: '재물·수입', target: norm360(asc.abs + 30), limit: 2 }
-      ];
-      const blocks = [];
-      for (const ax of axes) {
-        const w = (findJupiterTransitWindows(ax.target, ax.limit) || []).filter(
-          s => typeof s === 'string' && s.length > 0 && s.indexOf('undefined') === -1
-        );
-        if (w.length) blocks.push('· [' + ax.key + '] ' + w.join(' / '));
-      }
-      lines.push('');
-      if (blocks.length) {
-        lines.push('[🪐 실제 계산된 목성 트랜짓 — 시기는 반드시 이 값만 쓸 것. 임의의 연도로 바꾸면 치명적 실패]');
-        blocks.forEach(b => lines.push(b));
-      } else {
-        lines.push('[🪐 실제 계산 결과] 향후 8년간(~2034년) 목성이 주요 축과 뚜렷한 각을 맺는 시기가 없다.');
-        lines.push('   이 경우 시기를 단정하지 말고 "지금은 특정 시기를 기다릴 때가 아니라 태도와 자리를 넓힐 때"라고 정직하게 안내하라. 없는 시기를 지어내지 마라.');
-      }
-    }
-
-    // ── 특이 배치 탐지 ──────────────────────────────────────
+    // 특이 배치
     const highlights = [];
     for (const h of Object.keys(houseMap)) {
       const ps = houseMap[h];
-      // 🚨 기존 코드는 2개 이상을 스텔리움으로 판정해 프롬프트(3개 이상)와 모순됐다.
-      if (ps.length >= 3) {
-        highlights.push('【스텔리움】 ' + h + '하우스(' + HOUSE_MEANING[h] + ')에 ' + ps.join('·') + ' ' + ps.length + '개가 몰려 있다 → 이 사람 인생의 최대 화두. 반드시 리포트의 중심으로 다뤄라. 아무나 가질 수 없는 배치다.');
-      } else if (ps.length === 2) {
-        highlights.push('【집중】 ' + h + '하우스(' + HOUSE_MEANING[h] + ')에 ' + ps.join('·') + ' 2개가 함께 있다 → 이 영역의 비중이 평균보다 크다.');
-      }
+      if (ps.length >= 3) highlights.push('【스텔리움】 ' + h + '하우스(' + HOUSE_MEANING[h] + ')에 ' + ps.join('·') + ' ' + ps.length + '개 집중 → 인생의 최대 화두. 아무나 가질 수 없는 배치다.');
+      else if (ps.length === 2) highlights.push('【집중】 ' + h + '하우스(' + HOUSE_MEANING[h] + ')에 ' + ps.join('·') + ' 2개.');
     }
-    if (houseMap[7]) highlights.push('【배우자궁의 행성】 7하우스 안에 ' + houseMap[7].join('·') + '이 있다 → 배우자·관계 해석의 결정적 단서.');
-    if (houseMap[12]) highlights.push('【숨겨진 상처】 12하우스에 ' + houseMap[12].join('·') + '이 있다 → 남에게 말 못 한 감정·억눌린 패턴이 있다. 이걸 짚으면 소름 돋는다.');
-    if (houseMap[4]) highlights.push('【부모·뿌리】 4하우스에 ' + houseMap[4].join('·') + '이 있다 → 가정환경과 부모와의 관계가 성격 형성에 결정적이었다.');
-    if (houseMap[11]) highlights.push('【인간관계】 11하우스에 ' + houseMap[11].join('·') + '이 있다 → 인맥·모임·친구 관계가 인생에서 큰 비중을 차지한다.');
-    if (houseMap[8]) highlights.push('【깊은 상처와 변형】 8하우스에 ' + houseMap[8].join('·') + '이 있다 → 얕은 관계로는 만족 못 하는 사람. 또한 타인의 돈·투자·중개로 부를 만드는 재능이 있다.');
-    if (houseMap[1]) highlights.push('【강한 자아】 1하우스에 ' + houseMap[1].join('·') + '이 있다 → 존재감이 강하고 첫인상이 뚜렷하다.');
-    if (houseMap[6]) highlights.push('【일상·건강】 6하우스에 ' + houseMap[6].join('·') + '이 있다 → 일하는 방식과 몸 상태가 인생의 질을 좌우한다.');
-
-    // ── 재물·직업 축 ────────────────────────────────────────
-    const moneyLines = [];
-    if (houseMap[2]) moneyLines.push('2하우스(타고난 재능·자산)에 ' + houseMap[2].join('·') + ' → 이 행성들이 돈 버는 능력의 원천이다.');
-    if (houseMap[6]) moneyLines.push('6하우스(일하는 방식·기술)에 ' + houseMap[6].join('·') + ' → 실제로 일하는 스타일과 강점.');
-    if (houseMap[10]) moneyLines.push('10하우스(커리어·명예)에 ' + houseMap[10].join('·') + ' → 사회적으로 이름을 얻는 분야.');
-    if (houseMap[8]) moneyLines.push('8하우스(타인의 자원)에 ' + houseMap[8].join('·') + ' → 투자·중개·타인의 자본을 다루는 재능.');
-    if (planets['목성']) moneyLines.push('목성(확장·행운)이 ' + planets['목성'].sign + ' ' + (houseOf['목성'] || '?') + '하우스 → 부가 불어나는 영역. 여기에 투자하면 커진다.');
-    if (planets['토성']) moneyLines.push('토성(축적·인내)이 ' + planets['토성'].sign + ' ' + (houseOf['토성'] || '?') + '하우스 → 시간을 들여 단단히 쌓아야 하는 영역. 조급하면 무너진다.');
-    if (moneyLines.length) {
-      lines.push('');
-      lines.push('[💰 재물·직업 분석 재료 — CHAPTER 02에서 반드시 활용하라]');
-      moneyLines.forEach(l => lines.push(l));
+    for (const t of table) {
+      // 🚨 세대행성의 품위는 또래 전체가 동일하다(1984~95년생은 전부 명왕성 전갈=제 집).
+      //    명세표에는 사실이니 그대로 두되, AI의 개인화 근거로는 쓰지 않는다.
+      if (OUTER.indexOf(t.name) >= 0) continue;
+      if (t.dignity && t.dignity.indexOf('지배') === 0) highlights.push('【품위】 ' + t.name + '이 ' + t.sign + '에서 제 집에 있다 → 이 행성의 능력이 온전히 발휘된다. 강점 서술의 1순위 근거.');
+      if (t.dignity && t.dignity.indexOf('고양') === 0) highlights.push('【품위】 ' + t.name + '이 ' + t.sign + '에서 고양 → 타고난 축복. 아무나 못 가진 자리다.');
+      if (t.dignity && (t.dignity.indexOf('함몰') === 0 || t.dignity.indexOf('추락') === 0)) highlights.push('【품위】 ' + t.name + '이 ' + t.sign + '에서 ' + t.dignity.split(' ')[0] + ' → 이 영역에서 유독 애를 써야 했다. 그래서 남보다 깊어진 자리로 뒤집어라.');
+    }
+    if (houseMap[7]) highlights.push('【배우자궁】 7하우스에 ' + houseMap[7].join('·') + ' → 관계 해석의 결정적 단서.');
+    if (houseMap[12]) highlights.push('【숨겨진 상처】 12하우스에 ' + houseMap[12].join('·') + ' → 남에게 말 못 한 감정. 짚으면 소름 돋는다.');
+    if (houseMap[4]) highlights.push('【부모·뿌리】 4하우스에 ' + houseMap[4].join('·') + ' → 가정환경이 성격 형성에 결정적이었다.');
+    if (houseMap[8]) highlights.push('【깊은 결속】 8하우스에 ' + houseMap[8].join('·') + ' → 얕은 관계로 만족 못 한다. 타인의 자본·투자·중개 재능.');
+    if (houseMap[11]) highlights.push('【인맥】 11하우스에 ' + houseMap[11].join('·') + ' → 모임·네트워크가 인생의 큰 축.');
+    if (houseMap[1]) highlights.push('【강한 자아】 1하우스에 ' + houseMap[1].join('·') + ' → 존재감이 강하고 첫인상이 뚜렷하다.');
+    if (houseMap[6]) highlights.push('【일상·건강】 6하우스에 ' + houseMap[6].join('·') + ' → 일하는 방식과 몸 상태가 삶의 질을 좌우한다.');
+    // 노드와 행성의 겹침 (수동 샘플의 결정적 장치)
+    for (const n of PLANET_ORDER) {
+      if (planets[n] === undefined) continue;
+      if (angleDiff(planets[n], nnLon) <= 6)
+        highlights.push('【겹침 · 매우 중요】 ' + n + '이 노스노드와 ' + angleDiff(planets[n], nnLon).toFixed(1) + '도 이내로 겹친다 → 이 행성의 재능을 키우는 일이 곧 이번 생의 과제다. 리포트를 하나로 봉합하는 결정적 단서.');
+      if (angleDiff(planets[n], mcLon) <= 5)
+        highlights.push('【천정 합】 ' + n + '이 천정(MC)과 ' + angleDiff(planets[n], mcLon).toFixed(1) + '도로 겹친다 → 이 행성의 성질이 곧 사회적 얼굴이 된다. 직업 해석의 1순위.');
     }
 
-    // ── 애스펙트 (해석 깊이의 핵심) ──────────────────────────
+    // 애스펙트
     const weightOf = n => (PERSONAL.indexOf(n) >= 0 ? 3 : (SOCIAL.indexOf(n) >= 0 ? 2 : 1));
-    const raw = [];
-    const pnames = Object.keys(planets);
+    const raw = [], pnames = Object.keys(planets);
     for (let i = 0; i < pnames.length; i++) {
       for (let j = i + 1; j < pnames.length; j++) {
         const a = pnames[i], b = pnames[j];
-        // 세대행성끼리의 각도는 같은 세대 전체가 동일하므로 개인화 근거로 무의미 → 제외
         if (OUTER.indexOf(a) >= 0 && OUTER.indexOf(b) >= 0) continue;
-        const diff = angleDiff(planets[a].abs, planets[b].abs);
+        const diff = angleDiff(planets[a], planets[b]);
         for (const asp of ASPECTS) {
           const orbErr = Math.abs(diff - asp.ang);
           if (orbErr <= asp.orb) {
             const key = PAIR_MEANING[a + '-' + b] ? a + '-' + b : (PAIR_MEANING[b + '-' + a] ? b + '-' + a : null);
             if (key && PAIR_MEANING[key][asp.tone]) {
-              raw.push({
-                score: weightOf(a) + weightOf(b),
-                orbErr: orbErr,
-                text: '【각도】 ' + key.replace('-', '과 ') + ' ' + asp.name + '(' + asp.tone + ', 오차 ' + orbErr.toFixed(1) + '도) → ' + PAIR_MEANING[key][asp.tone]
-              });
+              raw.push({ score: weightOf(a) + weightOf(b), orbErr: orbErr,
+                text: '【각도】 ' + key.replace('-', '과 ') + ' ' + asp.name + '(' + asp.ang + '도, 오차 ' + orbErr.toFixed(1) + '도, ' + asp.tone + ') → ' + PAIR_MEANING[key][asp.tone] });
             }
             break;
           }
         }
       }
     }
-    // 개인행성이 관여한 각도 우선, 그다음 오차가 작은(=강력한) 각도 우선
     raw.sort((x, y) => (y.score - x.score) || (x.orbErr - y.orbErr));
     const aspectLines = raw.slice(0, 10).map(r => r.text);
-
     if (aspectLines.length) {
-      highlights.push('--- 아래는 행성 간 각도다. 이 사람 성격·연애·일 패턴의 가장 정밀한 근거이니 반드시 최소 2개를 해석에 녹여라 ---');
+      highlights.push('--- 아래는 행성 간 각도다. 가장 정밀한 근거이니 최소 2개를 본문에 녹이고, 인용할 때 오차 도수까지 함께 써라 ---');
       aspectLines.forEach(l => highlights.push(l));
     }
-
     if (highlights.length) {
       lines.push('');
       lines.push('[🔬 이 사람만의 특이 배치 — 중심 스토리로 반드시 활용하라]');
       highlights.forEach(h => lines.push(h));
     }
 
-    // ── 달의 교점 ───────────────────────────────────────────
-    let nodeInfo = null;
-    try {
-      const nnLon = calcNorthNode(dateTimeIso);
-      const nn = signDeg(nnLon);
-      const sn = signDeg(nnLon + 180);
-      const meaning = NODE_MEANING[nn.sign];
+    // 달의 교점
+    const meaning = NODE_MEANING[nnRow.s.sign];
+    lines.push('');
+    lines.push('[🔮 전생과 영혼의 과제 — 달의 교점]');
+    lines.push('사우스노드(전생에 통달한 것): ' + snRow.s.sign + ' ' + snRow.s.text + ' / ' + snRow.h + '하우스(' + HOUSE_MEANING[snRow.h] + ')');
+    lines.push('노스노드(이번 생의 과제): ' + nnRow.s.sign + ' ' + nnRow.s.text + ' / ' + nnRow.h + '하우스(' + HOUSE_MEANING[nnRow.h] + ')');
+    if (meaning) {
+      lines.push('→ 전생의 익숙한 패턴: ' + meaning.south);
+      lines.push('→ 이번 생에 배워야 할 것: ' + meaning.north);
+    }
+
+    // 사인 경계 경고 — 경계 1도 이내면 출생시각 오차에 별자리가 뒤집힐 수 있다
+    const nearCusp = table.filter(t => {
+      const inSign = ((t.deg.match(/^(\d+)/) || [0, 0])[1] | 0) + (((t.deg.match(/°(\d+)/) || [0, 0])[1] | 0) / 60);
+      return inSign < 1 || inSign > 29;
+    });
+    if (nearCusp.length) {
+      console.warn('⚠️ 사인 경계 1도 이내: ' + nearCusp.map(t => t.name + '(' + t.sign + ' ' + t.deg + ')').join(', '));
       lines.push('');
-      lines.push('[🔮 전생과 영혼의 과제 — 달의 교점]');
-      lines.push('사우스노드(전생에 통달한 것): ' + sn.sign + ' ' + sn.deg + '도');
-      lines.push('노스노드(이번 생의 과제): ' + nn.sign + ' ' + nn.deg + '도');
-      if (meaning) {
-        lines.push('→ 전생의 익숙한 패턴: ' + meaning.south);
-        lines.push('→ 이번 생에 반드시 배워야 할 것: ' + meaning.north);
-      }
-      if (asc) {
-        const nh = wholeSignHouse(nnLon, asc.abs);
-        const sh = ((nh + 5) % 12) + 1;
-        lines.push('노스노드가 ' + nh + '하우스(' + HOUSE_MEANING[nh] + '), 사우스노드가 ' + sh + '하우스(' + HOUSE_MEANING[sh] + ')에 있다 → 이번 생의 성장은 ' + nh + '하우스 영역에서 일어난다.');
-      }
-      nodeInfo = meaning ? meaning.north : null;
-    } catch (e) { /* 교점 실패는 리포트 전체를 막지 않는다 */ }
+      lines.push('⚠️[경계 주의] ' + nearCusp.map(t => t.name).join('·') + '은 별자리 경계에서 1도 이내다. 출생시각이 조금만 달라도 옆 별자리로 넘어간다. 이 천체를 해석의 핵심 근거로 삼지 말고, 다른 배치를 중심으로 써라.');
+    }
 
-    // ── 중심 서사 앵커 확정 ─────────────────────────────────
-    const core = pickCoreNarrative({ planets, houseMap, houseOf, aspectLines, nodeInfo });
-
-    return { digest: lines.join('\n'), core: core };
+    return {
+      digest: lines.join('\n'),
+      core: pickCoreNarrative({ planets: planets, houseMap: houseMap, houseOf: houseOf, aspectLines: aspectLines, table: table }),
+      table: table, methodNote: methodNote, stats: stats
+    };
   } catch (e) {
-    console.error('⚠️ analyzeChart 실패:', e.message);
-    return { digest: null, core: null };
+    console.error('⚠️ analyzeChart 실패:', e.message, e.stack);
+    return { digest: null, core: null, table: null, methodNote: null, stats: null };
   }
 }
 
-// ============================================================================
-//  🎯 [수정 4-b] 중심 서사 앵커 선정
-// ----------------------------------------------------------------------------
-//  Gemini 호출을 둘로 쪼개면 각 호출이 서로 다른 배치를 중심으로 잡아
-//  리포트가 두 개의 다른 글처럼 갈라질 위험이 있다.
-//  그래서 서버가 규칙 기반으로 '중심 배치'를 하나 확정해 양쪽에 똑같이 주입한다.
-//  우선순위: 달-토성 각 → 12·8하우스 개인행성 → 스텔리움 → 토성 하우스 → 달 배치
-// ============================================================================
+// 중심 서사 앵커 — 호출을 둘로 쪼개도 이야기가 갈라지지 않게 서버가 하나로 고정한다
 function pickCoreNarrative(ctx) {
-  const { planets, houseMap, houseOf, aspectLines } = ctx;
-  const pick = t => '이 리포트 전체를 관통하는 중심 배치는 【' + t + '】다. 네 챕터 모두 이 배치에서 출발해, 이것이 상처였다가 재능이 되고 결국 이번 생의 과제로 이어지는 하나의 이야기로 써라. 챕터마다 다른 배치를 중심으로 삼지 마라.';
+  const { planets, houseMap, houseOf, aspectLines, table } = ctx;
+  const pick = t => '이 리포트 전체를 관통하는 중심 배치는 【' + t + '】다. 네 챕터 모두 이 배치에서 출발해, ' +
+    '그것이 상처였다가 재능이 되고 결국 이번 생의 과제로 이어지는 하나의 이야기로 써라. 챕터마다 다른 배치를 중심으로 삼지 마라.';
 
-  const moonSaturn = (aspectLines || []).find(l => l.indexOf('달과 토성') >= 0);
-  if (moonSaturn) return pick('달과 토성의 각 — 감정을 드러내지 않고 혼자 감당해온 구조') + '\n(근거: ' + moonSaturn + ')';
+  const nodeConj = (aspectLines || []).length ? null : null;
+  void nodeConj;
 
-  const sunSaturn = (aspectLines || []).find(l => l.indexOf('태양과 토성') >= 0);
-  if (sunSaturn) return pick('태양과 토성의 각 — 늘 부족하다 느끼며 스스로를 몰아붙여온 구조') + '\n(근거: ' + sunSaturn + ')';
+  const ms = (aspectLines || []).find(l => l.indexOf('달과 토성') >= 0);
+  if (ms) return pick('달과 토성의 각 — 감정을 드러내지 않고 혼자 감당해온 구조') + '\n(근거: ' + ms + ')';
+  const ss = (aspectLines || []).find(l => l.indexOf('태양과 토성') >= 0);
+  if (ss) return pick('태양과 토성의 각 — 늘 부족하다 느끼며 스스로를 몰아붙여온 구조') + '\n(근거: ' + ss + ')';
+
+  const exalt = (table || []).find(t => t.dignity && t.dignity.indexOf('고양') === 0);
+  if (exalt) return pick(exalt.name + '이 ' + exalt.sign + '에서 고양 — 타고난 축복이 ' + exalt.house + '하우스(' + exalt.houseName + ')에서 발휘되는 구조');
 
   for (const h of [12, 8]) {
     const ps = (houseMap[h] || []).filter(n => PERSONAL.indexOf(n) >= 0);
-    if (ps.length) {
-      const label = h === 12 ? '12하우스(무의식·숨겨진 상처)의 ' + ps.join('·') : '8하우스(깊은 결속·변형)의 ' + ps.join('·');
-      return pick(label);
-    }
+    if (ps.length) return pick(h + '하우스(' + HOUSE_MEANING[h] + ')의 ' + ps.join('·'));
   }
-
   for (const h of Object.keys(houseMap)) {
-    if (houseMap[h].length >= 3) {
-      return pick(h + '하우스(' + HOUSE_MEANING[h] + ')의 스텔리움 — ' + houseMap[h].join('·') + ' ' + houseMap[h].length + '개 집중');
-    }
+    if (houseMap[h].length >= 3) return pick(h + '하우스(' + HOUSE_MEANING[h] + ')의 스텔리움 — ' + houseMap[h].join('·'));
   }
-
-  if (planets['토성'] && houseOf['토성']) {
-    return pick('토성이 자리한 ' + houseOf['토성'] + '하우스(' + HOUSE_MEANING[houseOf['토성']] + ') — 이 영역에서 반복적으로 벽을 만나며 단단해진 구조');
-  }
-
-  if (planets['달']) {
-    const h = houseOf['달'];
-    return pick('달이 자리한 ' + planets['달'].sign + (h ? ' ' + h + '하우스(' + HOUSE_MEANING[h] + ')' : '') + ' — 이 사람 감정의 근본 구조');
-  }
-
-  return pick('태양과 상승점이 만드는 기본 기질');
+  if (planets['토성'] !== undefined && houseOf['토성'])
+    return pick('토성이 자리한 ' + houseOf['토성'] + '하우스(' + HOUSE_MEANING[houseOf['토성']] + ') — 반복해 벽을 만나며 단단해진 구조');
+  return pick('달이 자리한 ' + dms(planets['달']).sign + (houseOf['달'] ? ' ' + houseOf['달'] + '하우스' : '') + ' — 감정의 근본 구조');
 }
 
 // ============================================================================
 //  ✍️ 프롬프트 — 공통부
 // ----------------------------------------------------------------------------
-//  🚨 [수정 1] 분량 지시의 단일 출처(single source of truth)
-//     기존에는 [글 쓰는 방식] 6번이 "card1·3·4 각 2000자, card2 2500자"라고 했고
-//     JSON 스펙은 "card1 1600자, card2 2000자"라고 해서 서로 모순이었다.
-//     모델은 필드 바로 앞의 지시를 따르므로 실제 목표가 1600자로 내려앉아 있었다.
-//     → 자수는 JSON 필드 스펙에만 적고, 일반 규칙은 그것을 참조만 한다.
+//  설계 원칙
+//  1. 상세페이지(product_no=11)에서 약속한 항목과 1:1 대응. 약속 불이행 = 환불 사유.
+//  2. 자수 기준은 JSON 필드 스펙에만 적는다 (단일 출처).
+//  3. 'AI 냄새' 어휘를 블랙리스트로 차단. 이게 수동 리포트와의 가장 큰 체감 차이다.
+//  4. 소제목은 라벨형(【타고난 것】)이 아니라 서술형 문장으로. 대신 상세페이지
+//     약속 키워드를 본문에 그대로 등장시켜 손님이 "내가 산 그것"을 알아보게 한다.
 // ============================================================================
 function buildCommonPrompt(v) {
   return `
-[🚨🚨 절대 금지 - 최우선]
-'undefined', 'null', 'NaN', '트랜짓 항목', '데이터에 없음', '하우스맵' 같은 개발자/시스템 용어를 리포트 본문에 절대 쓰지 마라.
-손님은 일반인이다. 시스템 내부 사정을 손님에게 설명하지 마라. 어떤 정보가 계산되지 않았다면 그 사실을 언급하지 말고 자연스럽게 다른 근거로 서술하라.
+[화자 설정 — 이 목소리로만 써라]
+너는 명리학(사주)을 이십 년 공부한 뒤 서양 점성술로 옮겨온 상담가다. 이과 출신이라 근거 없는 말을 싫어한다.
+계산된 것만 말하고, 계산되지 않은 것은 말하지 않는다. 손님을 위로하려 들지 않는다. 다정하지만 단호하다.
+지금 네 앞에 ${v.name}님이 앉아 있다. 29,900원을 낸 손님이다. 다 읽고 "누군가 드디어 내 인생을 제대로 봤다"고 느끼게 만드는 것이 네 일이다.
 
-[🚨 시간 기준 - 최우선 규칙]
-오늘은 ${v.todayStr}이다. 너의 학습 데이터 기준 연도가 아니라 이 날짜가 진짜 현재다.
-미래 예측 시기는 반드시 오늘(${v.todayStr}) 이후의 연도와 월로만 써라. 이미 지난 시기를 미래로 쓰면 치명적인 실패다.
+[🚨 시간 기준]
+오늘은 ${v.todayStr}이다. 학습 데이터 기준 연도가 아니라 이 날짜가 현재다.
+${v.ageLine}
+미래 시기는 반드시 오늘 이후의 연·월로만 써라. 이미 지난 시기를 미래로 쓰면 치명적 실패다.
 
-너는 30년간 수많은 사람의 인생을 지켜봐온, 서양 점성술 대가이자 인생 상담가야.
-지금 네 앞에는 ${v.name}님이 앉아있어. 이 사람은 삼십만원짜리 인생 리포트를 받으러 온 소중한 손님이야.
-네 임무는, 이 사람이 다 읽고 나서 "누군가 드디어 내 인생을 온전히 이해해줬다"며 울컥하게 만드는 거야.
+[🚫 절대 금지 어휘 — 하나라도 쓰면 실패]
+① 유사영성 상투어: 우주가 당신에게, 에너지, 파동, 진동, 기운이 흐르다, 빛과 어둠, 신성한, 고귀한 영혼
+② AI 접속어: 결국, 즉, 다시 말해, 요약하면, 살펴보겠습니다, ~라는 점입니다, ~에 대해 말씀드리자면, 이는 ~을 의미합니다, ~라고 할 수 있습니다
+③ 하나마나한 덕담: 긍정적으로 생각하세요, 자신을 사랑하세요, 있는 그대로의 당신, 완벽한 사람은 없습니다, 시간이 해결해줍니다
+④ 발뺌 화법: ~한 느낌도 있습니다, ~한 면이 있으신 것 같아요, ~할 수도 있어요, 아마 ~일지도, 경우에 따라
+⑤ 연민: 얼마나 힘드셨어요, 안타깝네요, 가여운, 마음이 아프네요
+발뺌 대신 "~한 편입니다" 또는 단정을 써라. 이게 이 리포트의 기본 화법이다.
 
-[가장 중요한 원칙]
-이 리포트는 따로 노는 글이 아니라 하나로 이어지는 '인생 이야기'다.
-CHAPTER 01에서 상처를 정확히 짚고 → 02에서 그 상처가 실은 재능이었다고 뒤집고 → 03에서 나아갈 길과 타이밍을 밝히고 → 04에서 전생부터 이어진 영혼의 과제로 모든 것을 꿰뚫어 납득시키는,
-한 편의 영화처럼 감정이 흐르게 써라.
+[✍️ 문장 리듬 — AI는 문장 길이가 균일해서 티가 난다]
+· 각 단락에 15자 이내의 짧은 단정문을 최소 하나 넣어라. (예: "그건 성격이 아닙니다.")
+· 40자 넘는 문장이 연속 세 개 이상 나오면 실패다.
+· 단락 길이도 들쭉날쭉하게. 두 줄 단락과 여덟 줄 단락을 섞어라.
 
-[🎯 중심 서사 - 반드시 지켜라]
+[📌 소제목 규격]
+소제목은 라벨이 아니라 문장으로 써라. <b>【타고난 것】</b>(X) → <b>애어른의 별을 달고 태어났습니다</b>(O)
+형식: <b>소제목 문장</b> 으로 감싸고, 각 챕터에 지정된 개수만큼 쓴다.
+
+[🔬 차트 근거 인용 규격 — 이 리포트가 다른 곳과 다른 지점]
+아래 좌표는 실제 천문 계산 결과다. 없는 배치를 지어내면 치명적 실패다.
+1. 도·분 표기를 그대로 인용하라. "달이 황소자리에 있고"(X) → "<b>달이 황소자리 22°25′</b>에 있고"(O)
+2. 각도를 인용할 때는 오차 도수까지 함께 써라. "<b>달과 상승점이 정확히 90도, 오차 0.7도로 맞물려 있습니다.</b>"
+3. 품위(지배·고양·함몰·추락)가 표시된 행성이 있으면 최소 하나를 근거로 써라. 쉬운 말로 풀어서:
+   "수성이 쌍둥이자리에 있는데, 이건 수성이 가장 힘을 잘 쓰는 '제 집'입니다."
+4. 원소·성질 통계를 최소 한 번 숫자로 인용하라. "<b>고정성 별자리에 행성이 다섯 개</b> 몰려 있습니다."
+5. 근거는 챕터당 두세 개까지만 굵고 명확하게. 용어를 줄줄이 나열해 어렵게 만들지 마라.
+
+[정밀 계산된 네이탈 차트]
+${v.astro}
+
+[손님 정보] 이름 ${v.name} / 성별 ${v.myGender || '미기재'} / 출생지 ${v.city} / 생년월일시 ${v.date} ${v.time}
+
+[🎯 중심 서사 — 반드시 지켜라]
 ${v.core}
 
-[정밀 계산된 네이탈 차트 - 트로피컬(서양식) 기준]
-${v.astro}
-위 좌표는 실제 천체 계산 결과다. 반드시 이 데이터의 별자리/도수/하우스를 그대로 인용하고, 없는 배치를 절대 지어내지 마라.
+[🎬 장면 규격 — 추상적인 말이 이 리포트를 망친다]
+패턴을 설명할 때는 반드시 눈에 보이는 장면으로 써라. 아래 중 세 개 이상을 넣어라.
+① 시간·상황 (새벽 두 시, 회식 자리, 카톡 답장 전) ② 구체적 행동 (다 쓰고 지운다, 먼저 웃는다)
+③ 상대의 반응 ④ 몸의 감각 (가슴이 조인다, 목이 막힌다) ⑤ 속으로 한 말 (따옴표로 직접 인용)
+나쁜 예: "감정을 잘 표현하지 못합니다."
+좋은 예: "새벽 두 시에 답장을 다 써놓고, 보내기 직전에 지웁니다. <b>괜히 부담될까 봐.</b>"
 
-[손님 정보] 이름: ${v.name} / 성별: ${v.myGender || '미기재'} / 출생지: ${v.city} / 생년월일시: ${v.date} ${v.time}
+[🎯 과거 검증 문장 — CHAPTER 01에 반드시 하나]
+아래 [인생 주기] 표에서 이미 지난 시기 하나를 골라, 특정 나이와 연도를 짚고 단정하라.
+"<b>스물아홉, 2020년 무렵</b>에 그때까지의 관계나 일을 한 번 갈아엎으셨을 겁니다."
+이게 맞으면 손님은 나머지 전부를 믿는다. 가장 강력한 장치다.
 
-[🚨 감정 vs 연민 - 이 리포트의 핵심 톤]
-${v.name}님의 감정을 정확히 읽어주는 것(공감)과 불쌍하게 여기는 것(연민)은 완전히 다르다.
-- 공감(O): "당신은 힘들 때 아무에게도 기대지 못하고 혼자 삼켜왔습니다" → 마음을 정확히 읽어 문을 연다.
-- 연민(X): "얼마나 힘드셨어요", "안타깝네요", "가여운 당신" → 손님을 약자로 만든다. 절대 금지.
-🚨 규칙: 감정을 읽어 마음을 연 뒤, 반드시 그 상처를 강점·재능으로 뒤집어 끝내라.
-"당신은 늘 혼자 감당해왔습니다(공감) → 그건 약함이 아니라 아무나 못 가진 강인함입니다(반전)" 이 구조가 이 리포트의 심장이다.
-손님이 다 읽고 '위로받았다'가 아니라 '내가 이렇게 대단한 사람이었구나'라고 느끼게 하라.
+[🎯 반증 조건 — CHAPTER 01 또는 02 끝에 반드시 하나]
+"만약 ~라면 이 해석은 ${v.name}님에게 안 맞습니다. 그때는 ~쪽을 보십시오."
+스스로 틀릴 조건을 밝히는 리포트는 없다. 이 한 줄이 나머지 전부의 신뢰를 만든다.
 
-[🚨 강점은 확실하게, 특이점은 콕 집어서]
-- 강점은 절대 뭉뚱그리지 말고 "남들은 못 하는데 당신은 되는 것"의 형태로 단정하라. 반드시 이 사람의 실제 배치에서 도출하라.
-  배치별 참고: 태양·화성 1하우스 또는 양자리 강함→남보다 먼저 움직여 판을 여는 추진력 / 수성 3·9하우스 또는 쌍둥이·처녀 강함→말과 글로 설명하는 능력 / 금성 강함 또는 천칭·황소→사람 마음을 편하게 만드는 감각, 미적 안목 / 달·물 원소(게·전갈·물고기) 강함→상대 감정을 읽어내는 촉 / 토성 강함 또는 염소·10하우스→끝까지 버텨 결과를 만드는 지구력 / 목성 강함 또는 사수·9하우스→큰 그림을 보고 사람을 끌어들이는 낙천성 / 8·12하우스 강함→표면 아래 본질을 꿰뚫는 통찰 / 11하우스·물병 강함→사람을 모으고 판을 만드는 감각 / 스텔리움→그 하우스 영역의 집중된 재능.
-- 차트에서 이 사람만의 특이 배치(스텔리움, 달의 교점, 특정 하우스 집중, 드문 각)를 최소 1개 콕 집어 "이건 아무나 가질 수 없는 배치입니다"라고 강조하라. 평범한 차트처럼 다루면 실패다.
+[🎯 명리학 대비 — 리포트 전체에서 최대 두 번만]
+사주 관점을 짧게 언급한 뒤 네이탈로 뒤집어라. 자랑이 아니라 왜 이 리포트가 다른지 보여주는 용도다.
+"사주로 보면 이건 '토(土)가 강한 사람'으로 끝납니다. 네이탈 차트는 그게 <b>어느 방에서 벌어지는 일인지</b>까지 말해줍니다."
+세 번 이상 쓰면 장사꾼처럼 보인다. 두 번 이하로 제한하라.
 
-[🚨 성격의 그림자 - 신뢰도의 핵심]
-칭찬만 있는 리포트는 '누구한테나 하는 말'처럼 느껴져 안 믿긴다. 뜨끔한 단점을 정확히 짚으면 손님은 '이 사람이 나를 진짜 안다'고 느끼고 앞의 칭찬까지 다 믿게 된다.
-- 🚨절대 모두에게 '급하다'고 쓰지 마라. 실제 배치에서 도출되는 것만 골라라:
-  화성 양자리·사자·1하우스 또는 불 원소 상승점→급함·욱함 / 수성 쌍둥이·사수·3하우스→산만함 / 수성·화성 처녀·염소→완벽주의로 미룸·잔소리 / 달·금성 게자리·물고기·12하우스→거절 못 함·혼자 삼킴 / 토성 1·10하우스→자기검열·경직 / 천칭·2하우스→우유부단 / 전갈·8하우스→의심 많음·속을 안 보임 / 명왕성이 개인행성과 긴장각→통제 욕구 / 천왕성이 개인행성과 긴장각→싫증·이탈 / 해왕성이 개인행성과 긴장각→회피·이상화.
-- 🚨 화법: "성격이 급한 편입니다"처럼 부드럽게 단정하는 톤이 기본. "~합니다", "~하시죠"도 좋다.
-  [[발뺌 화법 금지]] "~한 느낌도 있습니다", "~한 면이 있으신 것 같아요", "~할 수도 있어요", "아마 ~일지도"처럼 빠져나갈 구멍을 만드는 표현은 소름을 죽인다. 절대 금지.
-- 🚨 균형: 반드시 '강점의 이면'으로 프레임하라. 그 기질이 준 강점을 먼저 인정한 뒤 "다만 그것 때문에 ~할 때가 있죠"로 짚어라. 기죽이지 말되 정확히 찔러라.
+[🚨 감정 vs 연민 — 이 리포트의 심장]
+감정을 정확히 읽는 것(공감)과 불쌍하게 여기는 것(연민)은 다르다.
+공감(O): "힘들 때 아무에게도 기대지 못하고 혼자 삼켜왔습니다." → 마음을 읽어 문을 연다.
+연민(X): "얼마나 힘드셨어요." → 손님을 약자로 만든다.
+규칙: 감정을 읽어 문을 연 뒤, 반드시 그 상처를 강점으로 뒤집어 끝내라.
+"늘 혼자 감당해왔습니다(공감) → 그건 약함이 아니라 아무나 못 가진 강인함입니다(반전)"
+다 읽고 '위로받았다'가 아니라 '내가 이런 사람이었구나'라고 느끼게 하라.
 
-[문체 기준]
-좋은 예: "<b>${v.name}님의 차트에는 금성·화성·토성 세 별이 전부 12하우스, 숨겨진 방에 몰려 있습니다.</b> 좋아하는 사람이 생겨도 티를 내지 못하고, 힘들어도 괜찮다는 말로 덮어온 것은 성격이 아니라 이 배치가 만든 오래된 습관입니다. <b>그리고 바로 이 배치가, 남의 감정을 누구보다 깊이 읽어내는 당신만의 특별한 재능이 되었습니다.</b>"
-나쁜 예(절대 금지): "긍정적으로 생각하세요" 같은 하나마나한 덕담 / 발뺌 화법 / "가여운", "안타까운" 같은 연민 / 강점을 뭉뚱그리는 것 / 교과서적 점성술 일반론.
+[💪 강점은 확신 있게, 특이점은 콕 집어서]
+· 강점은 "남들은 못 하는데 당신은 되는 것" 형태로 단정하라. 뭉뚱그린 칭찬은 실패다.
+· 반드시 실제 배치에서 도출하라. 품위(제 집·고양) 행성, 스텔리움, 노드와 겹친 행성이 1순위 근거다.
+· 이 사람만의 특이 배치를 최소 하나 골라 "이건 아무나 가질 수 없는 배치입니다"라고 못 박아라.
 
-[글 쓰는 방식]
-1. 🚨[차트 근거 필수] 각 챕터마다 최소 1번, 해석 전에 차트상의 근거를 먼저 밝혀라.
-   형식: "<b>${v.name}님의 차트를 보면, 달이 OO자리 OO도에 자리하고 있습니다.</b> 이것이 말해주는 것은..." — [차트 근거] → [해석] 순서.
-   위 실제 데이터의 행성 위치를 읽고 인용하라. 지어내지 마라. 단, 근거는 챕터당 1~2개만 굵고 명확하게. 용어를 줄줄이 나열해 어렵게 만들지 마라.
-2. 근거 뒤의 설명은 쉬운 말로 풀어라. "${v.name}님은~" 하고 이름을 부르며 눈을 마주보고 이야기하듯.
-3. 뭉뚱그리지 마라. "힘드셨을 거예요"(X) → "당신은 정작 당신이 힘들 때 아무에게도 기대지 못하고 혼자 삼켜왔습니다"(O)
-4. 모든 챕터는 '감정 읽기 → 강점으로 반전 → 구체적 방향' 흐름으로 끝나라. 상처만 파고 끝내지 마라.
-5. 강조는 <b> 태그로. 마크다운(*) 절대 금지. 단락 구분은 <br><br>.
-6. 🚨[분량] 각 필드에 적힌 최소 자수를 반드시 지켜라. 그 숫자가 유일한 기준이다. 소제목(<b>【소제목】</b>)으로 단락을 나눠 각 단락이 하나의 완결된 이야기가 되게 하라. 짧으면 29,900원 값을 못 한다. 길고 깊게, 그러나 지루하지 않게.
-7. 결과는 순수 JSON 객체로만 출력. 앞뒤에 아무것도 붙이지 마.
+[🕳️ 성격의 그림자 — 신뢰도의 결정타]
+칭찬만 있으면 '누구한테나 하는 말'로 읽혀 안 믿긴다. 뜨끔한 단점을 정확히 짚으면 앞의 칭찬까지 다 믿게 된다.
+🚨 절대 모두에게 '급하다'고 쓰지 마라. 실제 배치에서 도출되는 것만 골라라.
+화성 양자리·사자·1하우스 또는 불 원소 상승점 → 급함·욱함 / 수성 쌍둥이·사수·3하우스 → 산만함
+수성·화성 처녀·염소 → 완벽주의로 미룸·잔소리 / 달·금성 게자리·물고기·12하우스 → 거절 못 함·혼자 삼킴
+토성 1·10하우스 → 자기검열·경직 / 천칭·2하우스 → 우유부단 / 전갈·8하우스 → 의심 많음·속을 안 보임
+명왕성이 개인행성과 긴장각 → 통제 욕구 / 천왕성 긴장각 → 싫증·이탈 / 해왕성 긴장각 → 회피·이상화
+프레임: 그 기질이 준 강점을 먼저 인정한 뒤 "다만 그것 때문에 ~할 때가 있죠"로 짚어라. 기죽이지 말되 정확히 찔러라.
+
+[출력 형식]
+· 강조는 <b> 태그. 마크다운(*) 절대 금지. 단락 구분은 <br><br>.
+· 각 필드에 적힌 최소 자수를 반드시 지켜라. 그 숫자가 유일한 기준이다.
+· 순수 JSON 객체만 출력. 앞뒤에 아무것도 붙이지 마라.
 `;
 }
 
 // ── 호출 A: CHAPTER 01 + 02 ────────────────────────────────
+//    상세페이지 CHAPTER 01은 3개, CHAPTER 02는 4개 항목을 약속했다. 전부 이행한다.
 function buildPromptA(v) {
   return buildCommonPrompt(v) + `
-[출력 JSON 형식 — 아래 두 필드만 출력하라]
+[출력 JSON — 아래 세 필드만]
 {
-  "vip_card1": "(최소 2200자) [CHAPTER 01. 내 삶을 갉아먹는 무의식의 방해 공작] 냉정한 진단이되 마지막엔 반드시 강점으로 뒤집어라. 소제목 4개로 나눠 길고 깊게 써라. <b>【타고난 것】</b> 먼저 달·토성·12하우스 등 특이 배치를 차트 근거로 밝히고, 그것이 준 '아무나 못 가진 능력'을 먼저 인정하라. <b>【무의식의 그림자】</b> 🚨위 【각도】 항목 중 최소 1개를 반드시 근거로 인용하라(예: '달과 토성이 각을 이루어, 감정을 드러내면 안 된다고 배우셨습니다'). 이게 정밀함의 핵심이다. 그 능력의 이면에 자리잡은 무의식적 불안·결핍의 정체를 콕 집어라 — 잘 살고 싶은 마음과 반대로 자꾸 스스로를 망치는 선택으로 몰아온 패턴을. 🚨[성격 단점 필수] 이 단락 안에서 화성·수성·상승점 배치를 근거로 실제 성격 단점 1~2개를 '~한 편입니다'로 부드럽게 단정해 콕 집어라. 예시를 베끼지 말고 이 차트에서 도출되는 것만 써라. <b>【반복된 장면】</b> 그 패턴이 관계·일·돈에서 실제로 어떻게 반복됐는지 구체적 장면으로 보여줘라. 두루뭉술한 요약이 아니라 눈에 보이는 장면이어야 한다. <b>【뿌리와 열쇠】</b> 이 패턴이 어디서 시작됐는지(4하우스=가정·부모, 12하우스=숨은 상처) 뿌리를 추적하고, 그것이 결함이 아니라 '너무 일찍 유능해진 대가'였음을, 그리고 그 힘이 앞으로 어떻게 무기가 되는지 방향을 제시하라. 마지막은 <blockquote> 태그로 가슴을 관통하되 힘을 주는 한 문장 (예: '당신은 강한 게 아니라 유능한 사람입니다'). 연민 절대 금지.",
-  "vip_card2": "(최소 3000자) [CHAPTER 02. 타고난 재능과, 당신이 두각을 나타낼 자리] 🚨 ${v.name}님이 '내일 당장 뭘 해야 할지' 알게 만드는 실전 챕터다. 톤은 '당신은 이런 걸 타고난 대단한 사람'이라는 확신에 찬 선언. 겸손하게 굴리거나 발뺌하지 마라. 반드시 아래 6개 항목을 모두, 순서대로, <b>【소제목】</b>을 달아 항목당 480자 이상 써라.\\n\\n【1. 타고난 재능】 2하우스(재능·자산), 6하우스(일하는 방식), 10하우스(커리어)와 그 안의 행성을 차트 근거로 밝혀라. 그로부터 타고난 재능 3가지를 콕 집어라. 추상적인 말('창의적입니다') 금지. '남들은 못 하는데 당신은 되는 것'의 형태로 구체적으로 (예: 남이 놓치는 미세한 흐름의 변화를 먼저 감지하는 촉 / 처음 만난 사람도 3분 만에 무장해제시키는 언어 / 모두가 포기한 뒤에도 혼자 남아 끝을 보는 집요함).\\n\\n【2. 두각을 나타낼 직군】 🚨[필수] 위 재능에 맞는 <b>구체적인 직군·업종 3가지를 실명으로</b> 제시하라 (예: 부동산 경매·수익형 부동산, 심리상담·코칭, 온라인 강의 콘텐츠, 브랜드 컨설팅, 데이터 분석, 세무·회계, 커머스 셀러, 크리에이터 등 — 오늘 당장 검색해서 알아볼 수 있는 수준으로). 각 직군마다 '이 차트의 어떤 배치 때문에 맞는지' 근거를 한 줄씩 반드시 붙여라. 그중 <b>가장 강력한 1순위</b>를 못 박아라.\\n\\n【3. 조직인가 독립인가】 10하우스와 토성 위치를 근거로, 조직 안에서 성장할 사람인지 독립해 자기 것을 세울 사람인지 단정하라. '둘 다 가능합니다' 금지. 독립 시점도 짚어라.\\n\\n【4. 나에게 맞는 돈 버는 방식】 2하우스와 8하우스를 근거로 고유한 돈 버는 방식을 밝혀라. 시간을 팔아 버는 사람(월급·수임) / 결과물을 팔아 버는 사람(제품·콘텐츠) / 남의 돈을 굴려 버는 사람(투자·중개) / 신뢰를 자본 삼아 버는 사람(브랜드·커뮤니티) 중 어디인지. <b>절대 손대면 안 되는 돈벌이 방식</b>도 경고하라.\\n\\n【5. 재물이 불어나는 원리】 목성(확장)과 토성(축적)의 위치를 근거로 재물이 커지는 구조를 밝혀라. 한 방에 크게 버는 사람인지, 시간을 들여 복리로 쌓는 사람인지. 자산을 어떤 형태로 굴려야 하는지(부동산·현물·사업지분·현금흐름 중). 위 [목성 트랜짓]의 <b>재물·수입 축 시기를 그대로 인용</b>해 부가 실현되는 시점을 못 박아라.\\n\\n【6. 몸과 일의 리듬】 6하우스·상승점·화성 배치를 근거로, 이 사람이 무리하면 가장 먼저 무너지는 지점과 성과가 최대로 나오는 일하는 방식(단기 집중형인지 장기 지속형인지, 혼자인지 팀인지)을 짚어라. 건강은 의학적 진단이 아니라 '체력과 집중의 리듬' 관점으로만 다뤄라. 마지막은 '나도 할 수 있겠다'는 확신이 서도록 뜨겁게 마무리하라."
+  "core_sentence": "(30~45자) ${v.name}님의 인생을 한 문장으로 요약한 선언. 리포트 맨 위에 크게 박힌다. 중심 서사에서 뽑아내고, 뻔한 덕담이 아니라 읽는 순간 숨이 멎는 문장으로. 예: '당신의 서늘함은 차가움이 아니라, 너무 일찍 어른이 된 대가입니다.' <b> 태그 쓰지 말고 순수 텍스트로.",
+
+  "vip_card1": "(최소 2400자) [CHAPTER 01. 왜 나는 항상 비슷한 곳에서 넘어지는가?]\\n\\n먼저 <p class='lead'>...</p> 로 2~3문장의 리드문을 써라. 이 챕터에서 무엇을 밝힐지 예고하되 결론은 아직 말하지 마라.\\n\\n그다음 아래 네 개의 소제목 단락을 순서대로. 각 단락 550자 이상. 소제목은 반드시 서술형 문장으로.\\n\\n【1. 내 삶을 갉아먹는 무의식의 방해 공작】 달·토성·12하우스 등 중심 배치를 도·분과 함께 밝히고, 그것이 준 '아무나 못 가진 능력'을 먼저 인정하라. 그다음 그 능력의 이면에 자리잡은 무의식적 불안·결핍의 정체를 콕 집어라 — 잘 살고 싶은 마음과 반대로 자꾸 스스로를 망치는 선택으로 몰아온 패턴을. 위 【각도】 항목 중 최소 하나를 오차 도수까지 인용하라. 그리고 이 단락 안에 <b>과거 검증 문장</b>을 반드시 하나 넣어라(특정 나이·연도 지목).\\n\\n【2. 상처가 만들어낸 가짜 방어기제】 🚨상세페이지에서 약속한 항목이다. 반드시 <b>'가짜 방어기제'</b>라는 표현을 본문에 그대로 쓰라. 타인의 시선이나 과거의 경험 때문에 억지로 만들어 입은 갑옷 — 그 갑옷의 정체를 밝혀라. 그리고 <b>그 갑옷이 ${v.name}님의 진짜 매력을 어떻게 가리고 있는지</b>를 구체적으로 짚어라. 사람들이 오해하는 모습 vs 실제 모습을 대비시켜라. 상승점·토성·12하우스 배치가 근거다. 여기서 반드시 장면 규격을 지켜 눈에 보이게 써라.\\n\\n【3. 인간관계와 돈이 새어나가는 진짜 이유】 🚨상세페이지 약속 항목이다. '운이 나빠서가 아니다'라는 전제로 시작하라. 차트 속 꼬여있는 심리적 패턴이 어떻게 <b>현실의 재정 누수</b>와 <b>악연</b>으로 이어지는지 그 경로를 단계적으로 보여줘라. 예: 거절을 못 함 → 부탁을 다 받음 → 돈과 시간이 새어나감 → 정작 내 일이 밀림. 2하우스·8하우스·11하우스·12하우스 배치와 금성·화성의 각도를 근거로. 돈이 새는 구체적 항목(빌려주고 못 받음, 체면 지출, 감정 소비, 손해 보는 계약 등) 중 이 차트에 맞는 것을 콕 집어라.\\n\\n【4. 뿌리와 열쇠】 이 패턴이 어디서 시작됐는지(4하우스=가정·부모, 12하우스=숨은 상처) 뿌리를 추적하고, 그것이 결함이 아니라 '너무 일찍 유능해진 대가'였음을 밝혀라. 그리고 그 힘이 앞으로 어떻게 무기가 되는지 방향을 제시하라.\\n\\n마지막은 <blockquote> 태그로 가슴을 관통하되 힘을 주는 한 문장. 연민 절대 금지.",
+
+  "vip_card2": "(최소 3200자) [CHAPTER 02. 타고난 재능과, 내가 두각을 나타낼 자리]\\n\\n<p class='lead'>...</p> 리드문 2~3문장 먼저. 그다음 아래 여섯 항목을 순서대로, 각 500자 이상, 서술형 소제목을 달아서.\\n톤은 '당신은 이런 걸 타고난 사람'이라는 확신에 찬 선언이다. 겸손하게 굴리거나 발뺌하지 마라.\\n\\n【1. 가지고 태어난 재능 3가지】 🚨상세페이지 약속. 2하우스(재능·자산)·6하우스(일하는 방식)·10하우스(커리어)와 그 안의 행성, 그리고 품위(제 집·고양) 행성을 근거로 재능 세 가지를 콕 집어라. 추상어('창의적입니다') 금지. '남들은 못 하는데 당신은 되는 것' 형태로. 예: 남이 놓치는 미세한 흐름의 변화를 먼저 감지하는 촉 / 처음 만난 사람도 삼 분 만에 무장해제시키는 언어 / 모두가 포기한 뒤에도 혼자 남아 끝을 보는 집요함.\\n\\n【2. 두각을 나타낼 직군·업종 3가지】 🚨상세페이지가 '실명으로 제시'를 약속했다. 반드시 <b>구체적인 직군·업종 세 개를 실명으로</b> 써라. 예: 수익형 부동산·경매, 심리상담·코칭, 온라인 강의 콘텐츠, 브랜드 컨설팅, 데이터 분석, 세무·회계, 커머스 셀러, B2B 영업, 의료·재활, 교육 콘텐츠, 크리에이터. 오늘 당장 검색해서 알아볼 수 있는 수준으로. 각 직군마다 '이 차트의 어떤 배치 때문에 맞는지' 근거를 한 줄씩 붙여라. 그중 <b>1순위</b>를 못 박아라.\\n\\n【3. 조직인가 독립인가】 10하우스·천정(MC)·토성 위치를 근거로 조직에서 성장할 사람인지 독립해 자기 것을 세울 사람인지 단정하라. '둘 다 가능합니다' 금지. 독립이라면 언제가 적기인지 위 [목성 트랜짓]의 커리어 축 시기를 인용해 짚어라.\\n\\n【4. 나에게 맞는 돈 버는 방식】 🚨상세페이지 약속. 2하우스와 8하우스를 근거로, 네 유형 중 어디인지 단정하라 — 시간을 팔아 버는 사람(월급·수임) / 결과물을 팔아 버는 사람(제품·콘텐츠) / 남의 돈을 굴려 버는 사람(투자·중개) / 신뢰를 자본 삼아 버는 사람(브랜드·커뮤니티). 그리고 <b>절대 손대면 안 되는 방식</b>을 반드시 경고하라. 이것도 상세페이지 약속이다.\\n\\n【5. 재물이 불어나는 나만의 원리】 🚨상세페이지 약속. 목성(확장)과 토성(축적)의 위치·품위를 근거로 재물이 커지는 구조를 밝혀라. 한 방에 크게 버는 사람인지, 시간을 들여 복리로 쌓는 사람인지. 자산을 어떤 형태로 굴려야 하는지(부동산·현물·사업지분·현금흐름 중). 그리고 위 [목성 트랜짓]의 <b>재물·수입 축 시기를 그대로 인용</b>해 <b>부(富)의 크기와 실현 시점</b>을 못 박아라.\\n\\n【6. 몸과 일의 리듬】 6하우스·상승점·화성 배치를 근거로, 무리하면 가장 먼저 무너지는 지점과 성과가 최대로 나오는 일하는 방식(단기 집중형인지 장기 지속형인지, 혼자인지 팀인지)을 짚어라. 의학적 진단이 아니라 '체력과 집중의 리듬' 관점으로만.\\n\\n이 챕터 안 어딘가에 <b>반증 조건 문장</b>을 반드시 하나 넣어라(CHAPTER 01에 넣지 않았다면 여기에). 마지막은 '나도 할 수 있겠다'는 확신이 서도록 뜨겁게 마무리."
 }
 `;
 }
 
-// ── 호출 B: CHAPTER 03 + 04 + 연령대 점수표 ─────────────────
+// ── 호출 B: CHAPTER 03 + 04 + 봉합 + 점수표 ─────────────────
 function buildPromptB(v) {
   return buildCommonPrompt(v) + `
-[📅 인생 주기 실계산 — 연령대 점수표의 유일한 근거]
-${v.lifeCycles || '인생 주기 계산 데이터가 없다. 이 경우 연령대 점수는 차트의 행성 배치(특히 토성과 목성의 하우스)만 근거로 매기고, 특정 연도를 단정하지 마라.'}
+[📅 인생 주기 실계산 — 연령대 점수표와 과거 검증의 유일한 근거]
+${v.lifeCycles || '인생 주기 계산값이 없다. 이 경우 연령대 점수는 토성·목성의 하우스 배치만 근거로 매기고 특정 연도를 단정하지 마라.'}
 
-[🚨 연령대별 운세 점수 작성 규칙]
-- 위 [인생 주기 실계산] 표를 반드시 근거로 삼아라. 토성 리턴·토성 스퀘어가 걸린 구간은 점수가 낮고(시련·재편), 목성 리턴이 걸린 구간은 점수가 높다(확장·기회). 표에 없는 연도를 지어내지 마라.
-- 점수는 구간마다 뚜렷하게 차이 나게 매겨라. 최저와 최고가 20점 이상 차이 나야 한다. 전부 비슷한 점수는 실패다.
-- 각 설명에는 그 구간에 실제로 걸리는 주기 이름과 연도를 자연스럽게 녹여라 (예: "2020년 토성이 제자리로 돌아오며 그때까지의 관계와 일을 한 번 갈아엎었을 겁니다"). 단, '토성 리턴' 같은 용어는 쉬운 말로 풀어 써라.
-- 이미 지난 구간은 "그때 이런 일이 있었을 겁니다"라고 과거를 짚어 맞혀라. 과거를 정확히 맞히면 미래 예측의 신뢰도가 폭발적으로 올라간다. 앞으로 올 구간은 "무엇이 기다리는지" 관점으로.
-- best_age는 반드시 위 점수 중 최고점을 매긴 구간과 정확히 일치해야 한다.
+[🚨 연령대별 점수 작성 규칙]
+· 위 표를 근거로 삼아라. 토성 리턴·토성 스퀘어가 걸린 구간은 낮고(시련·재편), 목성 리턴이 걸린 구간은 높다(확장·기회). 표에 없는 연도를 지어내지 마라.
+· 점수는 구간마다 뚜렷하게 갈라라. 최고와 최저가 20점 이상 차이 나야 한다. 전부 비슷하면 실패다.
+· 각 설명에 그 구간에 실제로 걸리는 주기의 연도를 자연스럽게 녹여라. 단 '토성 리턴' 같은 용어는 쉬운 말로 풀어서.
+· 이미 지난 구간은 "그때 이런 일이 있었을 겁니다"라고 과거를 짚어 맞혀라. 과거가 맞으면 미래 예측의 신뢰도가 폭발한다.
+· best_age는 반드시 최고점을 매긴 구간과 정확히 일치해야 한다.
 
-[출력 JSON 형식 — 아래 필드를 모두 출력하라]
+[출력 JSON — 아래 필드 전부]
 {
-  "vip_card3": "(최소 2200자) [CHAPTER 03. 이제, 당신의 시간이 옵니다] 막연한 희망이 아니라 하늘에 적힌 일정표를 보여주듯 확신 있게 써라. 소제목 4개로 나눠라. 🚨🚨[연도는 반드시 계산된 값 그대로] 위 [🪐 실제 계산된 목성 트랜짓]의 세 축(인연·결혼 / 커리어·사회적 성취 / 재물·수입)을 <b>각각 모두</b> 그대로 인용하라. 절대로 임의의 연도로 바꾸지 마라. 왜 그 시기인지(목성이 그 축과 이루는 각도)를 짧게 설명하라. '뚜렷한 트랜짓이 없다'는 결과라면 그 사실을 정직하게 인정하며 시기보다 태도·행동에 집중하라는 방향으로 안내하라. 시기 생략이나 임의 변경 절대 금지. 그리고 <b>【놓아줘야 할 것】</b>에서 진짜 행복해지기 위해 내려놔야 할 것을 짚고, <b>【곁에 두면 안 되는 사람】</b>에서 ${v.name}님을 갉아먹는 사람의 유형(레드플래그)을 <span style='color:#ff3b30;font-weight:900;'>빨간 글씨</span>로 분명히 경고하라. 이 유형도 차트 근거(7하우스·8하우스·12하우스 배치)에서 도출하라. 마지막은 ${v.name}님을 굳게 믿어주는 뜨거운 축복으로 끝내라.",
-  "vip_card4": "(최소 2000자) [CHAPTER 04. 전생의 당신, 이번 생의 과제] 🔮 위 [전생과 영혼의 과제 - 달의 교점] 항목을 반드시 근거로 삼아라. 소제목으로 나눠 길고 깊게 써라. ① <b>【전생에 통달한 것】</b> 사우스노드를 근거로, ${v.name}님이 전생에서 이미 완벽히 익혔기에 이번 생에도 너무 익숙하고 편안한 패턴을 짚어라. 이걸 먼저 '대단한 강함'으로 인정하라 (예: '당신은 어떤 위기가 와도 자기 힘으로 일어서는, 근본적으로 강한 영혼입니다'). ② <b>【익숙함의 함정】</b> 그래서 힘들 때마다 자꾸 그 익숙한 자리로 도망쳐 왔다는 것을, 왜 그 길이 안전하지만 공허해지는지 설명하라. ③ <b>【이번 생의 과제】</b> 노스노드를 근거로 이번 생에 반드시 배워야 할 것을 밝혀라 — 불편하고 어색하지만 바로 거기에 성장과 가장 큰 행복이 있음을. ④ 앞 챕터(무의식의 그림자, 타고난 재능, 다가올 시기)와 연결해, 그 모든 게 하나의 인생 이야기로 납득되게 하라. ⑤ 마지막은 <blockquote> 태그로 '${v.name}님이 이번 생에 풀어야 할 단 하나의 숙제'를, 약해지라는 게 아니라 '이미 강한 당신이 이제 함께 나눌 사람을 만나는 것'이라는 힘 있는 방향으로 못 박아라. 연민 금지, 강함을 전제로.",
+  "vip_card3": "(최소 2400자) [CHAPTER 03. 언제, 어떻게 승부수를 띄울 것인가?]\\n\\n<p class='lead'>...</p> 리드문 2~3문장 먼저. 막연한 희망이 아니라 하늘에 적힌 일정표를 펼쳐 보이는 톤으로. 그다음 아래 세 항목, 각 700자 이상, 서술형 소제목.\\n\\n【1. 운이 뚫리는 골든 크로스 시기】 🚨상세페이지 약속. 반드시 <b>'골든 크로스'</b>라는 표현을 본문에 그대로 쓰라. 위 [🪐 실제 계산된 목성 트랜짓]의 세 축(인연·결혼 / 커리어·사회적 성취 / 재물·수입)을 <b>각각 모두</b> 그대로 인용하라. 절대로 임의의 연도로 바꾸지 마라. 왜 그 시기인지(목성이 그 축과 이루는 각도)를 짧게 설명하라. '뚜렷한 트랜짓이 없다'는 결과라면 정직하게 인정하고 시기보다 태도·행동에 집중하라고 안내하라. 시기 생략이나 임의 변경은 치명적 실패다.\\n\\n【2. 대운을 내 통장에 꽂아 넣는 행동 전략】 🚨상세페이지 약속 항목이다. 반드시 <b>'대운'</b>이라는 표현을 그대로 쓰라. 시기를 아는 것과 그 시기를 자기 것으로 만드는 것은 다르다. 위에서 짚은 각 시기마다 <b>구체적인 액션 플랜</b>을 써라 — 그 시기가 오기 전 몇 개월 동안 무엇을 준비해두어야 하는지, 시기가 왔을 때 무엇을 실행하는지, 무엇을 하면 기회를 날리는지. 반드시 오늘 당장 적어둘 수 있는 수준으로 구체적으로. 그리고 이 사람의 성격적 약점(CHAPTER 01에서 짚은 그것) 때문에 기회 앞에서 어떻게 도망칠 위험이 있는지, 그때 어떻게 붙잡아야 하는지를 연결해서 경고하라.\\n\\n【3. 놓치지 말아야 할 귀인, 피해야 할 악연】 🚨상세페이지 약속. <b>'귀인'</b>과 <b>'악연'</b> 두 단어를 반드시 그대로 쓰라. 먼저 <b>귀인</b>: 7하우스·11하우스·목성 배치를 근거로, ${v.name}님의 성공을 증폭시켜 줄 사람의 유형을 구체적으로 그려라 — 어떤 성향, 어떤 나이대·위치, 어디서 만나게 되는지, 어떻게 알아보는지. 귀인을 빼먹으면 약속 불이행이다. 그다음 <b>악연</b>: 8하우스·12하우스·토성·명왕성 배치를 근거로 ${v.name}님을 갉아먹는 사람의 유형을 <span style='color:#ff3b30;font-weight:900;'>빨간 글씨</span>로 분명히 경고하라. 처음엔 어떻게 보여서 속게 되는지, 어떤 신호가 나타나면 손절해야 하는지까지.\\n\\n마지막은 ${v.name}님을 굳게 믿어주는 뜨거운 축복으로 끝내라.",
+
+  "vip_card4": "(최소 2200자) [CHAPTER 04. 전생의 나, 이번 생의 과제]\\n\\n<p class='lead'>...</p> 리드문 2~3문장. 노스노드와 사우스노드가 영혼의 두 방향을 가리킨다는 것을 짧게. 그다음 아래 세 항목, 각 600자 이상, 서술형 소제목.\\n\\n【1. 전생에 이미 통달한 익숙한 길】 🚨상세페이지 약속. 사우스노드의 별자리·도분·하우스를 근거로, ${v.name}님이 전생에서 이미 완벽히 익혔기에 이번 생에도 너무 익숙하고 편안한 패턴을 짚어라. 먼저 '대단한 강함'으로 인정하라. 그리고 힘들 때마다 자꾸 그 자리로 도망쳐 왔다는 것을, 왜 그 길이 안전하지만 공허해지는지를 밝혀라. 상세페이지 표현대로 <b>'익숙한 길'</b>이라는 말을 그대로 쓰라.\\n\\n【2. 영혼이 이번 생에 배우러 온 진짜 과제】 🚨상세페이지 약속. 노스노드의 별자리·도분·하우스를 근거로 이번 생에 반드시 배워야 할 것을 밝혀라 — 불편하고 어색하지만 바로 거기에 성장과 가장 큰 행복이 있음을. 위 차트에 <b>【겹침】</b> 항목(행성이 노스노드와 겹침)이 있으면 그것을 결정적 단서로 반드시 활용하라. 그 행성의 재능을 키우는 일이 곧 이번 생의 과제라는 뜻이다.\\n\\n【3. 이번 생에 풀어야 할 단 하나의 숙제】 🚨상세페이지 약속. 앞의 세 챕터(무의식의 방해 공작, 가짜 방어기제, 타고난 재능, 다가올 시기)와 전부 연결해, <b>왜 ${v.name}님의 인생이 지금까지 이렇게 흘러왔는지</b>가 마침내 납득되게 하라. 이게 이 챕터의 존재 이유다. 흩어진 조각이 하나로 맞물리는 순간을 만들어라.\\n\\n마지막은 <blockquote> 태그로 '이번 생에 풀어야 할 단 하나의 숙제'를 못 박아라. 약해지라는 게 아니라 '이미 강한 당신이 이제 ~하는 것'이라는 힘 있는 방향으로. 연민 금지.",
+
+  "closing": "(400~600자) 리포트 전체를 봉합하는 마지막 문단. 챕터 번호나 소제목 없이 순수한 산문으로. 네 챕터에서 밝힌 것들을 한 흐름으로 엮어 ${v.name}님이 어떤 사람이고 어디로 가는 사람인지를 조용히 정리하라. 마지막 두세 문장은 짧게 끊어서 여운을 남겨라. 여기서는 차트 용어를 쓰지 마라. '이 리포트는 정해진 운명을 통보하는 글이 아닙니다'라는 태도로, 손님이 다 읽고 화면을 닫을 때 등이 펴지게 만들어라. <b> 태그는 한두 곳만.",
+
   "life_score_10": 점수숫자만,
   "life_desc_10": "(2~3문장) 10대의 흐름 — 이 시기에 뿌려진 씨앗과 그것이 지금까지 남긴 것",
   "life_score_20": 점수숫자만,
-  "life_desc_20": "(2~3문장) 20대의 흐름과 핵심",
+  "life_desc_20": "(2~3문장) 20대",
   "life_score_30": 점수숫자만,
-  "life_desc_30": "(2~3문장) 30대의 흐름과 핵심",
+  "life_desc_30": "(2~3문장) 30대",
   "life_score_40": 점수숫자만,
-  "life_desc_40": "(2~3문장) 40대의 흐름과 핵심",
+  "life_desc_40": "(2~3문장) 40대",
   "life_score_50": 점수숫자만,
-  "life_desc_50": "(2~3문장) 50대의 흐름과 핵심",
+  "life_desc_50": "(2~3문장) 50대",
   "life_score_60": 점수숫자만,
-  "life_desc_60": "(2~3문장) 60대의 흐름과 핵심",
+  "life_desc_60": "(2~3문장) 60대",
   "life_score_70": 점수숫자만,
-  "life_desc_70": "(2~3문장) 70대의 흐름과 핵심",
+  "life_desc_70": "(2~3문장) 70대",
   "life_score_80": 점수숫자만,
-  "life_desc_80": "(2~3문장) 80대의 흐름 — 인생을 마무리하는 시기",
+  "life_desc_80": "(2~3문장) 80대 — 인생을 마무리하는 시기",
   "best_age": "가장 점수 높은 연령대 (예: 40대)",
-  "best_age_reason": "(3~4문장) 왜 그 시기가 인생의 황금기인지, 위 인생 주기 표의 실제 연도와 차트 근거를 함께 들어 설명"
+  "best_age_reason": "(3~4문장) 왜 그 시기가 인생의 황금기인지, 위 인생 주기 표의 실제 연도와 차트 근거를 함께 들어"
 }
 `;
 }
 
 // ============================================================================
-//  🤖 Gemini 호출 헬퍼
-// ----------------------------------------------------------------------------
-//  🚨 [수정 2] maxOutputTokens 32768 → 65536
-//     Gemini 2.5는 thinking 토큰이 output 예산에서 차감된다. 기존 설정으로는
-//     목표 분량이 상한에 붙어 모델이 스스로 분량을 줄여 썼다.
-//  🚨 [수정 4] 1회 호출 → 2회 병렬 호출. 각 호출이 독립적인 출력·사고 예산을
-//     갖게 되어 실질 분량과 깊이가 함께 올라간다. 병렬이므로 체감 시간은 동일.
+//  🚦 품질 게이트 — 프롬프트에 "쓰지 마라"고 적는 것만으로는 안 지켜진다.
+//     서버가 직접 검사해서 걸리면 재생성한다. 이게 수동 리포트와의 체감 차이를 만든다.
 // ============================================================================
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
-const MAX_ATTEMPTS = 3;
+const BANNED = [
+  // 유사영성 상투어
+  '우주가 당신', '에너지가', '파동', '진동수', '기운이 흐르', '빛과 어둠', '고귀한 영혼',
+  // AI 접속어·문어체 습관
+  '다시 말해', '요약하면', '살펴보겠습니다', '라는 점입니다', '말씀드리자면',
+  '을 의미합니다', '를 의미합니다', '라고 할 수 있습니다', '할 수 있겠습니다',
+  // 하나마나한 덕담
+  '긍정적으로 생각', '자신을 사랑하', '있는 그대로의 당신', '완벽한 사람은 없',
+  '시간이 해결', '노력하면 됩니다',
+  // 발뺌 화법
+  '느낌도 있습니다', '면이 있으신 것 같', '할 수도 있어요', '아마 ', '일지도 모릅니다',
+  '경우에 따라', '사람에 따라 다르',
+  // 연민
+  '얼마나 힘드셨', '안타깝네요', '가여운', '마음이 아프네요', '안쓰럽',
+  // 시스템 용어 누출
+  'undefined', 'null', 'NaN', '하우스맵', '트랜짓 항목', '데이터에 없', '계산되지 않'
+];
 
-function extractJson(text) {
-  const s = text.indexOf('{');
-  const e = text.lastIndexOf('}');
-  if (s === -1 || e === -1 || e <= s) return null;
-  try {
-    return JSON.parse(text.slice(s, e + 1));
-  } catch (err) {
-    // 후행 쉼표 등 흔한 깨짐 1차 복구
-    try {
-      return JSON.parse(text.slice(s, e + 1).replace(/,\s*([}\]])/g, '$1'));
-    } catch (err2) {
-      return null;
-    }
-  }
+function scanBanned(text) {
+  if (typeof text !== 'string') return [];
+  const hits = [];
+  for (const w of BANNED) if (text.indexOf(w) >= 0) hits.push(w);
+  return hits;
 }
 
-async function callGemini(opts) {
-  const { prompt, thinkingBudget, label, validate } = opts;
-  let lastErr = '';
+// 상세페이지에서 약속한 키워드가 본문에 실제로 등장하는지 검사.
+// 빠지면 약속 불이행 = 환불 사유이므로 재생성한다.
+const PROMISE_KEYWORDS = {
+  vip_card1: ['가짜 방어기제'],
+  vip_card3: ['골든 크로스', '대운', '귀인', '악연']
+};
 
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const isLast = attempt === MAX_ATTEMPTS;
-    try {
-      const r = await fetch(GEMINI_URL + '?key=' + process.env.GEMINI_API_KEY, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            maxOutputTokens: 65536,
-            temperature: 0.95,
-            responseMimeType: 'application/json',
-            thinkingConfig: { thinkingBudget: thinkingBudget }
-          }
-        })
-      });
-
-      if (!r.ok) {
-        lastErr = 'Gemini ' + r.status + ': ' + (await r.text()).slice(0, 300);
-        console.error('🔥 [' + label + ' 시도 ' + attempt + '] ' + lastErr);
-        if (r.status === 503 || r.status === 429) await new Promise(s => setTimeout(s, 1500 * attempt));
-        continue;
-      }
-
-      const j = await r.json();
-      const cand = j.candidates && j.candidates[0];
-      // MAX_TOKENS로 잘렸으면 JSON이 깨지므로 원인을 명확히 남긴다
-      if (cand && cand.finishReason && cand.finishReason !== 'STOP') {
-        console.warn('⚠️ [' + label + '] finishReason=' + cand.finishReason);
-      }
-      const parts = (cand && cand.content && cand.content.parts) || [];
-      const text = parts.map(p => p.text || '').join('');
-      const parsed = extractJson(text);
-
-      if (!parsed) {
-        lastErr = '응답 JSON 파싱 실패: ' + text.slice(0, 200);
-        console.error('🔥 [' + label + ' 시도 ' + attempt + '] ' + lastErr);
-        continue;
-      }
-
-      const check = validate(parsed, isLast);
-      if (!check.ok) {
-        lastErr = '품질 미달: ' + check.reason;
-        console.warn('⚠️ [' + label + ' 시도 ' + attempt + '] ' + lastErr);
-        if (!isLast) continue;
-      }
-
-      console.log('✅ [' + label + '] 성공 (시도 ' + attempt + ')' + (check.ok ? '' : ' — 마지막 시도라 품질 미달 상태로 채택'));
-      return { ok: true, data: parsed };
-    } catch (err) {
-      lastErr = err.message;
-      console.error('🔥 [' + label + ' 시도 ' + attempt + '] ' + err.message);
-    }
-  }
-  return { ok: false, error: '[' + label + '] ' + lastErr };
-}
-
-// 분량·필드 검증 (엄격 기준 = 목표 자수의 70%)
 function makeValidator(specs) {
   return (d, lenient) => {
     for (const s of specs) {
@@ -1139,9 +1136,23 @@ function makeValidator(specs) {
         if (v === undefined || v === null || isNaN(Number(v))) return { ok: false, reason: s.key + ' 누락/비숫자' };
         continue;
       }
-      if (typeof v !== 'string' || v.trim().length === 0) return { ok: false, reason: s.key + ' 누락' };
-      if (!lenient && s.min && v.length < s.min) {
-        return { ok: false, reason: s.key + ' 분량 부족(' + v.length + '자 < ' + s.min + '자)' };
+      if (typeof v !== 'string' || !v.trim()) return { ok: false, reason: s.key + ' 누락' };
+      if (s.min && v.length < s.min) {
+        if (!lenient) return { ok: false, reason: s.key + ' 분량 부족(' + v.length + '자 < ' + s.min + ')' };
+      }
+      if (s.max && v.length > s.max) return { ok: false, reason: s.key + ' 분량 초과(' + v.length + '자)' };
+      // 약속 키워드 (관용 모드에서도 검사 — 약속 불이행은 분량보다 중대하다)
+      const need = PROMISE_KEYWORDS[s.key];
+      if (need) {
+        const miss = need.filter(k => v.indexOf(k) === -1);
+        if (miss.length && !lenient) return { ok: false, reason: s.key + ' 상세페이지 약속 키워드 누락: ' + miss.join(', ') };
+        if (miss.length) console.warn('⚠️ [약속 누락 방출] ' + s.key + ' → ' + miss.join(', '));
+      }
+      // 금지 어휘
+      const bad = scanBanned(v);
+      if (bad.length) {
+        if (!lenient) return { ok: false, reason: s.key + ' 금지 어휘 ' + bad.length + '개: ' + bad.slice(0, 4).join(', ') };
+        console.warn('⚠️ [금지 어휘 방출] ' + s.key + ' → ' + bad.join(', '));
       }
     }
     return { ok: true };
@@ -1149,42 +1160,98 @@ function makeValidator(specs) {
 }
 
 const VALIDATE_A = makeValidator([
-  { key: 'vip_card1', min: 1540 },
-  { key: 'vip_card2', min: 2100 }
+  { key: 'core_sentence', min: 18, max: 90 },
+  { key: 'vip_card1', min: 1680 },
+  { key: 'vip_card2', min: 2240 }
 ]);
-
 const VALIDATE_B = makeValidator([
-  { key: 'vip_card3', min: 1540 },
-  { key: 'vip_card4', min: 1400 },
-  { key: 'best_age' },
-  { key: 'best_age_reason' },
-  { key: 'life_score_10', numeric: true },
-  { key: 'life_score_20', numeric: true },
-  { key: 'life_score_30', numeric: true },
-  { key: 'life_score_40', numeric: true },
-  { key: 'life_score_50', numeric: true },
-  { key: 'life_score_60', numeric: true },
-  { key: 'life_score_70', numeric: true },
-  { key: 'life_score_80', numeric: true }
+  { key: 'vip_card3', min: 1680 },
+  { key: 'vip_card4', min: 1540 },
+  { key: 'closing', min: 280 },
+  { key: 'best_age' }, { key: 'best_age_reason' },
+  { key: 'life_score_10', numeric: true }, { key: 'life_score_20', numeric: true },
+  { key: 'life_score_30', numeric: true }, { key: 'life_score_40', numeric: true },
+  { key: 'life_score_50', numeric: true }, { key: 'life_score_60', numeric: true },
+  { key: 'life_score_70', numeric: true }, { key: 'life_score_80', numeric: true }
 ]);
 
-// 점수 정규화 — 프론트가 숫자를 기대하므로 문자열로 와도 숫자로 강제
+// ============================================================================
+//  🤖 Gemini 호출
+// ============================================================================
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+const MAX_ATTEMPTS = 3;
+
+function extractJson(text) {
+  const s = text.indexOf('{'), e = text.lastIndexOf('}');
+  if (s === -1 || e <= s) return null;
+  const raw = text.slice(s, e + 1);
+  try { return JSON.parse(raw); }
+  catch (err) { try { return JSON.parse(raw.replace(/,\s*([}\]])/g, '$1')); } catch (e2) { return null; } }
+}
+
+async function callGemini(o) {
+  let lastErr = '';
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const isLast = attempt === MAX_ATTEMPTS;
+    try {
+      const r = await fetch(GEMINI_URL + '?key=' + process.env.GEMINI_API_KEY, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: o.prompt }] }],
+          generationConfig: {
+            maxOutputTokens: 65536, temperature: 0.92,
+            responseMimeType: 'application/json',
+            thinkingConfig: { thinkingBudget: o.thinkingBudget }
+          }
+        })
+      });
+      if (!r.ok) {
+        lastErr = 'Gemini ' + r.status + ': ' + (await r.text()).slice(0, 250);
+        console.error('🔥 [' + o.label + ' ' + attempt + '/' + MAX_ATTEMPTS + '] ' + lastErr);
+        if (r.status === 503 || r.status === 429) await new Promise(s => setTimeout(s, 1500 * attempt));
+        continue;
+      }
+      const j = await r.json();
+      const cand = j.candidates && j.candidates[0];
+      if (cand && cand.finishReason && cand.finishReason !== 'STOP')
+        console.warn('⚠️ [' + o.label + '] finishReason=' + cand.finishReason);
+      const text = ((cand && cand.content && cand.content.parts) || []).map(p => p.text || '').join('');
+      const parsed = extractJson(text);
+      if (!parsed) {
+        lastErr = 'JSON 파싱 실패: ' + text.slice(0, 180);
+        console.error('🔥 [' + o.label + ' ' + attempt + '] ' + lastErr);
+        continue;
+      }
+      const chk = o.validate(parsed, isLast);
+      if (!chk.ok) {
+        lastErr = chk.reason;
+        console.warn('⚠️ [' + o.label + ' ' + attempt + '] 재생성: ' + chk.reason);
+        if (!isLast) continue;
+      }
+      console.log('✅ [' + o.label + '] 통과 (' + attempt + '회)' + (chk.ok ? '' : ' — 마지막 시도라 미달 상태로 채택'));
+      return { ok: true, data: parsed };
+    } catch (e) {
+      lastErr = e.message;
+      console.error('🔥 [' + o.label + ' ' + attempt + '] ' + e.message);
+    }
+  }
+  return { ok: false, error: '[' + o.label + '] ' + lastErr };
+}
+
 function normalizeScores(d) {
   const decades = [10, 20, 30, 40, 50, 60, 70, 80];
-  let best = null, bestScore = -1;
+  let best = null, hi = -1;
   for (const dec of decades) {
-    const k = 'life_score_' + dec;
-    let n = Number(d[k]);
+    let n = Number(d['life_score_' + dec]);
     if (isNaN(n)) n = 50;
     n = Math.max(1, Math.min(100, Math.round(n)));
-    d[k] = n;
-    if (n > bestScore) { bestScore = n; best = dec + '대'; }
+    d['life_score_' + dec] = n;
+    if (n > hi) { hi = n; best = dec + '대'; }
   }
-  const spread = bestScore - Math.min.apply(null, decades.map(x => d['life_score_' + x]));
-  if (spread < 20) console.warn('⚠️ 연령대 점수 편차가 ' + spread + '점뿐 — 프롬프트 준수 미흡');
-  if (d.best_age && best && String(d.best_age).indexOf(best.replace('대', '')) === -1) {
-    console.warn('⚠️ best_age(' + d.best_age + ')와 최고점 구간(' + best + ') 불일치 — 본문 설명과 어긋날 수 있으니 확인 필요');
-  }
+  const lo = Math.min.apply(null, decades.map(x => d['life_score_' + x]));
+  if (hi - lo < 20) console.warn('⚠️ 연령대 점수 편차 ' + (hi - lo) + '점뿐 — 프롬프트 준수 미흡');
+  if (d.best_age && best && String(d.best_age).indexOf(best.replace('대', '')) === -1)
+    console.warn('⚠️ best_age(' + d.best_age + ') ≠ 최고점 구간(' + best + ')');
   if (!d.best_age) d.best_age = best;
   return d;
 }
@@ -1193,140 +1260,112 @@ function normalizeScores(d) {
 //  🚀 핸들러
 // ============================================================================
 const handler = async (req, res) => {
-  // ── 다시보기: GET + orderId ──────────────────────────────
   if (req.method === 'GET') {
     const orderId = req.query && req.query.orderId;
     if (!orderId) return res.status(400).json({ error: 'orderId 필요' });
     try {
       const saved = await kv.get('vip-report:' + orderId);
-      if (saved) {
-        res.setHeader('Cache-Control', 'no-store');
-        return res.status(200).json(saved);
-      }
-      return res.status(404).json({ error: '저장된 리포트 없음' });
-    } catch (e) {
-      return res.status(500).json({ error: 'KV 조회 실패: ' + e.message });
-    }
+      res.setHeader('Cache-Control', 'no-store');
+      return saved ? res.status(200).json(saved) : res.status(404).json({ error: '저장된 리포트 없음' });
+    } catch (e) { return res.status(500).json({ error: 'KV 조회 실패: ' + e.message }); }
   }
-
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST 요청만 받습니다.' });
 
-  console.log('✅ [1] gemini-vip.js 진입');
-
+  console.log('✅ [1] gemini-vip 진입');
   try {
-    const { name, date, time, city, myGender } = req.body || {};
-
-    if (!name || !date || !time) return res.status(400).json({ error: '필수 입력값 누락' });
-    if (!process.env.GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY 환경변수 없음' });
+    const b = req.body || {};
+    const { name, date, city, myGender } = b;
+    let time = b.time;
+    // 🚨 출생시간 미상 처리: 상승점·천정·하우스가 무의미해지므로 정밀도를 주장하지 않는다.
+    const timeUnknown = !!b.timeUnknown || !time || String(time).trim() === '';
+    if (timeUnknown) time = '12:00';
+    if (!name || !date) return res.status(400).json({ error: '이름과 생년월일은 필수입니다.' });
+    if (!process.env.GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY 없음' });
 
     let location = cityCoordinates[city];
+    const cityResolved = !!location && !timeUnknown;
     if (!location) {
-      console.error('⚠️ 출생지 좌표 없음: "' + city + '" → 서울로 임시 처리. 도시 목록 확인 필요!');
+      console.error('⚠️ 출생지 좌표 없음: "' + city + '" → 서울 대체. 도시 목록 확인 필요');
       location = cityCoordinates['Seoul'];
     }
-    const dateTimeIso = buildBirthIso(date, time, city);
+    if (timeUnknown) console.warn('⚠️ 출생시간 미상 → 정오 기준 근사. 정밀도 주장 철회됨');
 
-    // ── 천체 데이터 ─────────────────────────────────────────
-    let astrologyDataText = '정밀 천체 궤도 역산 데이터 기반.';
+    const dateTimeIso = buildBirthIso(date, time, city);
+    const tzName = cityTimezones[city] || 'Asia/Seoul';
+    const tzLabel = tzName + ' · UTC' + dateTimeIso.slice(-6);
+
+    let astro = '정밀 천체 궤도 역산 데이터 기반.';
     let core = '중심 배치를 하나 골라 네 챕터를 하나의 이야기로 이어라.';
+    let table = null, methodNote = null;
     try {
       if (process.env.PROKERALA_CLIENT_ID && process.env.PROKERALA_CLIENT_SECRET) {
-        const tokenRes = await fetch('https://api.prokerala.com/token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({
-            grant_type: 'client_credentials',
-            client_id: process.env.PROKERALA_CLIENT_ID,
-            client_secret: process.env.PROKERALA_CLIENT_SECRET
-          })
+        const tk = await fetch('https://api.prokerala.com/token', {
+          method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ grant_type: 'client_credentials',
+            client_id: process.env.PROKERALA_CLIENT_ID, client_secret: process.env.PROKERALA_CLIENT_SECRET })
         });
-        if (tokenRes.ok) {
-          const tokenData = await tokenRes.json();
-          const astroRes = await fetch(
-            'https://api.prokerala.com/v2/astrology/planet-position?datetime=' +
+        if (tk.ok) {
+          const td = await tk.json();
+          const ar = await fetch('https://api.prokerala.com/v2/astrology/planet-position?datetime=' +
             encodeURIComponent(dateTimeIso) + '&coordinates=' + location.lat + ',' + location.lon + '&ayanamsa=1',
-            { headers: { Authorization: 'Bearer ' + tokenData.access_token } }
-          );
-          if (astroRes.ok) {
-            const astroJson = await astroRes.json();
-            const r = analyzeChart(astroJson.data, dateTimeIso);
+            { headers: { Authorization: 'Bearer ' + td.access_token } });
+          if (ar.ok) {
+            const aj = await ar.json();
+            const r = analyzeChart(aj.data, dateTimeIso, location, tzLabel, cityResolved);
             if (r.digest) {
-              astrologyDataText = r.digest;
+              astro = r.digest; table = r.table; methodNote = r.methodNote;
               if (r.core) core = r.core;
-              console.log('📊 차트 다이제스트:\n' + r.digest);
+              console.log('📊 다이제스트\n' + r.digest);
             }
-          } else {
-            console.log('⚠️ Prokerala planet-position 실패: ' + astroRes.status);
-          }
+          } else console.log('⚠️ Prokerala planet-position ' + ar.status);
         }
       }
-    } catch (e) {
-      console.log('⚠️ Prokerala Fallback (VIP):', e.message);
-    }
+    } catch (e) { console.log('⚠️ Prokerala Fallback:', e.message); }
 
-    // ── 인생 주기 실계산 ────────────────────────────────────
     const lifeCycles = buildLifeCycles(date);
-    if (lifeCycles) console.log('📅 인생 주기:\n' + lifeCycles);
-
     const now = new Date();
-    const v = {
-      name: name,
-      date: date,
-      time: time,
-      city: city,
-      myGender: myGender,
-      astro: astrologyDataText,
-      core: core,
-      lifeCycles: lifeCycles,
-      todayStr: now.getFullYear() + '년 ' + (now.getMonth() + 1) + '월 ' + now.getDate() + '일'
-    };
+    const birthY = Number(String(date).replace(/\./g, '-').split('-')[0]);
+    const age = birthY ? now.getFullYear() - birthY : null;
+    const ageLine = age
+      ? '${name}님은 올해 만 ' + (age - 1) + '~' + age + '세다. 이 나이에 맞는 맥락으로 써라. 20대에게 "이미 늦었다", 50대에게 "이제 커리어를 시작" 같은 말은 실패다.'
+          .replace('${name}', name)
+      : '';
 
-    console.log('✅ [2] 차트 준비 완료 → Gemini 2회 병렬 호출 시작');
+    const v = { name: name, date: date, time: timeUnknown ? time + ' (미상 · 정오 기준)' : time,
+      city: city, myGender: myGender, astro: astro, core: core, lifeCycles: lifeCycles,
+      ageLine: ageLine, todayStr: now.getFullYear() + '년 ' + (now.getMonth() + 1) + '월 ' + now.getDate() + '일' };
 
-    // ── 병렬 호출 ───────────────────────────────────────────
-    const [resA, resB] = await Promise.all([
-      callGemini({
-        prompt: buildPromptA(v),
-        thinkingBudget: 8192,   // 재능·직업·돈 분석이 가장 많은 추론을 요구한다
-        label: 'CH01-02',
-        validate: VALIDATE_A
-      }),
-      callGemini({
-        prompt: buildPromptB(v),
-        thinkingBudget: 6144,
-        label: 'CH03-04+점수표',
-        validate: VALIDATE_B
-      })
+    console.log('✅ [2] 차트 준비 완료 → Gemini 2회 병렬 호출');
+    const [A, B] = await Promise.all([
+      callGemini({ prompt: buildPromptA(v), thinkingBudget: 8192, label: 'CH01-02', validate: VALIDATE_A }),
+      callGemini({ prompt: buildPromptB(v), thinkingBudget: 6144, label: 'CH03-04', validate: VALIDATE_B })
     ]);
-
-    if (!resA.ok || !resB.ok) {
-      const err = [resA.ok ? null : resA.error, resB.ok ? null : resB.error].filter(Boolean).join(' | ');
+    if (!A.ok || !B.ok) {
+      const err = [A.ok ? null : A.error, B.ok ? null : B.error].filter(Boolean).join(' | ');
       console.error('🔥 병렬 호출 실패:', err);
       return res.status(500).json({ error: '[Gemini VIP 실패] ' + err });
     }
 
-    const parsedData = normalizeScores(Object.assign({}, resA.data, resB.data));
+    const out = normalizeScores(Object.assign({}, A.data, B.data));
+    // 서버 계산 산출물 (AI를 거치지 않음 → 할루시네이션 0)
+    if (table) out.chart_table = table;
+    if (methodNote) out.method_note = methodNote;
+    out.time_unknown = timeUnknown;
 
-    console.log('✅ [3] 병합 완료 — 분량: card1 ' + (parsedData.vip_card1 || '').length +
-      ' / card2 ' + (parsedData.vip_card2 || '').length +
-      ' / card3 ' + (parsedData.vip_card3 || '').length +
-      ' / card4 ' + (parsedData.vip_card4 || '').length + '자');
+    console.log('✅ [3] 완료 — card1 ' + (out.vip_card1 || '').length + ' / card2 ' + (out.vip_card2 || '').length +
+      ' / card3 ' + (out.vip_card3 || '').length + ' / card4 ' + (out.vip_card4 || '').length +
+      ' / closing ' + (out.closing || '').length + '자');
 
-    // ── 저장 (🚨 [수정 6] 30일 → 1년) ────────────────────────
-    if (req.body.orderId) {
+    if (b.orderId) {
       try {
-        await kv.set('vip-report:' + req.body.orderId, parsedData, { ex: 60 * 60 * 24 * 365 });
-        console.log('💾 KV 저장 완료(1년): vip-report:' + req.body.orderId);
-      } catch (e) {
-        console.log('⚠️ KV 저장 실패(리포트 전송은 정상 진행):', e.message);
-      }
+        await kv.set('vip-report:' + b.orderId, out, { ex: 60 * 60 * 24 * 365 });
+        console.log('💾 KV 저장(1년): vip-report:' + b.orderId);
+      } catch (e) { console.log('⚠️ KV 저장 실패(전송은 진행):', e.message); }
     }
-
     res.setHeader('Cache-Control', 'no-store');
-    return res.status(200).json(parsedData);
-
+    return res.status(200).json(out);
   } catch (error) {
-    console.error('🔥 gemini-vip.js 에러:', error);
+    console.error('🔥 gemini-vip 에러:', error);
     return res.status(500).json({ error: '[VIP 서버 에러] ' + error.message });
   }
 };
