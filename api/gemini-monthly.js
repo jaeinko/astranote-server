@@ -1,506 +1,537 @@
-// ============================================================================
-//  api/gemini-monthly.js  —  아스트라노트 '오늘부터 30일' 운세 (1,900원)
-// ----------------------------------------------------------------------------
-//  ★ 기존 gemini.js / gemini-vip.js / gemini-couple.js 를 전혀 건드리지 않습니다.
-//
-//  💰 비용 설계 (1,900원 상품이라 여기가 생명)
-//   · '오늘 하늘'은 모든 손님이 공유한다 → Redis에 하루 단위로 캐싱
-//     - 그날 첫 손님만 Prokerala 11회를 쓰고, 이후 손님은 0회
-//     - 하루 방문자가 100명이어도 하늘 계산은 하루 11회로 끝
-//   · 손님당 실제 호출 = 본인 네이탈 1회 (시각 미상이면 2회)
-//   · Gemini 1회 (thinkingBudget을 낮춰 단가 절감)
-//
-//  ⚠️ 하늘 캐시는 '날짜'로만 구분한다. 손님 정보와 무관하므로 개인정보가 아니다.
-// ============================================================================
-
-'use strict';
-
+// ═══════════════════════════════════════════════════════════
+//  🌙 아스트라노트 — 월간 운세 리포트 (2,900원)
+//  · 트랜짓 테이블 내장 → Prokerala 추가 호출 없음(비용 증가 0)
+//  · 하우스 계산: 홀사인(Whole Sign) — gemini.js와 동일 기준
+// ═══════════════════════════════════════════════════════════
 const { kv } = require('@vercel/kv');
-const SYN = require('../lib/astro-synastry.js');
-const TR  = require('../lib/astro-transit.js');
-const cityCoordinates = require('../lib/cities.js');
 
-const KEY_PREFIX  = 'monthly-report:';
-const LOCK_PREFIX = 'monthly-lock:';
-const SKY_PREFIX  = 'sky:';           // 하늘 캐시 (모든 손님 공유)
-const TTL_DAYS    = 45;
+const allowCors = fn => async (req, res) => {
+  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
+  res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,Content-Type,Accept');
+  if (req.method === 'OPTIONS') { res.status(200).end(); return; }
+  return await fn(req, res);
+};
 
-/* 하늘 계산 기준 좌표 — 지구중심 황경이므로 관측지 영향이 사실상 없다.
-   서울로 고정해 캐시 적중률을 100%로 만든다. */
-const SKY_ORIGIN = { lat: 37.5665, lon: 126.978 };
+const cityCoordinates = {
+  "Seoul": { lat: 37.5665, lon: 126.978 },
+  "Incheon": { lat: 37.4563, lon: 126.7052 },
+  "Gimpo": { lat: 37.6152, lon: 126.7156 },
+  "Suwon": { lat: 37.2636, lon: 127.0286 },
+  "Seongnam": { lat: 37.42, lon: 127.1265 },
+  "Goyang": { lat: 37.6584, lon: 126.832 },
+  "Yongin": { lat: 37.2411, lon: 127.1776 },
+  "Bucheon": { lat: 37.5034, lon: 126.766 },
+  "Ansan": { lat: 37.3219, lon: 126.8309 },
+  "Anyang": { lat: 37.3943, lon: 126.9568 },
+  "Namyangju": { lat: 37.636, lon: 127.2165 },
+  "Hwaseong": { lat: 37.1995, lon: 126.831 },
+  "Pyeongtaek": { lat: 36.9921, lon: 127.1129 },
+  "Uijeongbu": { lat: 37.7381, lon: 127.0338 },
+  "Siheung": { lat: 37.38, lon: 126.8028 },
+  "Paju": { lat: 37.7599, lon: 126.7802 },
+  "Gwangmyeong": { lat: 37.4772, lon: 126.8646 },
+  "Gunpo": { lat: 37.3617, lon: 126.9352 },
+  "Osan": { lat: 37.1499, lon: 127.0774 },
+  "Icheon": { lat: 37.272, lon: 127.435 },
+  "Yangju": { lat: 37.7852, lon: 127.0458 },
+  "Guri": { lat: 37.5943, lon: 127.1296 },
+  "Anseong": { lat: 37.008, lon: 127.2797 },
+  "Pocheon": { lat: 37.8949, lon: 127.2003 },
+  "Uiwang": { lat: 37.3446, lon: 126.9683 },
+  "Hanam": { lat: 37.5392, lon: 127.2148 },
+  "Yeoju": { lat: 37.2982, lon: 127.6371 },
+  "Dongducheon": { lat: 37.9036, lon: 127.0606 },
+  "Gwacheon": { lat: 37.4292, lon: 126.9877 },
+  "Gapyeong": { lat: 37.8315, lon: 127.5105 },
+  "Yangpyeong": { lat: 37.4917, lon: 127.4874 },
+  "Yeoncheon": { lat: 38.0965, lon: 127.0748 },
+  "GyeonggiEtc": { lat: 37.4138, lon: 127.5183 },
+  "Chuncheon": { lat: 37.8813, lon: 127.7298 },
+  "Wonju": { lat: 37.3422, lon: 127.9202 },
+  "Gangneung": { lat: 37.7519, lon: 128.8761 },
+  "Sokcho": { lat: 38.207, lon: 128.5918 },
+  "Donghae": { lat: 37.5247, lon: 129.1143 },
+  "Taebaek": { lat: 37.164, lon: 128.9856 },
+  "Samcheok": { lat: 37.4499, lon: 129.1656 },
+  "Hongcheon": { lat: 37.6971, lon: 127.8887 },
+  "Cheorwon": { lat: 38.1467, lon: 127.3134 },
+  "Jeongseon": { lat: 37.3806, lon: 128.6608 },
+  "Yeongwol": { lat: 37.1836, lon: 128.4617 },
+  "Pyeongchang": { lat: 37.3705, lon: 128.3901 },
+  "GangwonEtc": { lat: 37.8228, lon: 128.1555 },
+  "Cheongju": { lat: 36.6424, lon: 127.489 },
+  "Chungju": { lat: 36.991, lon: 127.9259 },
+  "Jecheon": { lat: 37.1326, lon: 128.191 },
+  "Eumseong": { lat: 36.9403, lon: 127.6906 },
+  "Jincheon": { lat: 36.8553, lon: 127.4355 },
+  "Okcheon": { lat: 36.3062, lon: 127.5714 },
+  "Yeongdong": { lat: 36.175, lon: 127.7834 },
+  "ChungbukEtc": { lat: 36.8, lon: 127.7 },
+  "Daejeon": { lat: 36.3504, lon: 127.3845 },
+  "Sejong": { lat: 36.48, lon: 127.289 },
+  "Cheonan": { lat: 36.8151, lon: 127.1139 },
+  "Asan": { lat: 36.7898, lon: 127.0018 },
+  "Seosan": { lat: 36.7848, lon: 126.4503 },
+  "Dangjin": { lat: 36.8894, lon: 126.6457 },
+  "Nonsan": { lat: 36.1872, lon: 127.0987 },
+  "Gongju": { lat: 36.4466, lon: 127.119 },
+  "Boryeong": { lat: 36.3333, lon: 126.6127 },
+  "Buyeo": { lat: 36.2757, lon: 126.9098 },
+  "Hongseong": { lat: 36.6014, lon: 126.6608 },
+  "Taean": { lat: 36.7456, lon: 126.298 },
+  "Geumsan": { lat: 36.1089, lon: 127.4881 },
+  "ChungnamEtc": { lat: 36.5184, lon: 126.8 },
+  "Jeonju": { lat: 35.8242, lon: 127.148 },
+  "Iksan": { lat: 35.9483, lon: 126.9577 },
+  "Gunsan": { lat: 35.9676, lon: 126.7369 },
+  "Jeongeup": { lat: 35.5699, lon: 126.856 },
+  "Namwon": { lat: 35.4164, lon: 127.3905 },
+  "Gimje": { lat: 35.8038, lon: 126.8807 },
+  "Wanju": { lat: 35.9047, lon: 127.1622 },
+  "Gochang": { lat: 35.4358, lon: 126.702 },
+  "Buan": { lat: 35.7318, lon: 126.7333 },
+  "Imsil": { lat: 35.6178, lon: 127.2892 },
+  "Sunchang": { lat: 35.3744, lon: 127.1374 },
+  "Jinan": { lat: 35.7917, lon: 127.4247 },
+  "Muju": { lat: 36.0068, lon: 127.6608 },
+  "Jangsu": { lat: 35.6474, lon: 127.5213 },
+  "JeonbukEtc": { lat: 35.7175, lon: 127.153 },
+  "Gwangju": { lat: 35.1595, lon: 126.8526 },
+  "Yeosu": { lat: 34.7604, lon: 127.6622 },
+  "Suncheon": { lat: 34.9506, lon: 127.4872 },
+  "Mokpo": { lat: 34.8118, lon: 126.3922 },
+  "Naju": { lat: 35.0158, lon: 126.7108 },
+  "Gwangyang": { lat: 34.9407, lon: 127.6959 },
+  "Damyang": { lat: 35.3211, lon: 126.9882 },
+  "Goheung": { lat: 34.6111, lon: 127.285 },
+  "Boseong": { lat: 34.7714, lon: 127.08 },
+  "Hwasun": { lat: 35.0645, lon: 126.9866 },
+  "Jangheung": { lat: 34.6816, lon: 126.907 },
+  "Gangjin": { lat: 34.642, lon: 126.7672 },
+  "Haenam": { lat: 34.5734, lon: 126.599 },
+  "Yeongam": { lat: 34.8, lon: 126.6967 },
+  "Muan": { lat: 34.9903, lon: 126.4817 },
+  "Hampyeong": { lat: 35.0658, lon: 126.5165 },
+  "Yeonggwang": { lat: 35.2772, lon: 126.512 },
+  "Jangseong": { lat: 35.3019, lon: 126.7849 },
+  "Wando": { lat: 34.311, lon: 126.755 },
+  "Jindo": { lat: 34.4867, lon: 126.2634 },
+  "Sinan": { lat: 34.8276, lon: 126.1076 },
+  "Gokseong": { lat: 35.282, lon: 127.2921 },
+  "Gurye": { lat: 35.2025, lon: 127.4629 },
+  "JeonnamEtc": { lat: 34.8679, lon: 126.991 },
+  "Daegu": { lat: 35.8714, lon: 128.6014 },
+  "Pohang": { lat: 36.019, lon: 129.3435 },
+  "Gumi": { lat: 36.1196, lon: 128.3446 },
+  "Gyeongju": { lat: 35.8562, lon: 129.2247 },
+  "Andong": { lat: 36.5684, lon: 128.7294 },
+  "Gimcheon": { lat: 36.1398, lon: 128.1136 },
+  "Yeongju": { lat: 36.8057, lon: 128.624 },
+  "Yeongcheon": { lat: 35.9733, lon: 128.9386 },
+  "Sangju": { lat: 36.4109, lon: 128.159 },
+  "Mungyeong": { lat: 36.5866, lon: 128.1867 },
+  "Gyeongsan": { lat: 35.8251, lon: 128.7413 },
+  "Chilgok": { lat: 35.9955, lon: 128.4014 },
+  "Uiseong": { lat: 36.3527, lon: 128.6971 },
+  "Cheongdo": { lat: 35.6473, lon: 128.7341 },
+  "Goryeong": { lat: 35.7261, lon: 128.2626 },
+  "Seongju": { lat: 35.9192, lon: 128.2831 },
+  "Yecheon": { lat: 36.6575, lon: 128.437 },
+  "Bonghwa": { lat: 36.8931, lon: 128.7325 },
+  "Uljin": { lat: 36.993, lon: 129.4004 },
+  "Ulleung": { lat: 37.4844, lon: 130.9057 },
+  "Yeongdeok": { lat: 36.4152, lon: 129.3656 },
+  "Cheongsong": { lat: 36.4362, lon: 129.0571 },
+  "Yeongyang": { lat: 36.6667, lon: 129.1124 },
+  "Gunwi": { lat: 36.2429, lon: 128.5729 },
+  "GyeongbukEtc": { lat: 36.2486, lon: 128.6647 },
+  "Busan": { lat: 35.1796, lon: 129.0756 },
+  "Ulsan": { lat: 35.5384, lon: 129.3114 },
+  "Changwon": { lat: 35.228, lon: 128.6811 },
+  "Gimhae": { lat: 35.2285, lon: 128.8894 },
+  "Jinju": { lat: 35.18, lon: 128.1076 },
+  "Yangsan": { lat: 35.335, lon: 129.0378 },
+  "Geoje": { lat: 34.8806, lon: 128.6211 },
+  "Tongyeong": { lat: 34.8544, lon: 128.4331 },
+  "Sacheon": { lat: 35.0036, lon: 128.0642 },
+  "Miryang": { lat: 35.5038, lon: 128.7469 },
+  "Haman": { lat: 35.2723, lon: 128.4066 },
+  "Geochang": { lat: 35.6867, lon: 127.9095 },
+  "Changnyeong": { lat: 35.5445, lon: 128.4923 },
+  "Goseong": { lat: 34.973, lon: 128.3222 },
+  "Namhae": { lat: 34.8377, lon: 127.8925 },
+  "Hadong": { lat: 35.0672, lon: 127.7514 },
+  "Sancheong": { lat: 35.4156, lon: 127.8735 },
+  "Hamyang": { lat: 35.5205, lon: 127.7252 },
+  "Hapcheon": { lat: 35.5666, lon: 128.1658 },
+  "Uiryeong": { lat: 35.3222, lon: 128.2617 },
+  "GyeongnamEtc": { lat: 35.2599, lon: 128.2635 },
+  "Jeju": { lat: 33.4996, lon: 126.5312 },
+  "Seogwipo": { lat: 33.2541, lon: 126.56 },
+  "NewYork": { lat: 40.7128, lon: -74.006 },
+  "LosAngeles": { lat: 34.0522, lon: -118.2437 },
+  "Chicago": { lat: 41.8781, lon: -87.6298 },
+  "Toronto": { lat: 43.6532, lon: -79.3832 },
+  "Vancouver": { lat: 49.2827, lon: -123.1207 },
+  "MexicoCity": { lat: 19.4326, lon: -99.1332 },
+  "SaoPaulo": { lat: -23.5505, lon: -46.6333 },
+  "London": { lat: 51.5074, lon: -0.1278 },
+  "Paris": { lat: 48.8566, lon: 2.3522 },
+  "Berlin": { lat: 52.52, lon: 13.405 },
+  "Frankfurt": { lat: 50.1109, lon: 8.6821 },
+  "Rome": { lat: 41.9028, lon: 12.4964 },
+  "Madrid": { lat: 40.4168, lon: -3.7038 },
+  "Tokyo": { lat: 35.6895, lon: 139.6917 },
+  "Beijing": { lat: 39.9042, lon: 116.4074 },
+  "Shanghai": { lat: 31.2304, lon: 121.4737 },
+  "HongKong": { lat: 22.3193, lon: 114.1694 },
+  "Singapore": { lat: 1.3521, lon: 103.8198 },
+  "Bangkok": { lat: 13.7563, lon: 100.5018 },
+  "Manila": { lat: 14.5995, lon: 120.9842 },
+  "Sydney": { lat: -33.8688, lon: 151.2093 },
+  "Melbourne": { lat: -37.8136, lon: 144.9631 },
+  "Auckland": { lat: -36.8485, lon: 174.7633 },
+  "Overseas": { lat: 37.5665, lon: 126.978 }
+};
 
-/* -------------------------------------------------------------------------
-   CORS
-------------------------------------------------------------------------- */
-function allowCors(fn) {
-  return async (req, res) => {
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    if (req.method === 'OPTIONS') { res.status(200).end(); return; }
-    return await fn(req, res);
+// ═══ 도시별 시간대 (해외 출생 정확도) ═══
+// 한국 이외 도시는 현지 시간대로 환산해야 상승점·하우스가 정확하다.
+const cityTimezones = {
+  "NewYork": "America/New_York",
+  "LosAngeles": "America/Los_Angeles",
+  "Chicago": "America/Chicago",
+  "Toronto": "America/Toronto",
+  "Vancouver": "America/Vancouver",
+  "MexicoCity": "America/Mexico_City",
+  "SaoPaulo": "America/Sao_Paulo",
+  "London": "Europe/London",
+  "Paris": "Europe/Paris",
+  "Berlin": "Europe/Berlin",
+  "Frankfurt": "Europe/Berlin",
+  "Rome": "Europe/Rome",
+  "Madrid": "Europe/Madrid",
+  "Tokyo": "Asia/Tokyo",
+  "Beijing": "Asia/Shanghai",
+  "Shanghai": "Asia/Shanghai",
+  "HongKong": "Asia/Hong_Kong",
+  "Singapore": "Asia/Singapore",
+  "Bangkok": "Asia/Bangkok",
+  "Manila": "Asia/Manila",
+  "Sydney": "Australia/Sydney",
+  "Melbourne": "Australia/Melbourne",
+  "Auckland": "Pacific/Auckland"
+};
+
+// 출생일 기준 현지 UTC 오프셋(분). 서머타임 자동 반영.
+function getUtcOffsetMinutes(tz, y, mo, d, h, mi) {
+  try {
+    const asUTC = Date.UTC(y, mo - 1, d, h, mi, 0);
+    const dtf = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz, hour12: false,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
+    });
+    const p = {};
+    for (const part of dtf.formatToParts(new Date(asUTC))) {
+      if (part.type !== 'literal') p[part.type] = parseInt(part.value, 10);
+    }
+    const asLocal = Date.UTC(p.year, p.month - 1, p.day, p.hour % 24, p.minute, p.second);
+    return Math.round((asLocal - asUTC) / 60000);
+  } catch (e) {
+    console.error('시간대 계산 실패:', tz, e.message);
+    return 540;
+  }
+}
+
+// 출생 정보 → 정확한 ISO 문자열 (도시 시간대 반영)
+function buildBirthIso(dateStr, timeStr, cityKey) {
+  const ds = String(dateStr).replace(/\./g, '-');
+  const parts = ds.split('-').map(Number);
+  const y = parts[0], mo = parts[1], d = parts[2];
+  const tparts = String(timeStr).split(':').map(Number);
+  const h = tparts[0], mi = tparts[1] || 0;
+  const tz = cityTimezones[cityKey];
+
+  // 한국 도시는 목록에 없으므로 기존과 동일하게 +09:00
+  if (!tz) return ds + 'T' + timeStr + ':00+09:00';
+
+  const off = getUtcOffsetMinutes(tz, y, mo, d, h, mi);
+  const sign = off >= 0 ? '+' : '-';
+  const ab = Math.abs(off);
+  const hh = String(Math.floor(ab / 60)).padStart(2, '0');
+  const mm = String(ab % 60).padStart(2, '0');
+  console.log('🌍 ' + cityKey + ' → ' + tz + ' (UTC' + sign + hh + ':' + mm + ')');
+  return ds + 'T' + timeStr + ':00' + sign + hh + ':' + mm;
+}
+
+
+const SIGNS_KR = ['양자리','황소자리','쌍둥이자리','게자리','사자자리','처녀자리','천칭자리','전갈자리','사수자리','염소자리','물병자리','물고기자리'];
+const PLANET_KR = { Sun:'태양', Moon:'달', Mercury:'수성', Venus:'금성', Mars:'화성', Jupiter:'목성', Saturn:'토성', Ascendant:'상승점' };
+
+function lahiriAyanamsa(dateTimeIso) {
+  const d = new Date(dateTimeIso);
+  const y = d.getUTCFullYear() + (d.getUTCMonth() + 1) / 12;
+  return 23.853 + 0.013972 * (y - 2000);
+}
+function signDeg(lon) {
+  const l = ((lon % 360) + 360) % 360;
+  return { sign: SIGNS_KR[Math.floor(l / 30)], deg: (l % 30).toFixed(1), abs: l };
+}
+function signIndex(lon){ return Math.floor((((lon % 360) + 360) % 360) / 30); }
+function wholeSignHouse(planetLon, ascLon){
+  return ((signIndex(planetLon) - signIndex(ascLon)) % 12 + 12) % 12 + 1;
+}
+
+// ── 월별 트랜짓 테이블 (2026-01 ~ 2031-12, 매월 15일 기준) ──
+const TRANSIT_START={year:2026,month:1};
+const T_SUN=[294.96, 326.43, 354.53, 25.16, 54.31, 84.05, 112.67, 142.33, 172.31, 201.78, 232.76, 263.14, 294.72, 326.19, 354.3, 24.94, 54.09, 83.83, 112.44, 142.1, 172.07, 201.54, 232.51, 262.89, 294.47, 325.94, 355.05, 25.67, 54.82, 84.55, 113.16, 142.82, 172.81, 202.29, 233.28, 263.66, 295.25, 326.71, 354.81, 25.44, 54.58, 84.32, 112.93, 142.59, 172.57, 202.05, 233.03, 263.42, 295.0, 326.47, 354.58, 25.2, 54.35, 84.09, 112.71, 142.36, 172.33, 201.81, 232.78, 263.16, 294.75, 326.22, 354.33, 24.96, 54.12, 83.86, 112.48, 142.13, 172.1, 201.56, 232.54, 262.92];
+const T_MER=[290.83, 343.45, 340.16, 359.98, 54.95, 108.53, 109.41, 129.49, 187.33, 226.58, 215.23, 253.42, 303.14, 333.48, 326.79, 10.8, 71.46, 95.67, 91.95, 145.95, 196.56, 211.24, 217.52, 264.67, 312.95, 304.01, 332.68, 29.23, 74.74, 67.79, 101.26, 161.8, 197.56, 184.67, 230.38, 277.33, 298.07, 301.66, 344.29, 43.61, 51.23, 61.82, 119.09, 169.5, 174.1, 190.96, 241.86, 283.91, 272.43, 309.84, 359.53, 37.59, 30.04, 73.15, 133.51, 164.46, 154.44, 204.04, 251.63, 264.79, 273.87, 321.98, 12.11, 8.33, 30.8, 91.58, 139.04, 137.04, 164.15, 215.85, 254.51, 242.01];
+const T_VEN=[296.98, 335.88, 10.78, 48.97, 85.31, 121.95, 155.98, 188.21, 212.92, 215.76, 202.89, 217.95, 248.24, 283.34, 316.52, 353.9, 30.3, 68.05, 104.76, 142.95, 181.38, 218.65, 257.14, 294.27, 332.2, 8.96, 40.95, 69.05, 79.34, 64.38, 71.08, 97.18, 130.15, 165.01, 202.69, 239.97, 278.79, 317.64, 352.63, 31.13, 68.1, 106.0, 142.32, 179.31, 215.35, 248.52, 278.41, 293.96, 281.46, 285.04, 308.05, 340.66, 14.8, 51.21, 87.1, 124.77, 163.02, 200.42, 239.27, 276.91, 315.72, 354.23, 28.41, 65.07, 98.48, 128.51, 145.85, 135.84, 133.21, 155.34, 187.78, 222.78];
+const T_MAR=[293.58, 317.82, 339.87, 4.13, 27.13, 50.14, 71.5, 92.49, 112.2, 129.71, 145.38, 156.52, 160.29, 152.56, 142.87, 141.99, 150.19, 163.85, 179.94, 198.52, 218.65, 239.4, 262.0, 284.79, 309.0, 333.51, 356.34, 20.3, 42.81, 65.25, 86.12, 106.81, 126.61, 144.81, 162.29, 177.25, 189.08, 193.92, 188.74, 177.69, 175.46, 183.39, 196.93, 214.47, 234.4, 255.38, 278.36, 301.48, 325.82, 350.15, 11.79, 35.13, 56.96, 78.72, 99.06, 119.44, 139.22, 157.82, 176.38, 193.46, 209.6, 222.97, 230.52, 229.8, 220.0, 214.46, 220.36, 234.3, 252.77, 273.22, 295.98, 318.83];
+const T_JUP=[109.47, 106.02, 105.11, 106.98, 111.07, 116.84, 123.23, 130.07, 136.59, 141.97, 145.79, 147.02, 145.3, 141.5, 138.29, 137.0, 138.53, 142.45, 147.78, 154.19, 160.9, 167.13, 172.62, 176.27, 177.5, 175.76, 172.27, 168.77, 167.54, 169.06, 172.77, 178.2, 184.57, 191.04, 197.44, 202.69, 206.35, 207.39, 205.81, 202.16, 198.81, 197.51, 198.92, 202.71, 208.18, 214.39, 221.15, 227.42, 232.9, 236.56, 237.63, 236.05, 232.56, 229.08, 227.76, 229.18, 233.03, 238.41, 244.98, 251.68, 258.32, 263.94, 267.49, 268.99, 267.66, 264.15, 260.68, 259.15, 260.5, 264.25, 269.94, 276.47];
+const T_SAT=[357.14, 0.12, 3.44, 7.29, 10.67, 13.31, 14.63, 14.44, 12.78, 10.48, 8.52, 7.95, 9.03, 11.59, 14.73, 18.6, 22.23, 25.36, 27.32, 27.86, 26.78, 24.64, 22.33, 21.1, 21.47, 23.48, 26.45, 30.25, 34.03, 37.52, 40.03, 41.26, 40.85, 39.06, 36.61, 34.84, 34.5, 35.91, 38.4, 42.01, 45.84, 49.63, 52.63, 54.58, 54.95, 53.74, 51.4, 49.19, 48.11, 48.77, 50.75, 54.04, 57.81, 61.76, 65.17, 67.76, 68.92, 68.42, 66.46, 64.05, 62.3, 62.15, 63.52, 66.36, 69.93, 73.94, 77.63, 80.75, 82.65, 82.94, 81.58, 79.25];
+const R_SUN=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+const R_MER=[0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0];
+const R_VEN=[0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0];
+const R_MAR=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0];
+const R_JUP=[1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0];
+const R_SAT=[0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1];
+
+const HOUSE_MEANING = {
+  1:'나 자신·컨디션·인상', 2:'수입·소유·자기가치', 3:'소통·이동·학습',
+  4:'집·가족·정서적 뿌리', 5:'연애·즐거움·자기표현', 6:'일상·업무·건강',
+  7:'관계·파트너·계약', 8:'깊은 결속·타인의 돈·변화', 9:'배움·먼 곳·확장',
+  10:'커리어·평판·성취', 11:'인맥·모임·소망', 12:'휴식·정리·무의식'
+};
+
+function transitIndex(year, month){
+  return (year - TRANSIT_START.year) * 12 + (month - TRANSIT_START.month);
+}
+
+// ── 트랜짓 vs 출생차트 다이제스트 ──
+function buildMonthlyDigest(natalData, dateTimeIso, year, month){
+  const list = natalData.planet_position || natalData.planet_positions || [];
+  if (!list.length) return null;
+  const ay = lahiriAyanamsa(dateTimeIso);
+  const natal = {};
+  for (const p of list){
+    const kr = PLANET_KR[p.name];
+    if (!kr || typeof p.longitude !== 'number') continue;
+    natal[kr] = signDeg(p.longitude + ay);
+  }
+  const asc = natal['상승점'];
+  if (!asc) return null;
+
+  const idx = transitIndex(year, month);
+  if (idx < 0 || idx >= T_SUN.length) return null;
+
+  const T = {
+    '태양': { lon: T_SUN[idx], r: R_SUN[idx] },
+    '수성': { lon: T_MER[idx], r: R_MER[idx] },
+    '금성': { lon: T_VEN[idx], r: R_VEN[idx] },
+    '화성': { lon: T_MAR[idx], r: R_MAR[idx] },
+    '목성': { lon: T_JUP[idx], r: R_JUP[idx] },
+    '토성': { lon: T_SAT[idx], r: R_SAT[idx] }
   };
-}
 
-/* -------------------------------------------------------------------------
-   입력 정규화
-------------------------------------------------------------------------- */
-function cleanName(v) {
-  return String(v || '').trim().replace(/[<>{}\\"']/g, '').slice(0, 20);
-}
-
-function normPerson(body) {
-  const name = cleanName(body.name) || '고객';
-  const date = String(body.date || '').trim().replace(/\./g, '-');
-  const time = String(body.time || '').trim();
-
-  /* 프론트가 timeUnknown을 보내거나 time이 비면 미상으로 본다.
-     🚨 절대 12:00 같은 임의값으로 채우지 않는다. */
-  const timeUnknown = !!body.timeUnknown || time === '' || time === '모름';
-
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
-  if (!timeUnknown && !/^\d{2}:\d{2}$/.test(time)) return null;
-
-  return {
-    name,
-    date,
-    time: timeUnknown ? null : time,
-    timeUnknown,
-    city: body.city && cityCoordinates[body.city] ? body.city : 'Seoul',
-    gender: body.myGender === '남성' ? '남성' : (body.myGender === '여성' ? '여성' : '미상')
-  };
-}
-
-/* -------------------------------------------------------------------------
-   Prokerala
-------------------------------------------------------------------------- */
-async function getToken() {
-  const r = await fetch('https://api.prokerala.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'client_credentials',
-      client_id: process.env.PROKERALA_CLIENT_ID,
-      client_secret: process.env.PROKERALA_CLIENT_SECRET
-    })
+  const lines = [];
+  lines.push(`[출생차트 기준]`);
+  lines.push(`상승점(ASC): ${asc.sign} ${asc.deg}도  ← 하우스 배정 기준(홀사인)`);
+  ['태양','달','수성','금성','화성','목성','토성'].forEach(function(n){
+    if (natal[n]) lines.push(`출생 ${n}: ${natal[n].sign} ${natal[n].deg}도 / ${wholeSignHouse(natal[n].abs, asc.abs)}하우스`);
   });
-  if (!r.ok) throw new Error(`Prokerala 토큰 실패 ${r.status}`);
-  return (await r.json()).access_token;
-}
 
-async function rawChart(iso, loc, token) {
-  const url = `https://api.prokerala.com/v2/astrology/planet-position`
-            + `?datetime=${encodeURIComponent(iso)}`
-            + `&coordinates=${loc.lat},${loc.lon}&ayanamsa=1`;
-  const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-  if (!r.ok) throw new Error(`Prokerala 실패 ${r.status}: ${(await r.text()).slice(0, 160)}`);
-  return (await r.json()).data;
-}
+  lines.push(`\n[${year}년 ${month}월 트랜짓 — 이 달 해석의 유일한 근거]`);
+  Object.keys(T).forEach(function(n){
+    const sd = signDeg(T[n].lon);
+    const h = wholeSignHouse(T[n].lon, asc.abs);
+    lines.push(`${n} → ${sd.sign} ${sd.deg}도 · 당신의 ${h}하우스(${HOUSE_MEANING[h]}) 통과${T[n].r ? ' ⚠️역행 중' : ''}`);
+  });
 
-/**
- * 손님 네이탈 차트.
- * 시각을 알면 1회, 모르면 그날 00:01 / 23:59 두 시점을 받아
- * 별자리가 바뀌는 행성은 통째로 제외한다 (추측 금지).
- */
-async function fetchNatal(person, token) {
-  const loc = cityCoordinates[person.city] || cityCoordinates['Seoul'];
-
-  if (!person.timeUnknown) {
-    const iso = `${person.date}T${person.time}:00+09:00`;
-    const chart = SYN.parseChart(await rawChart(iso, loc, token), iso);
-    if (!chart) throw new Error('차트 파싱 실패');
-    return chart;
-  }
-
-  const isoStart = `${person.date}T00:01:00+09:00`;
-  const isoEnd   = `${person.date}T23:59:00+09:00`;
-  const [ds, de] = await Promise.all([
-    rawChart(isoStart, loc, token),
-    rawChart(isoEnd,   loc, token)
-  ]);
-  const chart = SYN.buildUnknownTimeChart(ds, de, isoStart);
-  if (!chart) throw new Error('차트 파싱 실패 (시각 미상)');
-  return chart;
-}
-
-/**
- * 🚨 오늘 하늘 — 모든 손님이 공유하므로 하루 단위로 캐싱한다.
- * 이 캐싱이 없으면 손님 1명당 Prokerala 11회가 나가 1,900원에 적자가 난다.
- */
-async function fetchSky(samples, token) {
-  const isoList = samples.map(s => `${TR.ymd(s.date)}T12:00:00+09:00`);
-  const cacheKey = SKY_PREFIX + TR.ymd(samples[0].date);
-
-  try {
-    const cached = await kv.get(cacheKey);
-    if (cached && Array.isArray(cached.raw) && cached.raw.length === samples.length) {
-      console.log('☀️ 하늘 캐시 적중 — Prokerala 호출 0회');
-      return TR.parseSky(cached.raw, isoList);
-    }
-  } catch (e) {
-    console.log('하늘 캐시 조회 실패(무시하고 계산):', e.message);
-  }
-
-  /* 캐시 미스 — 그날 첫 손님만 여기로 온다 */
-  console.log(`🌌 하늘 신규 계산 (Prokerala ${samples.length}회)`);
-  const raw = [];
-  for (let i = 0; i < isoList.length; i++) {
-    raw.push(await rawChart(isoList[i], SKY_ORIGIN, token));
-  }
-
-  try {
-    /* 36시간 보관 — 자정 전후 경계에서도 안전하게 겹치도록 */
-    await kv.set(cacheKey, { raw, at: Date.now() }, { ex: 60 * 60 * 36 });
-  } catch (e) {
-    console.log('하늘 캐시 저장 실패(동작에는 영향 없음):', e.message);
-  }
-
-  return TR.parseSky(raw, isoList);
-}
-
-/* -------------------------------------------------------------------------
-   프롬프트
-------------------------------------------------------------------------- */
-function buildPrompt({ P, digest, todayStr, endStr, correction }) {
-  return `${correction ? `[🚨🚨🚨 직전 원고 반려 — 아래를 반드시 고쳐서 다시 써라]
-${correction}
-이 지적을 무시하면 또 반려된다. 나머지 규칙은 그대로 지키면서 이 부분만 확실히 고쳐라.
-
-` : ''}[🚨🚨 최우선 절대 금지]
-'undefined', 'null', 'NaN', '데이터 없음', '트랜짓 목록', '다이제스트' 같은 시스템 용어를 본문에 절대 쓰지 마라.
-🚨 마크다운 금지. **굵게**, *기울임*, # 제목 전부 안 된다. 이 글은 HTML로 출력되므로 별표가 화면에 그대로 보인다.
-   강조는 <b>강조할 말</b> 만 써라.
-🚨 '오차 0.3도', '트랜짓 화성 — 내 태양 삼각', '금성 양자리 4.4도' 같은 계산 표기를 그대로 옮기지 마라.
-   별자리 이름과 도수를 손님에게 읽어주면 암호로 보인다. 그 배치가 뜻하는 '실제 벌어지는 일'로만 풀어써라.
-   나쁜 예: "타고난 금성 양자리 4.4도의 영향을 받습니다"
-   좋은 예: "마음이 가는 대로 먼저 움직이는 편이라, 이 시기에 그 성향이 그대로 드러납니다"
-
-[🚨 시간 기준 — 이 상품의 핵심]
-오늘은 ${todayStr}이다. 이 리포트가 다루는 기간은 <b>오늘부터 30일</b>, 즉 ${todayStr} ~ ${endStr}이다.
-- 이 기간 밖의 날짜를 언급하면 치명적 실패다.
-- '이번 달', '다음 달' 같은 달력 단위 표현을 쓰지 마라. 우리는 달력이 아니라 실제 하늘의 움직임을 본다.
-- 날짜는 아래 계산된 것만 써라. 지어낸 날짜는 즉시 실패다.
-- 오늘 날짜 자체를 "오늘 ${todayStr}" 처럼 본문에 박아 넣지 마라. 시스템 로그처럼 읽힌다.
-
-[역할]
-너는 명리학을 오래 공부하다 서양 점성술로 넘어온, 40년 경력의 상담가다.
-${P.name}님(${P.gender})의 앞으로 30일을 읽어준다.
-이 리포트는 1,900원짜리지만, 읽고 나서 "이 값에 이걸?" 소리가 나와야 한다. 그래야 다음 상품을 산다.
-
-[정밀 계산된 데이터 — 트로피컬(서양식) 기준]
-${digest}
-
-위 좌표·각도·날짜·점수는 전부 실제 천체 계산 결과다. 이것만 인용하고 없는 것을 지어내지 마라.
-
-[🚨🚨 점수 절대 금지 — 이 상품에서 가장 중요한 규칙]
-이 리포트에는 점수가 없다. 한 달을 몇 점이라고 매기면 손님에게 낙인이 된다.
-매달 보는 상품이라 낮은 점수가 반복되면 "나는 원래 안 되는 사람"이라는 인상만 남는다.
-🚨 "74점", "70점대", "점수가 높은 편" 같은 표현을 **어떤 형태로도 쓰지 마라.** 숫자·등급·별점 전부 금지다.
-   위 '내부 참고용 강약'은 네가 톤을 정하는 데만 쓰는 것이고, 본문에 옮기면 리포트가 폐기된다.
-🚨 대신 그 영역이 **무엇을 하고 있는지**를 써라. 평가가 아니라 서술이다.
-   나쁜 예: "금전운은 74점으로 다소 주의가 필요합니다."
-   좋은 예: "이번 30일은 들어오는 돈보다 나가는 돈의 속도가 빠릅니다."
-   나쁜 예: "컨디션이 낮은 편입니다."
-   좋은 예: "하고 싶은 건 늘어나는데 몸이 그만큼 안 따라옵니다."
-🚨 각 카드가 서로 다른 방식으로 시작해야 한다. 같은 문장 구조를 반복하지 마라.
-
-[🚨 서술 규칙 — 이 리포트의 생명]
-1. 교과서적 점성술 일반론 금지. ("화성은 열정의 별입니다" 같은 문장 금지)
-   대신 ${P.name}님이 그 시기에 실제로 겪을 장면으로 써라.
-   🚨 첫 문장에 '마치', '~같은', '~듯한', '~처럼' 을 쓰면 자동 반려된다.
-   사물에 빗대는 비유(파도·우물·자석·나무·바다 등)는 어떤 카드에서도 금지다. 흔해빠져서 값이 싸 보인다.
-2. 화법은 '~한 편입니다' 같은 부드러운 단언을 기본으로.
-   [[발뺌 금지]] "~할 수도 있어요", "아마 ~일지도" 처럼 빠져나갈 구멍을 만들지 마라.
-   "~할 수 있습니다" → "~합니다" 로 바꿔 쓰면 대부분 해결된다. 이 표현은 자동으로 세어진다.
-   [[과잉 단정 금지]] "반드시 ~합니다", "무조건 ~됩니다" 같은 표현도 금지.
-   [[어미 오용 금지]] '~편입니다'는 현재 성향에만 붙는다. "느꼈을 편입니다" 같은 과거 추측형은 비문이다.
-3. 날짜를 반드시 구체적으로 써라. "월초", "중순" 같은 뭉뚱그림 금지. 계산된 날짜를 그대로 인용하라.
-4. 연민 금지. "힘드시겠어요" 같은 표현은 손님을 약자로 만든다. 정확히 읽어주고 다룰 방법으로 끝내라.
-5. 나쁜 시기를 다룰 때 공포를 팔지 마라. 무슨 일이 벌어지는지 짚고, 어떻게 넘길지를 반드시 붙여라.
-
-[출력 형식 — 아래 JSON 키를 정확히 그대로, 순수 JSON만]
-{
-  "headline": "(20자 이내) 이 30일을 한 문장으로. 손님이 캡처해서 저장하고 싶을 만큼 뾰족하게.\\n     🚨 덕담·무난한 요약 금지. '좋은 기운이 가득한 달' 같은 표현은 실패다.\\n     반드시 '대가'나 '역설'이 드러나야 한다. 좋은 것 하나를 얻는 대신 무엇을 내주는지 짚어라.\\n     좋은 예: '지갑은 열리고, 마음은 바쁜 30일' / '기회는 오는데 몸이 안 따라주는 시기'",
-  "keyword_1": "(6자 이내) 이 30일의 키워드. 셋 중 최소 하나는 불편한 진실이어야 한다.",
-  "keyword_2": "(6자 이내)",
-  "keyword_3": "(6자 이내)",
-  "label_love": "(8자 이내) 이번 30일 애정 영역이 무엇을 하고 있는지. 평가 금지, 서술만. 예: '관계가 열리는 달' / '혼자 정리하는 달'",
-  "label_money": "(8자 이내) 금전 영역의 상태. 예: '나가는 쪽이 빠른 달' / '들어올 자리가 생기는 달'",
-  "label_work": "(8자 이내) 일·성취 영역의 상태. 예: '밀어붙일 수 있는 달' / '정리가 먼저인 달'",
-  "label_body": "(8자 이내) 컨디션 영역의 상태. 예: '체력 관리가 필요한 달' / '회복이 빠른 달'",
-  "card1_overview": "(400자 이상) 이 30일의 전체 흐름. 어떤 기조로 흘러가는지, 그 안에서 ${P.name}님이 무엇을 붙잡고 무엇을 놓아야 하는지. 종합 점수의 의미도 여기서 설명하라.",
-  "card2_love": "(350자 이상) 애정운. 지금 만나는 사람이 있든 없든 읽히게 써라. 계산된 날짜를 최소 1개 인용하고, 그날 무슨 일이 벌어지기 쉬운지 장면으로.",
-  "card3_money": "(350자 이상) 금전운. 들어오는 흐름과 새는 구멍을 함께 짚어라. 막연한 '재물운이 좋다' 금지. 어디서 벌고 어디서 빠져나가는지 구체적으로.",
-  "card4_work": "(350자 이상) 일과 성취. 밀어붙일 시기와 물러설 시기를 날짜로 나눠서 제시하라.",
-  "card5_body": "(300자 이상) 컨디션과 마음 상태. 몸이 먼저 신호를 보내는 지점을 짚되, 의학적 진단처럼 쓰지 마라.",
-  "card6_gooddays": "(300자 이상) 🚨 계산된 '좋은 날'만 써라. 각 날짜에 무엇을 하면 좋은지 행동 단위로 구체적으로. '좋은 일이 생깁니다' 같은 뭉뚱그림 금지.",
-  "card7_caredays": "(300자 이상) 🚨 계산된 '조심할 날'만 써라. 무엇을 조심해야 하는지, 그리고 그날을 어떻게 넘길지까지. 공포만 주고 끝내면 실패다.",
-  "card8_action": "(350자 이상) 이 30일 동안 해야 할 것 3가지와 하지 말아야 할 것 3가지.\n     🚨 서식을 반드시 아래 구조 그대로 지켜라. 줄바꿈 없이 붙여 쓰면 읽을 수가 없다.\n     <b>해야 할 것</b><br>1. ...<br>2. ...<br>3. ...<br><br><b>하지 말아야 할 것</b><br>1. ...<br>2. ...<br>3. ...\n     각 항목은 계산된 날짜를 최소 1개 포함하고 행동 단위로 구체적으로. '긍정적으로 생각하세요' 같은 뻔한 조언 금지.",
-  "card_planet": "(250자 이상) 위 '이번 달의 행성'으로 지정된 행성 이야기.\n     그 기운이 왜 이번 30일에 눌리는지 실제 흐름으로 설명하고, 계산된 '채우는 날'에 무엇을 하면 채워지는지를 행동 단위로 써라.\n     🚨 '행운을 부른다', '액운을 막는다', '지니면 좋아진다' 같은 효험 표현은 절대 금지다. 상태를 설명하고 행동을 제안하는 선에서 멈춰라.",
-  "card9_teaser": "(3문장) 이 30일의 흐름은 ${P.name}님의 타고난 차트 위에서 벌어지는 일이라는 점을 짚어라.\\n     이번 리포트에서 실제로 드러난 흐름 하나를 지목하고, 그 뿌리는 개인 차트에 있다는 방향으로 자연스럽게 이어라.\\n     강매 톤·가격 언급 금지. 마지막은 질문으로 끝내 궁금증을 남겨라."
-}`;
-}
-
-/* -------------------------------------------------------------------------
-   Gemini 호출 + 검증
-------------------------------------------------------------------------- */
-const REQUIRED_KEYS = [
-  'headline', 'card1_overview', 'card2_love', 'card3_money', 'card4_work',
-  'card5_body', 'card6_gooddays', 'card7_caredays', 'card8_action', 'card_planet'
-];
-
-/* 🚨 '금성 양자리 4.4도' 같은 좌표 표기가 실제로 손님에게 나간 사례가 있었다.
-   일반인에게는 암호로 읽히므로 도수 표기를 통째로 차단한다. */
-/* 🚨 점수 표기를 차단한다. 프롬프트로만 막았더니 실제로 새어나왔다. */
-/* 효험 주장은 표시광고법·광고 심사에 걸린다. 상태 설명만 허용한다. */
-const BANNED = /undefined|null|NaN|트랜짓 목록|다이제스트|확정 점수|정보 완전도|오차 \d|[가-힣]+자리\s*\d+(\.\d+)?\s*도|\d+하우스\s*\d+도|\d{2}\s*점|\d{2}점대|점수(가|는|를|로)|액운|부적|지니면|행운을 부르/i;
-const HEDGE = /(수 있습니다|수 있어요|수도 있습니다|수 있고|수 있으며|여지가 있습니다|위험이 있습니다)/g;
-const HEDGE_LIMIT = 12;
-const METAPHOR_OPEN = /^.{0,40}(마치|같은 |듯한|처럼 느껴지는)/;
-/* 카드를 점수 언급으로 여는 패턴. 실측에서 6장 중 4장이 그랬다.
-   한두 장은 자연스럽지만 3장 넘어가면 성의 없어 보인다. */
-const SCORE_OPEN = /^.{0,25}(\d{2}\s*점|점수\s*\d{2})/;
-const SCORE_OPEN_LIMIT = 2;
-const CLICHE = /(잃어버[린렸]|반쪽|자석|우물|나침반|퍼즐 조각)/;
-
-/** 브랜드 밖 색상·마크다운을 재생성 없이 결정론적으로 교정한다 */
-function sanitize(data) {
-  for (const k of Object.keys(data)) {
-    if (typeof data[k] !== 'string') continue;
-    data[k] = data[k]
-      .replace(/color:\s*#(?!ff3b30\b)[0-9a-fA-F]{3,8}/gi, 'color:#d4af37')
-      .replace(/\*\*\*(.+?)\*\*\*/g, '<b>$1</b>')
-      .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
-      .replace(/(^|[^*])\*([^*\n]+?)\*(?!\*)/g, '$1<b>$2</b>')
-      .replace(/^#{1,6}\s+/gm, '')
-      .replace(/\u00a0/g, ' ')
-      .trim();
-  }
-  return data;
-}
-
-function validate(data, P, isLastAttempt) {
-  if (!data || typeof data !== 'object') return '응답이 객체가 아님';
-  for (const k of REQUIRED_KEYS) {
-    if (!data[k] || String(data[k]).trim().length < 10) return `필수 항목 누락/부실: ${k}`;
-  }
-  const body = REQUIRED_KEYS.map(k => String(data[k])).join(' ');
-  if (BANNED.test(body)) return '시스템 용어 노출';
-
-  /* 품질 검사 — 마지막 시도에서는 통과시킨다.
-     완벽을 고집하다 결제한 손님에게 아무것도 못 주는 게 더 큰 실패이기 때문. */
-  if (!isLastAttempt) {
-    const hedges = (body.match(HEDGE) || []).length;
-    if (hedges > HEDGE_LIMIT) return `발뺌 화법 과다 (${hedges}회 / 허용 ${HEDGE_LIMIT}회)`;
-    for (const k of REQUIRED_KEYS) {
-      if (METAPHOR_OPEN.test(String(data[k]))) return `${k} 카드가 비유로 시작함`;
-    }
-    if (CLICHE.test(body)) return '상투적 비유 사용';
-
-    /* 점수 자체를 없앴으므로 오프닝 검사는 BANNED가 대신 처리한다 */
-  }
-  return null;
-}
-
-async function callGemini(prompt) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
-  const r = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        maxOutputTokens: 16384,
-        temperature: 0.9,
-        responseMimeType: 'application/json',
-        /* 1,900원 상품이라 사고 예산을 낮춰 단가를 줄인다 */
-        thinkingConfig: { thinkingBudget: 2048 }
+  // 트랜짓 → 출생 행성 각도
+  const ASPECTS = [
+    { ang:0, name:'합', orb:5, tone:'강한 자극' },
+    { ang:180, name:'대립', orb:5, tone:'긴장·부딪힘' },
+    { ang:120, name:'삼각', orb:5, tone:'순조로움' },
+    { ang:90, name:'사각', orb:5, tone:'마찰·과부하' },
+    { ang:60, name:'육각', orb:4, tone:'기회' }
+  ];
+  const targets = ['태양','달','금성','화성','상승점'];
+  const hits = [];
+  Object.keys(T).forEach(function(tn){
+    targets.forEach(function(nn){
+      if (!natal[nn]) return;
+      let d = Math.abs(T[tn].lon - natal[nn].abs) % 360;
+      if (d > 180) d = 360 - d;
+      for (const a of ASPECTS){
+        if (Math.abs(d - a.ang) <= a.orb){
+          hits.push(`트랜짓 ${tn} × 출생 ${nn} ${a.name} (${a.tone})`);
+          break;
+        }
       }
-    })
+    });
   });
-  if (!r.ok) {
-    const t = await r.text();
-    const err = new Error(`Gemini ${r.status}: ${t.slice(0, 200)}`);
-    err.status = r.status;
-    throw err;
+  if (hits.length){
+    lines.push(`\n[이 달의 핵심 각도 — 최소 2개는 반드시 해석에 인용하라]`);
+    hits.slice(0, 8).forEach(function(h){ lines.push('• ' + h); });
   }
-  const j = await r.json();
-  const parts = (j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts) || [];
-  const text = parts.map(p => p.text || '').join('');
-  const s = text.indexOf('{'), e = text.lastIndexOf('}');
-  if (s === -1 || e === -1) throw new Error('응답에 JSON 없음: ' + text.slice(0, 150));
-  return JSON.parse(text.slice(s, e + 1));
+
+  const retro = Object.keys(T).filter(function(n){ return T[n].r; });
+  if (retro.length) lines.push(`\n[역행 중인 행성] ${retro.join(', ')} → 되돌아보기·재정비·재연락에 유리, 새 계약/새 시작은 신중`);
+
+  return lines.join('\n');
 }
 
-/* -------------------------------------------------------------------------
-   핸들러
-------------------------------------------------------------------------- */
 const handler = async (req, res) => {
-
-  /* ---------- 다시보기 ---------- */
   if (req.method === 'GET') {
     const orderId = req.query && req.query.orderId;
     if (!orderId) return res.status(400).json({ error: 'orderId 필요' });
     try {
-      const saved = await kv.get(KEY_PREFIX + orderId);
-      if (!saved) {
-        res.setHeader('Cache-Control', 'no-store');
-        return res.status(404).json({ error: '저장된 리포트 없음' });
-      }
-      if (saved.status === 'completed') {
-        res.setHeader('Cache-Control', 'private, max-age=300');
-        res.setHeader('ETag', `"monthly-${orderId}"`);
-      } else {
-        res.setHeader('Cache-Control', 'no-store');
-      }
-      return res.status(200).json(saved);
+      const saved = await kv.get(`monthly:${orderId}`);
+      if (saved) return res.status(200).json(saved);
+      return res.status(404).json({ error: '저장된 리포트 없음' });
     } catch (e) {
-      res.setHeader('Cache-Control', 'no-store');
       return res.status(500).json({ error: 'KV 조회 실패: ' + e.message });
     }
   }
-
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST 요청만 받습니다.' });
 
-  const body = req.body || {};
-  const orderId = body.orderId ? String(body.orderId).slice(0, 60) : null;
-  let lockKey = null;
+  console.log('✅ [1] monthly.js 진입');
 
   try {
-    const P = normPerson(body);
-    if (!P) return res.status(400).json({ error: '생년월일과 태어난 시간을 다시 확인해주세요.' });
+    const { name, date, time, city } = req.body;
+    if (!name || !date || !time) return res.status(400).json({ error: '필수 입력값 누락' });
+    if (!process.env.GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY 환경변수 없음' });
 
-    if (!process.env.GEMINI_API_KEY) return res.status(500).json({ error: '서버 설정 오류(GEMINI)' });
-    if (!process.env.PROKERALA_CLIENT_ID || !process.env.PROKERALA_CLIENT_SECRET) {
-      return res.status(500).json({ error: '서버 설정 오류(PROKERALA)' });
+    let location = cityCoordinates[city];
+    if (!location) {
+      console.error(`⚠️ 출생지 좌표 없음: "${city}" → 서울로 임시 처리`);
+      location = cityCoordinates['Seoul'];
     }
+    const dateTimeIso = buildBirthIso(date, time, city);
 
-    /* ---------- 완성본 재사용 ----------
-       ⚠️ 단, 리포트가 만들어진 날짜가 오늘과 다르면 기간이 어긋나므로 다시 만든다.
-          "오늘부터 30일" 상품이라 어제 만든 리포트를 그대로 주면 하루가 빈다. */
-    const today = new Date();
-    const todayKey = TR.ymd(today);
+    // 대상 월 = 서버 기준 '지금'(KST). 매달 자동 갱신됨.
+    const nowKst = new Date(Date.now() + 9 * 3600 * 1000);
+    const year = nowKst.getUTCFullYear();
+    const month = nowKst.getUTCMonth() + 1;
 
-    if (orderId) {
-      const saved = await kv.get(KEY_PREFIX + orderId);
-      if (saved && saved.status === 'completed' && saved.baseDate === todayKey) {
-        res.setHeader('Cache-Control', 'no-store');
-        return res.status(200).json(saved);
+    let digest = null;
+    try {
+      if (process.env.PROKERALA_CLIENT_ID && process.env.PROKERALA_CLIENT_SECRET) {
+        const tokenRes = await fetch('https://api.prokerala.com/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            grant_type: 'client_credentials',
+            client_id: process.env.PROKERALA_CLIENT_ID,
+            client_secret: process.env.PROKERALA_CLIENT_SECRET
+          })
+        });
+        if (tokenRes.ok) {
+          const tk = await tokenRes.json();
+          const astroRes = await fetch(
+            `https://api.prokerala.com/v2/astrology/planet-position?datetime=${encodeURIComponent(dateTimeIso)}&coordinates=${location.lat},${location.lon}&ayanamsa=1`,
+            { headers: { 'Authorization': `Bearer ${tk.access_token}` } }
+          );
+          if (astroRes.ok) {
+            const aj = await astroRes.json();
+            digest = buildMonthlyDigest(aj.data, dateTimeIso, year, month);
+            console.log('📊 월간 다이제스트:\n' + digest);
+          }
+        }
       }
-    }
+    } catch (e) { console.log('⚠️ Prokerala Fallback:', e.message); }
 
-    /* ---------- 생성 락 ---------- */
-    if (orderId) {
-      lockKey = LOCK_PREFIX + orderId;
-      const got = await kv.set(lockKey, '1', { nx: true, ex: 300 });
-      if (!got) {
-        res.setHeader('Cache-Control', 'no-store');
-        return res.status(202).json({ status: 'pending', message: '리포트를 만들고 있습니다.' });
-      }
-      await kv.set(KEY_PREFIX + orderId, { status: 'pending', at: Date.now() }, { ex: 60 * 60 });
-    }
+    if (!digest) digest = '정밀 천체 역산 데이터 기반.';
 
-    /* ---------- 차트 + 하늘 ---------- */
-    const token = await getToken();
-    const samples = TR.sampleDates(today);
+    const prompt = `
+[🚨 절대 금지]
+'undefined','null','NaN','트랜짓 항목','데이터에 없음' 같은 시스템 용어를 본문에 쓰지 마라. 손님은 일반인이다.
 
-    /* 하늘은 캐시가 있으면 Prokerala 호출 0회 */
-    const [natal, sky] = await Promise.all([
-      fetchNatal(P, token),
-      fetchSky(samples, token)
-    ]);
+너는 명리학을 오래 공부하다 서양 점성술로 전향한 20년 경력의 전문가다.
+아래는 ${name}님의 출생차트와 ${year}년 ${month}월 실제 행성 위치다.
 
-    if (!sky.length) throw new Error('하늘 데이터를 가져오지 못했습니다');
+${digest}
 
-    const built = TR.buildMonthlyDigest(natal, sky, samples, today, P.name);
+[작성 규칙]
+1. 반드시 위 트랜짓과 각도를 근거로 써라. 별자리 일반론('사자자리는 열정적') 절대 금지.
+2. 최소 2개의 구체적 근거를 본문에 자연스럽게 녹여라. 예: "이번 달 화성이 당신의 6하우스를 지나며"
+3. 발뺌 화법 금지: '~일 수 있습니다', '~한 느낌도 있습니다' 금지. '~편입니다', '~합니다'로 부드럽게 단정하라.
+4. 날짜는 반드시 ${year}년 ${month}월 안의 구체적 시기(초순/중순/하순 또는 날짜 범위)로 써라.
+5. 뻔한 덕담 금지. 이 사람의 이번 달에만 해당하는 구체적 장면으로 써라.
+6. 어조는 따뜻하되 단정적으로. 겁주지 마라.
 
-    /* ---------- 리포트 생성 (최대 3회, 반려 사유 되먹임) ---------- */
-    const todayStr = TR.krDate(today, today);
-    const endStr   = TR.krDate(TR.addDays(today, TR.SPAN_DAYS), today);
+아래 JSON 형식으로만 답하라. 다른 말 붙이지 마라.
+{
+  "month_title": "${year}년 ${month}월",
+  "headline": "(45자 이내) 이번 달을 관통하는 핵심 한 줄. 강렬하고 구체적으로.",
+  "money": "(최소 300자) 💰 재물운. 트랜짓 근거 포함. 수입·지출·기회의 구체적 시기와 장면.",
+  "love": "(최소 300자) 💗 연애운. 솔로/커플 모두에게 해당하도록. 만남이나 관계 변화의 시기를 짚어라.",
+  "work": "(최소 300자) 🔥 일·성취운. 성과가 나는 시점과 주의할 시점을 나눠서.",
+  "exam": "(최소 200자) 📚 시험·학업운. 집중이 잘 되는 시기, 실수하기 쉬운 시기.",
+  "social": "(최소 200자) 🤝 대인관계운. 도움이 되는 사람, 거리를 둘 관계.",
+  "caution": "(최소 200자) ⚠️ 이 달 반드시 조심할 것. 역행이나 긴장 각도를 근거로 구체적으로 1~2가지.",
+  "luck": "(최소 150자) 🍀 개운 포인트. 행운의 색·방향·행동 각각 하나씩. 트랜짓 별자리와 연결해 근거를 대라.",
+  "teaser": "(120자 내외) 이번 달 흐름은 여기까지. 평생 단 하나뿐인 배우자·인생 전체 흐름이 궁금하다면 배우자 리포트로 자연스럽게 이어지는 문장."
+}
+`;
 
-    let data = null, lastErr = '', correction = '';
+    let parsed = null, lastErr = '';
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        const prompt = buildPrompt({ P, digest: built.text, todayStr, endStr, correction });
-        const candidate = sanitize(await callGemini(prompt));
-        const bad = validate(candidate, P, attempt === 3);
-        if (bad) {
-          lastErr = bad; correction = bad;
-          console.error(`🔥 [시도 ${attempt}] 검증 실패: ${bad}`);
+        const gRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                maxOutputTokens: 8192,
+                temperature: 0.9,
+                responseMimeType: 'application/json',
+                thinkingConfig: { thinkingBudget: 2048 }
+              }
+            })
+          }
+        );
+        if (!gRes.ok) {
+          lastErr = `Gemini ${gRes.status}: ${await gRes.text()}`;
+          console.error(`🔥 [시도 ${attempt}]`, lastErr);
+          if (gRes.status === 503) await new Promise(r => setTimeout(r, 1500 * attempt));
           continue;
         }
-        data = candidate;
+        const gd = await gRes.json();
+        const parts = (gd.candidates && gd.candidates[0] && gd.candidates[0].content && gd.candidates[0].content.parts) || [];
+        const txt = parts.map(p => p.text || '').join('');
+        const s = txt.indexOf('{'), e = txt.lastIndexOf('}');
+        if (s === -1 || e === -1) { lastErr = '응답에 JSON 없음'; continue; }
+        parsed = JSON.parse(txt.slice(s, e + 1));
         break;
       } catch (err) {
         lastErr = err.message;
-        console.error(`🔥 [시도 ${attempt}]`, err.message);
-        /* 503(과부하)·429(한도)는 수십 초 지속된다. 짧게 두드리면 같은 답만 받는다. */
-        if (err.status === 503 || err.status === 429) {
-          await new Promise(r => setTimeout(r, 8000 * attempt));
-        }
+        console.error(`🔥 [시도 ${attempt}] 실패:`, err.message);
       }
     }
 
-    if (!data) {
-      if (orderId) {
-        await kv.set(KEY_PREFIX + orderId, { status: 'failed', error: lastErr, at: Date.now() }, { ex: 60 * 30 });
-        await kv.del(lockKey);
-      }
-      res.setHeader('Cache-Control', 'no-store');
-      return res.status(500).json({ error: '리포트 생성에 실패했습니다. 잠시 후 다시 시도해주세요.', detail: lastErr });
-    }
+    if (!parsed) return res.status(500).json({ error: `[Gemini 실패] ${lastErr}` });
 
-    /* 🚨 점수는 손님에게 나가지 않는다. 혹시 AI가 넣었더라도 지운다. */
-    delete data.score_total; delete data.score_love; delete data.score_money;
-    delete data.score_work;  delete data.score_body;
+    parsed.generated_month = `${year}-${String(month).padStart(2, '0')}`;
+    parsed.customer_name = name;
 
-    const payload = {
-      status: 'completed',
-      generatedAt: Date.now(),
-      baseDate: todayKey,                  // 기간 판정용
-      version: 1,
-      meta: {
-        name: P.name,
-        periodStart: todayStr,
-        periodEnd: endStr,
-        goodDays: built.dates.good.map(d => d.peak),
-        careDays: built.dates.care.map(d => d.peak),
-        /* 이번 달의 행성 (행운 카드) */
-        planet: built.lucky.planet,
-        planetEn: built.lucky.en,
-        planetGlyph: built.lucky.glyph,
-        planetNeed: built.lucky.need,
-        planetDesc: built.lucky.desc,
-        planetDay: built.lucky.day,
-        /* 점수 대신 화면 주인공이 될 30일 흐름 곡선 (31개 지점, 이 달 안에서의 상대 높이) */
-        flow: built.flow.norm
-      },
-      report: data
-    };
-
-    if (orderId) {
+    if (req.body.orderId) {
       try {
-        await kv.set(KEY_PREFIX + orderId, payload, { ex: 60 * 60 * 24 * TTL_DAYS });
-        await kv.del(lockKey);
-      } catch (e) {
-        console.log('⚠️ KV 저장 실패(전송은 정상):', e.message);
-      }
+        await kv.set(`monthly:${req.body.orderId}`, parsed, { ex: 60 * 60 * 24 * 45 });
+        console.log('💾 KV 저장: monthly:' + req.body.orderId);
+      } catch (e) { console.log('⚠️ KV 저장 실패:', e.message); }
     }
 
-    res.setHeader('Cache-Control', 'no-store');
-    return res.status(200).json(payload);
-
+    res.status(200).json(parsed);
   } catch (error) {
-    console.error('🔥 gemini-monthly.js 에러:', error);
-    if (orderId) {
-      try {
-        await kv.set(KEY_PREFIX + orderId, { status: 'failed', error: error.message, at: Date.now() }, { ex: 60 * 30 });
-        if (lockKey) await kv.del(lockKey);
-      } catch (e) { /* 무시 */ }
-    }
-    res.setHeader('Cache-Control', 'no-store');
-    return res.status(500).json({ error: '잠시 문제가 있었습니다. 다시 시도해주세요.', detail: error.message });
+    console.error('🔥 monthly.js 에러:', error);
+    res.status(500).json({ error: `[서버 에러] ${error.message}` });
   }
 };
 
