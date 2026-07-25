@@ -193,6 +193,77 @@ const cityCoordinates = {
   "Overseas": { lat: 37.5665, lon: 126.978 }
 };
 
+// ═══ 도시별 시간대 (해외 출생 정확도) ═══
+// 한국 이외 도시는 현지 시간대로 환산해야 상승점·하우스가 정확하다.
+const cityTimezones = {
+  "NewYork": "America/New_York",
+  "LosAngeles": "America/Los_Angeles",
+  "Chicago": "America/Chicago",
+  "Toronto": "America/Toronto",
+  "Vancouver": "America/Vancouver",
+  "MexicoCity": "America/Mexico_City",
+  "SaoPaulo": "America/Sao_Paulo",
+  "London": "Europe/London",
+  "Paris": "Europe/Paris",
+  "Berlin": "Europe/Berlin",
+  "Frankfurt": "Europe/Berlin",
+  "Rome": "Europe/Rome",
+  "Madrid": "Europe/Madrid",
+  "Tokyo": "Asia/Tokyo",
+  "Beijing": "Asia/Shanghai",
+  "Shanghai": "Asia/Shanghai",
+  "HongKong": "Asia/Hong_Kong",
+  "Singapore": "Asia/Singapore",
+  "Bangkok": "Asia/Bangkok",
+  "Manila": "Asia/Manila",
+  "Sydney": "Australia/Sydney",
+  "Melbourne": "Australia/Melbourne",
+  "Auckland": "Pacific/Auckland"
+};
+
+// 출생일 기준 현지 UTC 오프셋(분). 서머타임 자동 반영.
+function getUtcOffsetMinutes(tz, y, mo, d, h, mi) {
+  try {
+    const asUTC = Date.UTC(y, mo - 1, d, h, mi, 0);
+    const dtf = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz, hour12: false,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
+    });
+    const p = {};
+    for (const part of dtf.formatToParts(new Date(asUTC))) {
+      if (part.type !== 'literal') p[part.type] = parseInt(part.value, 10);
+    }
+    const asLocal = Date.UTC(p.year, p.month - 1, p.day, p.hour % 24, p.minute, p.second);
+    return Math.round((asLocal - asUTC) / 60000);
+  } catch (e) {
+    console.error('시간대 계산 실패:', tz, e.message);
+    return 540;
+  }
+}
+
+// 출생 정보 → 정확한 ISO 문자열 (도시 시간대 반영)
+function buildBirthIso(dateStr, timeStr, cityKey) {
+  const ds = String(dateStr).replace(/\./g, '-');
+  const parts = ds.split('-').map(Number);
+  const y = parts[0], mo = parts[1], d = parts[2];
+  const tparts = String(timeStr).split(':').map(Number);
+  const h = tparts[0], mi = tparts[1] || 0;
+  const tz = cityTimezones[cityKey];
+
+  // 한국 도시는 목록에 없으므로 기존과 동일하게 +09:00
+  if (!tz) return ds + 'T' + timeStr + ':00+09:00';
+
+  const off = getUtcOffsetMinutes(tz, y, mo, d, h, mi);
+  const sign = off >= 0 ? '+' : '-';
+  const ab = Math.abs(off);
+  const hh = String(Math.floor(ab / 60)).padStart(2, '0');
+  const mm = String(ab % 60).padStart(2, '0');
+  console.log('🌍 ' + cityKey + ' → ' + tz + ' (UTC' + sign + hh + ':' + mm + ')');
+  return ds + 'T' + timeStr + ':00' + sign + hh + ':' + mm;
+}
+
+
 
 // ===== 🔬 차트 정밀 다이제스트 =====
 // Prokerala의 베딕(사이더리얼) 좌표를 서양 점성술(트로피컬)로 보정하고,
@@ -431,7 +502,7 @@ const handler = async (req, res) => {
         console.error(`⚠️ 출생지 좌표 없음: "${city}" → 서울로 임시 처리됨. 도시 목록 확인 필요!`);
         location = cityCoordinates["Seoul"];
     }
-    const dateTimeIso = `${date.replace(/\./g, '-')}T${time}:00+09:00`;
+    const dateTimeIso = buildBirthIso(date, time, city);
 
     let astrologyDataText = "정밀 천체 궤도 역산 데이터 기반.";
     try {
