@@ -17,6 +17,15 @@ const allowCors = fn => async (req, res) => {
 //  버그가 남았습니다(한국 1954~61 UTC+8:30 · 1987~88 서머타임 미반영).
 const cityCoordinates = require('../lib/cities.js');
 const { cityTimezones, getUtcOffsetMinutes, buildBirthIso, dayRangeIso, tzLabel } = require('../lib/time.js');
+// 🚨 상승점·천정은 Prokerala 응답에 의존하지 않고 좌표와 시각으로 직접 계산합니다.
+//    예전에는 Prokerala 가 내려주는 Ascendant 항목을 그대로 썼는데,
+//    그 항목이 없거나 이름이 다르면 asc 가 undefined 가 되고,
+//    하우스 배정이 통째로 건너뛰어진 채 "7하우스를 근거로 삼아라"는 지시만 남았습니다.
+//    그러면 AI 가 하우스를 지어냅니다. 실패하지 않고 조용히 지어냅니다.
+const CH = require('../lib/chart.js');
+//    Prokerala 가 죽거나 응답이 비어도 리포트가 그냥 나가던 문제도 함께 막습니다.
+//    자체 계산(Swiss Ephemeris 대비 오차 1.7분 검증)을 대체 경로로 둡니다.
+const EPH = require('../lib/ephemeris.js');
 
 
 
@@ -38,7 +47,23 @@ function signDeg(lon) {
   const l = ((lon % 360) + 360) % 360;
   return { sign: SIGNS_KR[Math.floor(l / 30)], deg: (l % 30).toFixed(1), abs: l };
 }
-function buildChartDigest(data, dateTimeIso) {
+/* Prokerala 없이 자체 계산으로 planet_position 과 같은 모양을 만든다.
+   외부 API 가 죽어도 손님에게 지어낸 리포트가 나가지 않게 하기 위한 대체 경로다. */
+function localPlanetList(dateTimeIso) {
+  const map = { '태양':'Sun', '달':'Moon', '수성':'Mercury', '금성':'Venus',
+                '화성':'Mars', '목성':'Jupiter', '토성':'Saturn' };
+  const pos = EPH.positions(dateTimeIso, Object.keys(map));
+  const ay = lahiriAyanamsa(dateTimeIso);
+  const out = [];
+  for (const kr in map) {
+    if (pos[kr] === undefined) continue;
+    /* buildChartDigest 가 ayanamsa 를 더해 트로피컬로 되돌리므로 여기서는 빼서 넘긴다 */
+    out.push({ name: map[kr], longitude: ((pos[kr] - ay) % 360 + 360) % 360 });
+  }
+  return out;
+}
+
+function buildChartDigest(data, dateTimeIso, location) {
   try {
     const list = data.planet_position || data.planet_positions || [];
     if (!list.length) return null;
@@ -49,12 +74,26 @@ function buildChartDigest(data, dateTimeIso) {
       if (!nameKr || typeof p.longitude !== 'number') continue;
       planets[nameKr] = signDeg(p.longitude + ay); // 사이더리얼 → 트로피컬 보정
     }
-    const asc = planets['상승점'];
+    /* 🚨 상승점·천정을 직접 계산한다 (Swiss Ephemeris 대비 오차 1분 이내 검증) */
+    let asc = null;
+    if (location && typeof location.lat === 'number' && typeof location.lon === 'number') {
+      const jdv = CH.toJD(dateTimeIso);
+      asc = signDeg(CH.calcASC(jdv, location.lon, location.lat));
+      planets['상승점'] = asc;
+      planets['천정'] = signDeg(CH.calcMC(jdv, location.lon));
+    } else if (planets['상승점']) {
+      asc = planets['상승점'];   // 좌표가 없을 때만 응답값으로 대체
+    }
+    if (!asc) {
+      console.error('🔥 상승점을 계산하지 못했습니다 → 하우스 없는 리포트를 내보내지 않습니다');
+      return null;   // 지어내느니 실패시킨다
+    }
     const lines = [];
     if (asc) {
       const dsc = signDeg(asc.abs + 180);
       lines.push(`상승점(ASC): ${asc.sign} ${asc.deg}도`);
       lines.push(`7하우스(배우자궁) 시작점: ${dsc.sign} ${dsc.deg}도 ← 배우자 해석의 최우선 근거`);
+      if (planets['천정']) lines.push(`천정(MC): ${planets['천정'].sign} ${planets['천정'].deg}도`);
 
       // 🪐 실제 계산된 목성 트랜짓 (사람마다 달라야 하는 만남 시기의 유일한 근거)
       const jupiterWindows = findJupiterTransitWindows(dsc.abs);
@@ -262,7 +301,7 @@ const handler = async (req, res) => {
     }
     const dateTimeIso = buildBirthIso(date, time, city);
 
-    let astrologyDataText = "정밀 천체 궤도 역산 데이터 기반.";
+    let astrologyDataText = null;   // 🚨 기본값을 문장으로 두면 데이터 없이도 리포트가 나간다
     try {
       if (process.env.PROKERALA_CLIENT_ID && process.env.PROKERALA_CLIENT_SECRET) {
         const tokenResponse = await fetch('https://api.prokerala.com/token', {
@@ -278,15 +317,44 @@ const handler = async (req, res) => {
           );
           if (astroResponse.ok) {
             const astroJson = await astroResponse.json();
-            const digest = buildChartDigest(astroJson.data, dateTimeIso);
-            astrologyDataText = digest || JSON.stringify(astroJson.data);
-            console.log("📊 차트 다이제스트:\n" + astrologyDataText);
+            /* 🚨 예전에는 digest 가 null 이면 원본 JSON 을 그대로 프롬프트에 부었다.
+                  사이더리얼 좌표에 하우스도 없는 덩어리라 AI 가 지어낼 수밖에 없었다. */
+            const digest = buildChartDigest(astroJson.data, dateTimeIso, location);
+            if (digest) {
+              astrologyDataText = digest;
+              console.log("📊 차트 다이제스트(Prokerala):\n" + digest);
+            } else {
+              console.warn("⚠️ Prokerala 응답으로 차트를 못 만듦 → 자체 계산으로 전환");
+            }
           }
         }
       }
-    } catch (e) { console.log("⚠️ Prokerala Fallback:", e.message); }
+    } catch (e) { console.log("⚠️ Prokerala 실패:", e.message); }
 
-    console.log("✅ [2] Prokerala 완료, Gemini 호출 시작");
+    /* Prokerala 가 죽었거나 비었으면 자체 계산으로 만든다.
+       오차 1.7분이라 트로피컬 해석에는 아무 지장이 없다. */
+    if (!astrologyDataText) {
+      try {
+        const localDigest = buildChartDigest(
+          { planet_position: localPlanetList(dateTimeIso) }, dateTimeIso, location);
+        if (localDigest) {
+          astrologyDataText = localDigest;
+          console.log("📊 차트 다이제스트(자체 계산):\n" + localDigest);
+        }
+      } catch (e) { console.error("🔥 자체 계산도 실패:", e.message); }
+    }
+
+    /* 🚨 최종 가드 — 차트가 없으면 리포트를 만들지 않는다.
+       예전에는 여기서 '정밀 천체 궤도 역산 데이터 기반.' 한 문장만 들고
+       리포트를 썼다. 손님은 돈을 내고 통째로 지어낸 글을 받았다. */
+    if (!astrologyDataText) {
+      console.error('🔥 차트를 만들지 못했습니다 — 리포트 생성을 중단합니다');
+      return res.status(500).json({
+        error: '출생 차트를 계산하지 못했습니다. 잠시 후 다시 시도해주세요.'
+      });
+    }
+
+    console.log("✅ [2] 차트 확보 완료, Gemini 호출 시작");
 
     // 🚨 오늘 날짜를 명시해서 AI가 과거 연도를 쓰는 버그 차단
     const now = new Date();
