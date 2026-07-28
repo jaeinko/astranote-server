@@ -54,6 +54,21 @@
       unhide: '.cpr-card,#cpr-hero,#cpr-upsell',
       grad: ['#241732', '#100b18', '#050505'],
       name: '궁합리포트'
+    },
+    /* 🚨 VVIP 는 강화 블록이 원래 저장 버튼을 숨기고(vip-capture-section:none)
+          자기 버튼(#apx-savebar)으로 갈아끼웁니다. 그 갈아끼우기가 실패하면
+          원래 버튼은 숨겨진 채 새 버튼도 안 생겨서 저장 버튼이 아예 사라집니다.
+          여기서 버튼 존재를 보장하고, 저장 방식도 공유 시트로 바꿉니다. */
+    '11': {
+      root: '#astro-vip-result-container',
+      order: ['.vip-report-header', '.apx-hero', '#apx-chart', '#apx-method',
+              '#vip-card1', '#vip-card2', '#vip-card3', '#vip-card4',
+              '#life-chart', '#apx-closing'],
+      hideInClone: ['.vip-capture-section', '#apx-savebar', '#apx-prog'],
+      unhide: '.vip-report-card,.life-chart-card,.apx-card,.apx-hero,.apx-closing',
+      grad: ['#1e1733', '#0b0812', '#050308'],
+      name: 'VVIP리포트',
+      bars: true   /* life-bar-fill 너비 복원 필요 */
     }
   };
 
@@ -112,9 +127,15 @@
 
   function labelOf(e, spec) {
     if (e.classList.contains('report-header')) return '표지';
+    if (e.classList.contains('vip-report-header')) return '표지';
+    if (e.classList.contains('apx-hero')) return '핵심 한 문장';
+    if (e.id === 'apx-chart') return '출생 천체 명세표';
+    if (e.id === 'apx-method') return '계산 방법론';
+    if (e.id === 'life-chart') return '인생 운세 점수표';
+    if (e.id === 'apx-closing') return '맺음말';
     if (e.id === 'cpr-hero') return '궁합 점수';
     if (e.id === 'upsell-gate' || e.id === 'cpr-upsell') return '안내';
-    var t = $('.card-title', e) || $('.cpr-tt', e);
+    var t = $('.card-title', e) || $('.cpr-tt', e) || $('.vip-card-title', e);
     return t ? t.textContent.trim().slice(0, 22) : '본문';
   }
 
@@ -124,6 +145,11 @@
       doc.querySelectorAll(spec.unhide).forEach(function (x) {
         x.style.opacity = '1'; x.style.transform = 'none';
       });
+      if (spec.bars) {
+        doc.querySelectorAll('.life-bar-fill').forEach(function (b) {
+          if (b.dataset && b.dataset.score) b.style.width = b.dataset.score + '%';
+        });
+      }
       spec.hideInClone.forEach(function (sel) {
         var e = doc.querySelector(sel); if (e) e.style.display = 'none';
       });
@@ -323,8 +349,70 @@
     });
   }
 
+  /* ── VVIP 전용 : 저장 버튼 보장 + 로딩 문구 교정 ──────────── */
+
+  /* 로딩 안내가 '1분 내외'로 되어 있는데, 문장이 기준에 못 미치면
+     서버가 최대 3회까지 다시 씁니다. 실제로는 3분 넘게도 걸립니다.
+     3만원짜리라 오래 걸리는 게 흠이 아니라 근거가 되도록 문구를 바꿉니다. */
+  function fixVipLoading() {
+    var host = $('#vip-data-loading');
+    if (!host || host.dataset.asvTxt) return;
+    var d = $('.vip-loading-desc', host);
+    if (!d) return;
+    host.dataset.asvTxt = '1';
+    d.innerHTML = '실제 천체 궤도를 역산해 당신만의 리포트를 쓰고 있습니다.<br>' +
+      '보통 <b style="color:#f0d77b">1~3분</b> 걸립니다. 화면을 끄지 마세요.<br>' +
+      '<span style="color:#8e83a8;font-size:12px">문장이 기준에 못 미치면 다시 씁니다. ' +
+      '그래서 시간이 걸립니다.</span>';
+    d.style.lineHeight = '1.75';
+    d.style.wordBreak = 'keep-all';
+    d.style.maxWidth = '340px';
+  }
+
+  /* VVIP 강화 블록이 원래 버튼을 숨겼는데 자기 버튼을 못 만든 경우를 메꾼다 */
+  function ensureVipBar() {
+    var host = $('#astro-vip-result-container');
+    if (!host) return null;
+    var c1 = $('#out-vip-card1');
+    if (!c1 || (c1.textContent || '').length < 50) return null;   // 아직 렌더 전
+
+    var existing = $('#apx-main');
+    if (existing) return existing;          // 강화 블록이 잘 만들었으면 그걸 쓴다
+    if ($('#asv-bar')) return $('#asv-vipbtn');
+
+    injectCSS();
+    var bar = document.createElement('div');
+    bar.id = 'asv-bar';
+    bar.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:2147482500;' +
+      'display:flex;flex-direction:column;align-items:center;gap:7px;' +
+      'padding:13px 16px calc(13px + env(safe-area-inset-bottom));' +
+      'background:linear-gradient(to top,rgba(5,3,8,.985) 55%,rgba(5,3,8,.7) 82%,rgba(5,3,8,0));';
+    bar.innerHTML =
+      '<button type="button" id="asv-vipbtn" style="width:100%;max-width:680px;border:none;' +
+      'cursor:pointer;border-radius:14px;padding:17px 14px;color:#1a1206;' +
+      'font:900 15.5px \'Noto Sans KR\',sans-serif;letter-spacing:-.045em;' +
+      'background:linear-gradient(135deg,#f7e7a8,#e8c766 38%,#d4af37 72%,#b8912e);' +
+      'box-shadow:0 10px 28px rgba(212,175,55,.3)">📸 리포트 이미지로 저장</button>' +
+      '<div style="font:500 10.5px \'Noto Sans KR\',sans-serif;color:#7a7186">' +
+      '저장한 이미지는 언제든 다시 볼 수 있습니다 · 무료</div>';
+    document.body.appendChild(bar);
+    console.log('[저장v2] VVIP 저장 버튼을 새로 만들었습니다');
+    return $('#asv-vipbtn');
+  }
+
   /* ── 기존 저장 버튼 가로채기 ─────────────────────────────── */
   function hook() {
+    /* VVIP (11번) */
+    if (document.body.classList.contains('is-vip')) {
+      fixVipLoading();
+      var b11 = ensureVipBar();
+      if (b11 && !b11.dataset.asv) {
+        b11.dataset.asv = '1';
+        b11.onclick = function (e) { if (e) e.preventDefault(); run('11', b11); };
+        window.saveVipReport = function () { run('11', b11); };
+        console.log('[저장v2] VVIP 저장 버튼 교체 완료');
+      }
+    }
     /* 배우자 (9번) */
     var b9 = document.getElementById('btn-save-report');
     if (b9 && !b9.dataset.asv && $(SPECS['9'].root)) {
