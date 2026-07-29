@@ -4,6 +4,6 @@
     "api/gemini-vip.js":     { "maxDuration": 300 },
     "api/gemini-couple.js":  { "maxDuration": 300 },
     "api/gemini-monthly.js": { "maxDuration": 300 },
-    "api/gemini-reunion.js": { "maxDuration": 300 }
+    "api/gemini-child.js":   { "maxDuration": 300 }
   }
 }
