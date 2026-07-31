@@ -20,6 +20,7 @@ const SYN = require('../lib/astro-synastry.js');
 //    lib/cities.js 로 옮기고 module.exports = cityCoordinates 한 줄만 붙이세요.
 //    (좌표 목록이 두 상품에서 어긋나면 출생지가 조용히 서울로 대체되는 사고가 납니다)
 const cityCoordinates = require('../lib/cities.js');
+const V = require('../lib/validate.js');
 // 🚨 출생시각 → ISO 변환도 공용 모듈을 씁니다.
 //    예전에는 아래에서 '+09:00' 을 하드코딩하면서 좌표는 뉴욕·런던을 넘겨,
 //    시각은 한국인데 장소는 해외가 되어 상승점이 최대 157도 어긋났습니다.
@@ -59,13 +60,17 @@ function normPerson(p, fallbackName) {
   // 시각 '모름' — 프론트에서 timeUnknown:true 를 보내거나 time을 비워두면 됨
   const timeUnknown = !!p.timeUnknown || time === '' || time === '모름';
 
-  if (!name || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
-  if (!timeUnknown && !/^\d{2}:\d{2}$/.test(time)) return null;
+  /* 🚨 형식만 보면 2026-02-31 이 통과하고, Date 가 그걸 2026-03-03 으로
+     조용히 바꿔버린다. 실존하는 날짜인지까지 확인해야 한다. (lib/validate.js) */
+  const okDate = V.normalizeDate(date);
+  if (!name || !okDate) return null;
+  const okTime = timeUnknown ? null : V.normalizeTime(time);
+  if (!timeUnknown && !okTime) return null;
 
   return {
     name,
-    date,
-    time: timeUnknown ? null : time,
+    date: okDate,
+    time: timeUnknown ? null : okTime,
     timeUnknown,
     city: p.city && cityCoordinates[p.city] ? p.city : 'Seoul',
     cityGiven: p.city || null,
