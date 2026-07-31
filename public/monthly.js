@@ -129,7 +129,10 @@
       숫자가 위로 뜹니다. 원 정중앙에 와야 하는 건 라벨이 아니라 숫자입니다.
       그래서 라벨을 흐름에서 빼내고(absolute) 숫자만 정중앙에 놓습니다. */
 '.mtg-gauge{position:relative;width:188px;height:188px;margin:0 auto 4px;}',
-'.mtg-gauge svg{transform:rotate(-90deg);display:block;}',
+/* 🚨 모바일에서 컨테이너는 164px 로 줄어드는데 SVG 는 188px 고정이었다.
+   원의 중심(94px)과 숫자 박스의 중심(82px)이 12px 어긋나 보였다.
+   viewBox 가 있으므로 width/height 를 100%로 두면 어떤 크기에도 정확히 맞는다. */
+'.mtg-gauge svg{transform:rotate(-90deg);display:block;width:100%;height:100%;}',
 '.mtg-gauge .val{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;}',
 '.mtg-gauge .num{font:900 54px/1 "Noto Sans KR",sans-serif;color:#f7e7a8;',
 '  text-shadow:0 0 28px rgba(212,175,55,.5);letter-spacing:-.02em;}',
