@@ -50,6 +50,18 @@
 '  padding-bottom:14px!important;}',
 '#cpr .cpr-lb{font-size:10.5px!important;letter-spacing:3.5px!important;margin-bottom:12px!important;}',
 
+/* ── 점수 원그래프 정렬 ──────────────────────────────────────
+   🚨 모바일에서 .cpr-gauge 는 190px → 164px 로 줄어드는데
+      안에 든 <svg> 는 190px 고정이었다.
+      원의 중심(95px)과 숫자 박스의 중심(82px)이 13px 어긋나
+      숫자가 원 왼쪽으로 밀려 보였다.
+      viewBox 가 있으므로 100%로 두면 어떤 크기에도 정확히 맞는다. */
+'#cpr .cpr-gauge svg{width:100%!important;height:100%!important;display:block!important;}',
+'#cpr .cpr-gauge{display:block!important;}',
+'#cpr .cpr-gauge .val{position:absolute!important;inset:0!important;',
+'  display:flex!important;align-items:center!important;justify-content:center!important;}',
+'#cpr .cpr-gauge .num{line-height:1!important;}',
+
 /* ── 히어로 ──────────────────────────────────────────────── */
 '#cpr #cpr-conf{font-size:11.5px!important;line-height:1.7!important;color:#7d7490!important;}',
 '#cpr .cpr-bar em{color:#a8a0b8!important;}',
