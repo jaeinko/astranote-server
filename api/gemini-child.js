@@ -35,6 +35,7 @@ const { kv } = require('@vercel/kv');
 const SYN = require('../lib/astro-synastry.js');
 const CH = require('../lib/astro-child.js');
 const cityCoordinates = require('../lib/cities.js');
+const V = require('../lib/validate.js');
 const { buildBirthIso, dayRangeIso } = require('../lib/time.js');
 
 const KEY_PREFIX = 'child-report:';
@@ -69,15 +70,19 @@ function normPerson(p, fallbackName) {
   const time = String(p.time || '').trim();
   const timeUnknown = !!p.timeUnknown || time === '' || time === '모름';
 
-  if (!name || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
-  if (!timeUnknown && !/^\d{2}:\d{2}$/.test(time)) return null;
+  /* 🚨 형식만 보면 2026-02-31 이 통과하고, Date 가 그걸 2026-03-03 으로
+     조용히 바꿔버린다. 실존하는 날짜인지까지 확인해야 한다. (lib/validate.js) */
+  const okDate = V.normalizeDate(date);
+  if (!name || !okDate) return null;
+  const okTime = timeUnknown ? null : V.normalizeTime(time);
+  if (!timeUnknown && !okTime) return null;
 
   const m = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   return {
     name,
     date,
     y: +m[1], mo: +m[2], d: +m[3],
-    time: timeUnknown ? null : time,
+    time: timeUnknown ? null : okTime,   /* 정규화된 값 사용 (9:05 → 09:05) */
     timeUnknown,
     city: p.city && cityCoordinates[p.city] ? p.city : 'Seoul',
     gender: p.gender === '남성' ? '남성' : (p.gender === '여성' ? '여성' : '미상')
@@ -160,7 +165,7 @@ ${C.name}는 아직 어리고, 이 리포트를 읽고 자기를 변호할 수 �
 특징만 말하고 방법을 안 주면 부모는 그걸 결함으로 읽는다.
 🚨 아이를 진단하지 마라. 발달·학습·정서 관련 의학적 표현은 한 글자도 금지.
 🚨 부모도 탓하지 마라. "부모님이 이렇게 하셔서"는 금지. 기질의 어긋남으로만 프레임하라.
-🚨 성적·지능을 평가하지 마라. 무엇에 두각을 나타낸다. 어떻게 배우는 아이인가를 써라.
+🚨 성적·지능을 평가하지 마라. 무엇을 잘한다가 아니라 어떻게 배우는 아이인가를 써라.
 
 [읽는 사람]
 읽는 사람은 ${P.name}(${P.role || '부모'})이고 대상은 ${C.name}(만 ${D.ageNow}세)다.
