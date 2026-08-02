@@ -2,6 +2,29 @@
 
 const { kv } = require('@vercel/kv');
 
+/* 🚨 Gemini 과부하(503·429) 대기 — 2026-08-02 상향
+   ----------------------------------------------------------------------------
+   [무슨 일이 있었나]
+   실제 손님 요청에서 Gemini 가 3번 연속 503 을 뱉었다.
+
+       1차 503 (1.44초) → 1.5초 대기
+       2차 503 (0.30초) → 3초 대기
+       3차 503 (0.37초) → 포기
+
+   11초 만에 손을 들고 손님에게 500 을 던졌다.
+
+   [왜 짧으면 안 되나]
+   503 은 구글 쪽 일시 과부하다. 보통 수십 초 지속된다.
+   몇 초 만에 다시 두드리면 같은 거절만 받는다.
+   게다가 503 은 즉시 거절이라 호출 자체가 1초도 안 걸린다.
+   즉 대기 시간이 곧 회복 기회의 전부다.
+
+   [조치] 20초 → 45초 (총 65초 확보)
+   최악의 경우(503 두 번 + 3차 정상 생성)에도 약 185초로
+   함수 제한 300초 안에 들어온다. */
+const RETRY_WAIT_MS = [20000, 45000, 0];   // 1·2차 실패 후 대기. 3차는 마지막이라 0.
+
+
 const allowCors = fn => async (req, res) => {
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -748,9 +771,14 @@ ${astrologyDataText}
         if (!geminiRes.ok) {
           lastErr = `Gemini ${geminiRes.status}: ${await geminiRes.text()}`;
           console.error(`🔥 [시도 ${attempt}]`, lastErr);
-          // 🚨 503(일시적 과부하)이면 살짝 기다렸다가 재시도 → 구글 서버 회복 시간 확보
-          if (geminiRes.status === 503) {
-            await new Promise(r => setTimeout(r, 1500 * attempt));
+          /* 503(과부하)·429(한도)는 구글 쪽 일시 문제다. 수십 초 지속되므로
+             짧게 두드리면 같은 거절만 받는다. 위 RETRY_WAIT_MS 주석 참고. */
+          if (geminiRes.status === 503 || geminiRes.status === 429) {
+            const w = RETRY_WAIT_MS[attempt - 1] || 0;
+            if (w) {
+              console.warn(`⏳ Gemini ${geminiRes.status} — ${w / 1000}초 대기 후 재시도`);
+              await new Promise(r => setTimeout(r, w));
+            }
           }
           continue;
         }
