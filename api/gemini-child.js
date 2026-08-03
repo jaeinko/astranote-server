@@ -53,19 +53,8 @@ const KEY_PREFIX = 'child-report:';
 const LOCK_PREFIX = 'child-lock:';
 const TTL_DAYS = 60;
 
-/* -------------------------------------------------------------------------
-   CORS
-------------------------------------------------------------------------- */
-function allowCors(fn) {
-  return async (req, res) => {
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    if (req.method === 'OPTIONS') { res.status(200).end(); return; }
-    return await fn(req, res);
-  };
-}
+/* 🔒 CORS `*` → 화이트리스트 · rate limit · 뷰 토큰 (2026-08-03, lib/security.js) */
+const SEC = require('../lib/security.js');
 
 /* -------------------------------------------------------------------------
    입력 정규화 · 검증
@@ -378,17 +367,25 @@ const METAPHOR_OPEN = /^.{0,40}(마치|같은 아이|듯한|처럼 느껴지는)
       '아이 이름 + 부정 단정' 형태는 이름을 넣어 동적으로 만든다.
       "집중하기 어려워하는 편입니다" 같은 완화형은 통과시킨다. 그건 기질 서술이다. */
 const LABEL_FIXED =
-  /(소질이 없|재능이 없|재능은 없|머리가 나쁘|공부를 못하는 아이|거짓말을 잘하는|게으른 아이|산만한 아이|문제아|버릇없는 아이|이기적인 아이|모자란 아이|뒤떨어지는 아이|잘하는 게 없)/;
+  /(소질이 없|재능이 없|재능은 없|머리가 나쁘|공부를 못|거짓말을 잘|거짓말쟁이|게으른 아이|게을러서|산만한 아이|문제아|버릇없는 아이|이기적인 아이|모자란 아이|뒤떨어지는 아이|잘하는 게 없|집중력이 없)/;
+/* 🚨 한글은 음절 단위다: "잘하"는 "잘합니다"(잘+합)와 매칭되지 않는다.
+   그래서 "거짓말을 잘", "공부를 못"처럼 어간 앞에서 끊는다.
+   "공부를 못 하는 게 아니라" 같은 방어적 문장까지 같이 걸리지만,
+   그런 화법 자체를 프롬프트가 금지하고 있고, 아이 보호가 오탐 한 건보다 무겁다. */
 
-/* 아이의 미래를 부정적으로 단정하는 형태 */
+/* 아이의 미래를 부정적으로 단정하는 형태
+   🚨 "이 시기가 어렵습니다"(시기 예고 = 상품의 본질)는 잡지 않는다.
+      잡는 것은 능력·인생 자체에 대한 단정이다: "커서 성공하기 어렵습니다",
+      "평생 못 고칩니다", "어른이 되어도 힘들 겁니다" 류.
+   🚨 (?<![잊잃]지\s?)못 : "평생 잊지 못할 순간" 같은 긍정 관용구만 예외로 뺀다. */
 const DOOM_FIXED =
-  /(커서\s*[^.。!?\n]{0,15}(못하게|힘들게|실패|고생하게)|평생\s*[^.。!?\n]{0,15}(못|어렵|힘들)|장래가|가망이)/;
+  /((커서|평생|어른이 되어도|나중에도|앞으로도)\s*[^.。!?\n]{0,15}((?<![잊잃]지\s?)못|힘들|실패|고생|어렵)|(성공|행복)하기\s*어렵|장래가|가망이)/;
 
 function labelFor(name) {
   const n = String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return new RegExp(
     n + '(은|는|이|가)\\s*[^.。!?\\n]{0,20}' +
-    '(소질이 없|재능이 없|능력이 없|잘하지 못합니다|못하는 아이|안 되는 아이|부족한 아이)'
+    '(소질이 없|재능이 없|능력이 없|잘하지 못합니다|못하는 아이|안 되는 아이|부족한 아이|거짓말을 잘|공부를 못)'
   );
 }
 
@@ -531,13 +528,18 @@ const handler = async (req, res) => {
         res.setHeader('Cache-Control', 'no-store');
         return res.status(404).json({ error: '저장된 리포트 없음' });
       }
+      /* 🔒 IDOR 가드 — 새 리포트는 토큰 필요(강제 모드), 구버전은 통과 */
+      if (!SEC.guardView(saved, req)) {
+        res.setHeader('Cache-Control', 'no-store');
+        return res.status(403).json({ error: '접근 권한이 없습니다. 결제하신 기기·링크로 다시 열어주세요.' });
+      }
       if (saved.status === 'completed') {
         res.setHeader('Cache-Control', 'private, max-age=300');
         res.setHeader('ETag', `"child-${orderId}"`);
       } else {
         res.setHeader('Cache-Control', 'no-store');
       }
-      return res.status(200).json(saved);
+      return res.status(200).json(SEC.stripToken(saved));
     } catch (e) {
       res.setHeader('Cache-Control', 'no-store');
       return res.status(500).json({ error: 'KV 조회 실패: ' + e.message });
@@ -705,6 +707,8 @@ const handler = async (req, res) => {
 
     const payload = {
       status: 'completed',
+      /* 🔒 뷰 토큰 — POST 응답에 실려 프론트 localStorage에 저장된다 */
+      _vt: SEC.makeViewToken(orderId) || undefined,
       generatedAt: Date.now(),
       version: 1,
       meta: {
@@ -750,4 +754,4 @@ const handler = async (req, res) => {
   }
 };
 
-module.exports = allowCors(handler);
+module.exports = SEC.secure(handler, { name: 'child' });
