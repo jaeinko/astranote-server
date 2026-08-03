@@ -35,8 +35,12 @@
   var BASE = 'https://astranote-server.vercel.app';
   var MARK = 'astro_resolved';   // 무한 새로고침 방지 표식
 
+  /* 🚨 여기에 빠진 상품이 있으면, 그 상품 손님은 메일 링크로 들어올 때
+     엉뚱한 리포트를 보게 됩니다(맨 아래 9번으로 흘러내림).
+     상품을 새로 낼 때마다 반드시 이 목록에 추가하세요. */
   var ENDPOINTS = [
     { no: '11', path: '/api/gemini-vip',     label: 'VVIP 심층 리포트' },
+    { no: '16', path: '/api/gemini-child',   label: '우리 아이 양육설명서' },
     { no: '15', path: '/api/gemini-couple',  label: '궁합 리포트' },
     { no: '14', path: '/api/gemini-monthly', label: '30일 운세' },
     { no: '9',  path: '/api/gemini',         label: '배우자 분석 리포트' }
