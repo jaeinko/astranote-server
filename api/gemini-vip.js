@@ -1032,6 +1032,27 @@ async function callGemini(o) {
         lastErr = chk.reason;
         console.warn('⚠️ [' + o.label + ' ' + attempt + '] 재생성: ' + chk.reason);
         if (!isLast) continue;
+
+        /* 🚨 2026-08-02 수정 — 손님이 "리포트가 3장부터 시작한다" 고 문의한 사고
+           ------------------------------------------------------------------
+           [기존 동작]
+           마지막 시도에서는 검증이 실패해도 그대로 ok:true 로 반환했다.
+           "분량이 조금 모자라도 아예 못 주는 것보다 낫다" 는 취지였다.
+
+           [무엇이 잘못됐나]
+           그 취지는 '분량 부족' 에만 맞는다. 그런데 Gemini 가 vip_card1,
+           vip_card2 자체를 응답에서 빼먹은 경우에도 같은 경로를 타서
+           빈 리포트가 ok:true 로 저장됐다.
+           손님 화면에는 3장부터 나왔고, 29,900원을 내고 절반을 못 받았다.
+
+           [조치]
+           '내용이 모자란 것' 과 '내용이 없는 것' 을 구분한다.
+           누락은 어떤 경우에도 통과시키지 않는다.
+           차라리 500 을 내고 재시도하게 하는 편이 훨씬 낫다. */
+        if (/누락/.test(chk.reason)) {
+          console.error('🔥 [' + o.label + '] 필수 항목 누락 — 채택 불가: ' + chk.reason);
+          continue;   // 남은 시도가 없으면 아래에서 ok:false 로 빠진다
+        }
       }
       console.log('✅ [' + o.label + '] 통과 (' + attempt + '회)' + (chk.ok ? '' : ' — 마지막 시도라 미달 상태로 채택'));
       return { ok: true, data: parsed };
@@ -1152,6 +1173,22 @@ const handler = async (req, res) => {
     }
 
     const out = normalizeScores(Object.assign({}, A.data, B.data));
+
+    /* 🚨 저장 직전 최종 관문 — 2026-08-02 추가
+       ------------------------------------------------------------------
+       위 검증을 어떤 경로로든 뚫고 온 빈 리포트를 여기서 막는다.
+       한 번 KV 에 저장되면 1년간 그대로 손님에게 보이므로,
+       빈 채로 저장되는 것이 가장 나쁘다. 차라리 500 이 낫다.
+       (500 이면 손님이 다시 눌러 재생성할 수 있지만,
+        빈 리포트가 저장되면 다시 눌러도 그 빈 것만 나온다) */
+    const MUST = ['vip_card1', 'vip_card2', 'vip_card3', 'vip_card4', 'closing'];
+    const empty = MUST.filter(k => !out[k] || String(out[k]).trim().length < 200);
+    if (empty.length) {
+      console.error('🔥 저장 차단 — 내용이 비었거나 너무 짧음: ' + empty.join(', '));
+      return res.status(500).json({
+        error: '[VIP 생성 미완] ' + empty.join(', ') + ' 항목이 비어 있어 저장하지 않았습니다.'
+      });
+    }
     // 서버 계산 산출물 (AI를 거치지 않음 → 할루시네이션 0)
     if (table) out.chart_table = table;
     if (methodNote) out.method_note = methodNote;
