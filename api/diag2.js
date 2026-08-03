@@ -76,6 +76,13 @@ async function probe(label, url, token) {
 }
 
 module.exports = async (req, res) => {
+  /* 🚨 2026-08-03 잠금 — 이 파일은 호출될 때마다 Prokerala 크레딧을 씁니다.
+     주소만 알면 누구나(크롤러 포함) 태울 수 있었습니다.
+     admin-order 와 같은 ADMIN_KEY 를 씁니다. 사용:  ?key=●●● */
+  const admin = process.env.ADMIN_KEY || process.env.REVIEW_ADMIN_KEY;
+  if (!admin || (req.query && req.query.key) !== admin) {
+    return res.status(403).end('403');
+  }
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   const ID = process.env.PROKERALA_CLIENT_ID, SECRET = process.env.PROKERALA_CLIENT_SECRET;
   if (!ID || !SECRET) return res.status(500).end(JSON.stringify({ error: '환경변수 없음' }, null, 2));
