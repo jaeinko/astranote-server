@@ -43,14 +43,9 @@ const { kv } = require('@vercel/kv');
 const RETRY_WAIT_MS = [20000, 45000, 0];   // 1·2차 실패 후 대기. 3차는 마지막이라 0.
 
 
-const allowCors = fn => async (req, res) => {
-  res.setHeader('Access-Control-Allow-Credentials', true);
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
-  if (req.method === 'OPTIONS') { res.status(200).end(); return; }
-  return await fn(req, res);
-};
+/* 🚨 CORS 는 lib/cors.js 화이트리스트 정본 하나만 씁니다.
+   예전의 '*' 는 아무 사이트나 우리 Gemini 크레딧을 태울 수 있게 했습니다. */
+const { allowCors } = require('../lib/cors.js');
 
 // ── 공용 모듈 ──────────────────────────────────────────────────────────
 //  도시 좌표와 시간대 변환은 lib/ 아래 정본 하나만 씁니다.
