@@ -32,16 +32,9 @@ const PRODUCT_NAME = {
 /* -------------------------------------------------------------------------
    CORS
 ------------------------------------------------------------------------- */
-function allowCors(fn) {
-  return async (req, res) => {
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    if (req.method === 'OPTIONS') { res.status(200).end(); return; }
-    return await fn(req, res);
-  };
-}
+/* 🚨 CORS 는 lib/cors.js 화이트리스트 정본 하나만 씁니다.
+   예전의 '*' 는 아무 사이트나 우리 Gemini 크레딧을 태울 수 있게 했습니다. */
+const { allowCors } = require('../lib/cors.js');
 
 function clean(v, max) {
   return String(v == null ? '' : v).trim().replace(/[<>]/g, '').slice(0, max || 100);
