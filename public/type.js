@@ -39,7 +39,8 @@
     '#astro-vip-result-container .vip-card-content',  /* VVIP 11 */
     '#mtg .mtg-card .ct',                             /* 30일 14 (새 화면) */
     '#mtr .mtr-ct',                                   /* 30일 14 (옛 화면) */
-    '#cpr .cpr-ct'                                    /* 궁합 15 */
+    '#cpr .cpr-ct',                                   /* 궁합 15 */
+    '#chd .chd-ct'                                    /* 양육설명서 16 */
   ];
   var B = SEL.map(function (s) { return s + ' b, ' + s + ' strong'; }).join(',');
   var BR = SEL.map(function (s) { return s + ' br + br'; }).join(',');
