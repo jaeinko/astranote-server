@@ -59,6 +59,15 @@
           자기 버튼(#apx-savebar)으로 갈아끼웁니다. 그 갈아끼우기가 실패하면
           원래 버튼은 숨겨진 채 새 버튼도 안 생겨서 저장 버튼이 아예 사라집니다.
           여기서 버튼 존재를 보장하고, 저장 방식도 공유 시트로 바꿉니다. */
+    /* 우리 아이 양육설명서 (16) — child.js 결과화면 */
+    '16': {
+      root: '#chd',
+      order: ['.chd-cover', '.chd-hero', '.chd-card', '.chd-close'],
+      hideInClone: ['#chd-save-wrap'],
+      unhide: '.chd-card,.chd-hero,.chd-cover,.chd-close',
+      grad: ['#1b2140', '#0A0C16', '#050308'],
+      name: '양육설명서'
+    },
     '11': {
       root: '#astro-vip-result-container',
       order: ['.vip-report-header', '.apx-hero', '#apx-chart', '#apx-method',
