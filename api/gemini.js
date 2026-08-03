@@ -484,8 +484,15 @@ const handler = async (req, res) => {
     if (!orderId) return res.status(400).json({ error: 'orderId 필요' });
     try {
       const saved = await kv.get(`report:${orderId}`);
+      res.setHeader('Cache-Control', 'no-store');
       if (saved) return res.status(200).json(saved);
-      return res.status(404).json({ error: '저장된 리포트 없음' });
+      /* 프론트가 폴링할 때 "아직 만드는 중"과 "정말 없음"을 구분해야
+         손님에게 실패 화면을 성급하게 띄우지 않는다. */
+      const st = await kv.get(`status:${orderId}`);
+      if (st && st.state === 'pending') {
+        return res.status(202).json({ status: 'pending' });
+      }
+      return res.status(404).json({ error: '저장된 리포트 없음', state: st ? st.state : 'none' });
     } catch (e) {
       return res.status(500).json({ error: 'KV 조회 실패: ' + e.message });
     }
@@ -495,14 +502,80 @@ const handler = async (req, res) => {
 
   console.log("✅ [1] gemini.js 진입 성공");
 
+  /* 🚨 catch 블록에서도 써야 하므로 try 밖에서 잡는다 */
+  const body0   = req.body || {};
+  const orderId = body0.orderId ? String(body0.orderId).slice(0, 60) : null;
+  let lockKey   = null;
+
+  /* 실패로 끝날 때 반드시 거쳐가는 문. 락을 풀고 실패 사유를 남긴다.
+     ── 이게 없으면 손님 문의가 들어와도 "무엇이 왜 실패했는지"를 알 길이 없다. */
+  async function finishFail(status, message, detail) {
+    if (orderId) {
+      try {
+        await kv.set(`status:${orderId}`,
+          { state: 'failed', error: String(detail || message).slice(0, 400), at: Date.now() },
+          { ex: 60 * 60 * 24 * 30 });
+      } catch (e) {}
+      if (lockKey) { try { await kv.del(lockKey); } catch (e) {} }
+    }
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(status).json({ error: message, detail: detail || undefined });
+  }
+
   try {
-    const { name, date, time, city, myGender, targetGender } = req.body;
+    const { name, date, time, city, myGender, targetGender } = body0;
 
     if (!name || !date || !time) {
       return res.status(400).json({ error: '필수 입력값 누락' });
     }
     if (!process.env.GEMINI_API_KEY) {
-      return res.status(500).json({ error: 'GEMINI_API_KEY 환경변수 없음' });
+      return await finishFail(500, '서버 설정 오류(GEMINI)', 'GEMINI_API_KEY 없음');
+    }
+
+    /* ────────────────────────────────────────────────────────────────
+       ★ 손님 출생정보를 "리포트를 만들기 전에" 서버에 먼저 박아둔다.
+
+       예전에는 출생정보가 손님 브라우저 localStorage 에만 있었다.
+       그래서 생성이 한 번 실패하면 —
+         · 손님이 다른 기기로 들어오면 아무것도 복구할 수 없고
+         · 우리도 그 손님이 누구인지, 무엇을 넣었는지 알 수 없었다.
+       "결제했는데 리포트가 안 열려요" 문의에 손도 못 대던 이유가 이것이다.
+
+       이제 주문번호만 있으면 언제든 다시 만들 수 있다. (90일 보관)
+       ──────────────────────────────────────────────────────────────── */
+    if (orderId) {
+      try {
+        await kv.set(`intake:${orderId}`, {
+          product: '9', name, date, time,
+          city: city || 'Seoul', myGender, targetGender,
+          timeUnknown: !!body0.timeUnknown,
+          at: Date.now()
+        }, { ex: 60 * 60 * 24 * 90 });
+      } catch (e) { console.log('⚠️ intake 저장 실패(생성은 계속):', e.message); }
+
+      /* 이미 완성된 리포트가 있으면 다시 만들지 않는다.
+         새로고침·중복 클릭마다 새로 만들면 내용이 매번 달라지고 비용도 배로 나간다. */
+      try {
+        const done = await kv.get(`report:${orderId}`);
+        if (done && !done.error) {
+          console.log('♻️ 완성본 재사용:', orderId);
+          res.setHeader('Cache-Control', 'no-store');
+          return res.status(200).json(done);
+        }
+      } catch (e) {}
+
+      /* 생성 락 — 같은 주문이 동시에 두 번 Gemini 를 때리는 것을 막는다.
+         (손님이 새 창을 열거나 재시도 버튼을 연타할 때 실제로 일어난다) */
+      lockKey = `lock:${orderId}`;
+      try {
+        const got = await kv.set(lockKey, '1', { nx: true, ex: 280 });
+        if (!got) {
+          console.log('⏳ 이미 생성 중:', orderId);
+          res.setHeader('Cache-Control', 'no-store');
+          return res.status(202).json({ status: 'pending', message: '리포트를 만들고 있습니다.' });
+        }
+        await kv.set(`status:${orderId}`, { state: 'pending', at: Date.now() }, { ex: 60 * 60 });
+      } catch (e) { lockKey = null; }
     }
 
     let location = cityCoordinates[city];
@@ -560,9 +633,7 @@ const handler = async (req, res) => {
        리포트를 썼다. 손님은 돈을 내고 통째로 지어낸 글을 받았다. */
     if (!astrologyDataText) {
       console.error('🔥 차트를 만들지 못했습니다 — 리포트 생성을 중단합니다');
-      return res.status(500).json({
-        error: '출생 차트를 계산하지 못했습니다. 잠시 후 다시 시도해주세요.'
-      });
+      return await finishFail(500, '출생 차트를 계산하지 못했습니다. 잠시 후 다시 시도해주세요.', '차트 생성 실패');
     }
 
     console.log("✅ [2] 차트 확보 완료, Gemini 호출 시작");
@@ -812,7 +883,7 @@ ${astrologyDataText}
     }
 
     if (!parsedData) {
-      return res.status(500).json({ error: `[Gemini 실패] ${lastErr}` });
+      return await finishFail(500, '리포트 생성이 지연되고 있습니다. 잠시 후 다시 열어주세요.', lastErr);
     }
 
     /* ── 서버가 만든 사실 자료를 응답에 붙인다 ──
@@ -829,20 +900,25 @@ ${astrologyDataText}
 
     // 🚨 [다시보기 기능] 주문번호가 함께 왔으면 KV에 30일간 저장
     // → 이후 GET ?orderId=... 로 언제 어디서든 재조회 가능
-    if (req.body.orderId) {
+    if (orderId) {
       try {
-        await kv.set(`report:${req.body.orderId}`, parsedData, { ex: 60 * 60 * 24 * 30 });
-        console.log("💾 KV 저장 완료: report:" + req.body.orderId);
+        /* 30일 → 180일. 카페24 주문내역은 훨씬 오래 남는데 리포트만 30일 뒤
+           사라지면, 그때부터 "다시보기가 안 돼요" 문의가 시작된다. */
+        await kv.set(`report:${orderId}`, parsedData, { ex: 60 * 60 * 24 * 180 });
+        await kv.set(`status:${orderId}`, { state: 'completed', at: Date.now() }, { ex: 60 * 60 * 24 * 180 });
+        console.log("💾 KV 저장 완료: report:" + orderId);
       } catch (e) {
         console.log("⚠️ KV 저장 실패(리포트 전송은 정상 진행):", e.message);
       }
+      if (lockKey) { try { await kv.del(lockKey); } catch (e) {} }
     }
 
+    res.setHeader('Cache-Control', 'no-store');
     res.status(200).json(parsedData);
 
   } catch (error) {
     console.error("🔥 gemini.js 에러:", error);
-    res.status(500).json({ error: `[서버 에러] ${error.message}` });
+    return await finishFail(500, '잠시 문제가 있었습니다. 다시 열어주세요.', error.message);
   }
 };
 
