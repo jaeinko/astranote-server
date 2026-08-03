@@ -1,1099 +1,612 @@
-// ============================================================================
-//  lib/astro-child.js — 우리 아이 양육설명서 계산 엔진 (24,900원)
-// ----------------------------------------------------------------------------
-//  ▣ 이 상품이 파는 것
-//
-//  "우리 아이가 어떤 아이인가"는 부모가 이미 압니다. 매일 보니까요.
-//  부모가 모르는 건 <b>왜 그런가</b>와 <b>언제 무슨 일이 오는가</b>입니다.
-//  그래서 이 리포트의 값어치는 두 곳에 몰려 있습니다.
-//
-//    · 부모와 아이가 부딪히는 자리를 시너스트리로 짚는다 (2·3장)
-//    · 토성 하드각이 오는 시기를 실제로 계산해 예고한다 (7장) ★
-//
-//  ▣ 7장이 이 상품의 심장이다
-//
-//  브리프에는 "토성 스퀘어(만 7세, 만 14~15세)"라고 적혀 있었지만,
-//  Swiss Ephemeris 로 실측해 보니 아이마다 이만큼 벌어집니다.
-//
-//      1차 스퀘어   7.4세 ~ 8.9세
-//      대립(사춘기) 13.8세 ~ 16.2세
-//      2차 스퀘어   20.9세 ~ 22.6세
-//
-//  토성 궤도가 타원이라 근일점 부근에서 빨라지기 때문입니다.
-//  고정값 "7세"로 쓰면 2015년생 아이의 부모는 7세를 떠올렸다가
-//  아무 일도 없었음을 확인하고, 그 자리에서 리포트를 닫습니다.
-//  반드시 아이별로 계산합니다.
-//
-//  ▣ 역행 다중통과 — 그냥 넘기면 아까운 재료
-//
-//  토성은 역행하면서 같은 각을 최대 3번 지나갑니다.
-//  "이 시기는 세 번에 걸쳐 옵니다. 한 번 지나갔다고 끝난 게 아닙니다"는
-//  실제 계산에서 나온 사실이고, 부모가 겪은 일과 맞아떨어집니다.
-//
-//  ▣ 🚨 이 파일이 지켜야 하는 것 — 아이는 자기를 변호할 수 없다
-//
-//  부정적 낙인이 찍히면 부모가 그렇게 대하고, 그게 실제로 그 아이를 만듭니다.
-//  그래서 이 엔진은 아이의 능력이나 성격을 <b>결함으로 규정하는 값을 애초에
-//  만들지 않습니다.</b> 모든 축이 양극(兩極)이고, 양쪽 다 중립적으로 서술됩니다.
-//
-//      ❌ 산만함 점수 78          ← 이런 값을 만들지 않는다
-//      ✅ 재촉 반응: 느린 쪽 (-42) ← 빠른 쪽도 느린 쪽도 우열이 없다
-//
-//  ▣ 기존 상품 영향
-//
-//  없습니다. astro-synastry.js 를 읽기만 하고 아무것도 고치지 않습니다.
-// ============================================================================
+/* ============================================================================
+   ASTRANOTE — 우리 아이 양육설명서 결과화면 (product_no=16 · 29,900원)
+   ----------------------------------------------------------------------------
+   ▣ 배포 위치 : public/child.js  (GitHub 저장소)
+   ▣ 카페24 order_result.html 에 한 줄:
+        script src="https://astranote-server.vercel.app/child.js"  (태그로 감싸서)
+     resolve.js 보다 뒤, save.js 보다 앞이면 됩니다.
 
-'use strict';
+   ⚠️⚠️ 이 자리에 원래 lib/astro-child.js(계산엔진)가 복사되어 올라가 있었습니다.
+        결과화면이 아니라 서버 코드였습니다. 양육설명서 손님은 결제 후
+        기본 주문완료 화면만 봤습니다. 이 파일이 그 구멍을 메웁니다.
 
-const SYN = require('./astro-synastry.js');
+   ▣ 상품 페이지(주문서)가 저장해야 하는 것 — 이 계약만 지키면 됩니다
 
-const RAD = Math.PI / 180;
-const norm360 = SYN.norm360;
-const angleDiff = SYN.angleDiff;
-const signDeg = SYN.signDeg;
-const josa = SYN.josa;
-const houseOf = SYN.houseOf;
+        localStorage['astro_child_data'] = JSON.stringify({
+          parent: { name, date:'YYYY-MM-DD', time:'HH:MM', timeUnknown:false,
+                    city:'Seoul', gender:'여성' },
+          child:  { name, date:'YYYY-MM-DD', time:'HH:MM', timeUnknown:false,
+                    city:'Seoul', gender:'남성' },
+          ageBand: '미취학' | '초등' | '중고등' | '성인자녀' 중 하나
+        })
 
-/* ==========================================================================
-   [1] 느린 행성 — 7장 전용
-   --------------------------------------------------------------------------
-   🚨 처음에는 JPL 근사 궤도요소로 토성을 직접 구현했다가 버렸다.
-      lib/ephemeris.js 에 이미 토성이 있고, Schlyter 섭동항이 들어가 있어
-      더 정확했기 때문이다. Swiss Ephemeris 대조 결과:
+     부모 시각을 모르면 parent.timeUnknown:true (또는 time 비움).
+     서버가 알아서 케미스트리 장을 빼고 나머지를 씁니다.
 
-          lib/ephemeris.js   최대 2.85 arcmin
-          직접 구현한 JPL     최대 8.51 arcmin   ← 3배 나쁨
+   ▣ 서버 응답 (api/gemini-child.js)
+        { status:'completed', meta:{...}, report:{ headline,
+          ch1_title..ch9_title, ch1_lead..ch9_lead, ch1_nature..ch9_tenyears,
+          closing } }
+     meta.saturn  : [{label, meaning, ageFrom, ageTo, yearFrom, yearTo, passes}]
+     meta.jupiter : [{age, year}]
+     meta.curve   : [{age, y(0~100)}]   ← 성장 곡선 그래프용
+     meta.balance : { element:{불,흙,공기,물}, topElement, lackElement }
+     meta.hasParent : false 면 5장이 없다 — 그 자리는 안내문으로 채운다
+   ============================================================================ */
+(function () {
+  'use strict';
 
-      토성 마일스톤은 역행 고리가 목표각을 아슬아슬하게 넘는지로 통과 횟수가
-      갈리기 때문에, 이 3배 차이가 실제 판정을 바꾼다.
-      게다가 30일 운세가 쓰는 것과 같은 계산이 되어 상품 간 근거도 통일된다.
-========================================================================== */
-const EPH = require('./ephemeris.js');
+  var NO = '16';
+  var API = 'https://astranote-server.vercel.app/api/gemini-child';
+  var DATA_KEY = 'astro_child_data';
+  var REP_KEY_PREFIX = 'astro_rep:16:';
 
-function julianDayFromYMD(y, m, d) {
-  if (m <= 2) { y -= 1; m += 12; }
-  const A = Math.floor(y / 100);
-  const B = 2 - A + Math.floor(A / 4);
-  return Math.floor(365.25 * (y + 4716)) + Math.floor(30.6001 * (m + 1)) + d + B - 1524.5;
-}
+  function qs(k) {
+    try { return new URLSearchParams(location.search).get(k); } catch (e) { return null; }
+  }
 
-/* ephemeris.js 는 '2000-01-00 00:00 UT 기준 경과일'을 받는다 (Schlyter 의 d) */
-const JD_TO_D = 2451543.5;
-function saturnLongitudeJD(jd) { return EPH.fn['토성'](jd - JD_TO_D); }
-function jupiterLongitudeJD(jd) { return EPH.fn['목성'](jd - JD_TO_D); }
+  /* ── 상품 판정: 16번이 아니면 즉시 퇴장 (다른 상품 영향 0) ── */
+  var urlHint = qs('product_no') || qs('productNo');
+  var stored = null;
+  try { stored = JSON.parse(localStorage.getItem(DATA_KEY) || 'null'); } catch (e) {}
+  var hinted = urlHint || (stored && stored.productNo) || null;
+  if (String(hinted) !== NO) return;
+  if (window.__astroReportInit) return;
+  window.__astroChildV1 = true;
+  window.__astroReportInit = true;
 
-/* ==========================================================================
-   [2] 토성 마일스톤 — ★7장의 근거
-   --------------------------------------------------------------------------
-   출생 토성에서부터 토성이 실제로 몇 도를 진행했는지를 '언랩'해서 추적합니다.
+  var ORDER_ID = qs('order_id') || qs('orderId') || null;
+  var DATA = stored;
 
-   🚨 왜 언랩이 필요한가
-   단순히 (현재토성 - 출생토성) % 360 으로 재면, 역행 때문에 값이 0 과 360 을
-   넘나들며 오탐이 납니다(실제로 초기 구현에서 전 케이스가 "0.0세"로 나왔습니다).
-   매 스텝의 증분을 -180~180 으로 정규화해 누적해야 정확합니다.
+  /* ══════════════════════════════════════════════════════════════
+     CSS — 아스트라노트 디자인 시스템 (INK #0A0C16 · GOLD #C9A24B)
+     ══════════════════════════════════════════════════════════════ */
+  var CSS = [
+'#astro-result-container,#data-loading,#retry-screen,#astro-vip-result-container,',
+'#vip-data-loading,#vip-retry-screen,#cpr,#cpr-load,#cpr-retry,#mtg,#mtg-load,#mtr{display:none!important;}',
+'#header,#footer,.titleArea,.ec-base-step1,#aside,.topLogo,.path,.order-complete-wrap,',
+'.contentsBox,.snsIntroBox{display:none!important;}',
+'html,body{max-width:100vw;overflow-x:hidden;margin:0;padding:0;background:#0A0C16!important;}',
+'#chd,#chd *{box-sizing:border-box!important;}',
+'#chd{width:100%;min-height:100vh;position:absolute;top:0;left:0;z-index:999999;color:#E8E6EF;',
+'  background:radial-gradient(circle at 50% -6%,#1b2140 0%,#0A0C16 46%,#050308 100%);',
+'  font-family:"Noto Serif KR",serif;letter-spacing:-.04em;',
+'  padding:72px 16px 130px;display:flex;flex-direction:column;align-items:center;}',
+'@media(max-width:480px){#chd{padding:64px 13px 122px;}}',
+'#chd>*{width:100%;max-width:640px;margin-left:auto;margin-right:auto;}',
 
-   역행 구간에서는 증분이 음수가 되고, 그래서 같은 목표각을 여러 번 통과합니다.
-   그 통과를 전부 기록합니다. 3회 통과는 실제로 흔하며, 부모가 겪는
-   "그때 한 번 크게 부딪히고, 잠잠하다가, 또 한 번 왔다"와 정확히 맞습니다.
-========================================================================== */
-const SAT_TARGETS = [
-  { deg: 90,  key: 'sq1', label: '첫 번째 시험',
-    meaning: '처음으로 "나"와 "규칙"이 부딪히는 때. 학교·규율·또래 서열이 한꺼번에 들어온다.' },
-  { deg: 180, key: 'opp', label: '사춘기의 고비',
-    meaning: '자기가 누구인지 정하려는 힘과 어른이 정해 준 틀이 정면으로 맞선다. 이 상품에서 가장 중요한 시기.' },
-  { deg: 270, key: 'sq2', label: '홀로서기의 관문',
-    meaning: '진로·독립·책임이 현실이 되는 때. 부모의 역할이 보호에서 조언으로 바뀌는 지점.' }
-];
+/* ── 로딩 ── */
+'#chd-load{position:fixed;inset:0;z-index:1000000;background:#050308;display:flex;',
+'  flex-direction:column;justify-content:center;align-items:center;text-align:center;',
+'  padding:20px;transition:opacity .5s ease;font-family:"Noto Sans KR",sans-serif;}',
+'.chd-orb{position:relative;width:124px;height:124px;margin-bottom:30px;display:flex;align-items:center;justify-content:center;}',
+'.chd-orb .c{width:24px;height:24px;border-radius:50%;animation:chdP 1.8s ease-in-out infinite;',
+'  background:radial-gradient(circle at 35% 35%,#fff,#E7CE8E 40%,#C9A24B 70%);',
+'  box-shadow:0 0 30px rgba(201,162,75,.9),0 0 60px rgba(201,162,75,.45);}',
+'@keyframes chdP{0%,100%{transform:scale(1)}50%{transform:scale(1.18)}}',
+'.chd-orb .r{position:absolute;border-radius:50%;border:1px solid rgba(201,162,75,.28);}',
+'.chd-orb .r1{width:58px;height:58px;border-top-color:rgba(231,206,142,.95);animation:chdS 1.6s linear infinite;}',
+'.chd-orb .r2{width:92px;height:92px;border-top-color:rgba(140,180,255,.85);animation:chdS 2.6s linear infinite reverse;}',
+'.chd-orb .r3{width:124px;height:124px;border-top-color:rgba(201,162,75,.55);animation:chdS 3.8s linear infinite;}',
+'@keyframes chdS{to{transform:rotate(360deg)}}',
+'#chd-load h3{color:#E7CE8E;font:900 20px "Noto Sans KR",sans-serif;margin:0 0 13px;letter-spacing:-.05em;}',
+'#chd-step{color:#ddd;font:500 14.5px/1.7 "Noto Sans KR",sans-serif;max-width:330px;',
+'  height:52px;display:flex;align-items:center;justify-content:center;text-align:center;',
+'  word-break:keep-all;transition:opacity .4s ease;margin-bottom:24px;overflow:hidden;}',
+'#chd-step b{color:#E7CE8E;}',
+'#chd-load .hint{color:#6b687a;font:500 12px/1.7 "Noto Sans KR",sans-serif;max-width:300px;word-break:keep-all;}',
 
-/**
- * @param natalSaturnAbs 출생 토성 황경(트로피컬)
- * @param birth {y,m,d}
- * @param maxAge 몇 살까지 볼 것인가
- */
-function saturnMilestones(natalSaturnAbs, birth, maxAge) {
-  const jd0 = julianDayFromYMD(birth.y, birth.m, birth.d);
-  const limit = Math.round((maxAge || 24) * 365.25);
-  const STEP = 2;   // 2일 간격. 토성은 하루 최대 0.13도라 통과를 놓치지 않는다.
+/* ── 재시도 ── */
+'#chd-retry{position:fixed;inset:0;z-index:1000001;background:#050308;display:none;',
+'  flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:26px;',
+'  font-family:"Noto Sans KR",sans-serif;}',
+'#chd-retry.on{display:flex;}',
+'#chd-retry h3{color:#E7CE8E;font:900 19px "Noto Sans KR",sans-serif;margin:0 0 14px;letter-spacing:-.05em;}',
+'#chd-retry p{color:#b9b5c8;font:500 14px/1.8 "Noto Sans KR",sans-serif;margin:0 0 24px;max-width:320px;word-break:keep-all;}',
+'#chd-retry p strong{color:#7ee59b;}',
+'#chd-retry .oid{margin-top:16px;font-size:12px;color:#8b829e;line-height:1.7;}',
+'#chd-retry .oid b{color:#C9A24B;}',
+'#chd-retry-btn{background:linear-gradient(135deg,#E7CE8E,#C9A24B);color:#1a1206;border:none;',
+'  border-radius:12px;padding:15px 34px;font:900 15px "Noto Sans KR",sans-serif;cursor:pointer;letter-spacing:-.04em;}',
 
-  let prevLon = saturnLongitudeJD(jd0);
-  let cum = 0, prevCum = 0;
-  const hits = {};
-  /* 스침 판정용 : 마지막 통과 이후 목표각에서 얼마나 멀어졌는지 */
-  const dev = {};
-  SAT_TARGETS.forEach(t => { hits[t.key] = []; dev[t.key] = 0; });
+/* ── 표지 ── */
+'.chd-cover{text-align:center;padding:22px 0 6px;}',
+'.chd-cover .lb{color:#C9A24B;font:700 11.5px "Noto Sans KR",sans-serif;letter-spacing:.34em;margin-bottom:16px;}',
+'.chd-cover h1{color:#fff;font:900 27px/1.45 "Noto Serif KR",serif;margin:0 0 14px;letter-spacing:-.05em;word-break:keep-all;}',
+'.chd-cover h1 em{font-style:normal;color:#E7CE8E;}',
+'.chd-cover .who{color:#8b829e;font:500 13px "Noto Sans KR",sans-serif;letter-spacing:-.02em;}',
+'.chd-cover .who b{color:#ded7cc;font-weight:700;}',
+'.chd-line{width:56px;height:1px;margin:26px auto;',
+'  background:linear-gradient(90deg,transparent,#C9A24B,transparent);}',
 
-  /* 🚨 스침 필터
-     역행 고리가 목표각을 아슬아슬하게 스치는 경우, 통과로 셀지 말지가
-     계산 정밀도에 걸린다. Swiss Ephemeris 대조에서
-     ephemeris.js 로 바꿔 오차가 0.047도까지 내려왔으므로, 그 3배인 0.15도를
-     기준으로 잡는다. 이보다 얕게 스친 통과는 계산 오차와 구별되지 않는다.
-     진짜 역행 고리는 목표각을 훌쩍 넘나들므로 영향을 받지 않는다. */
-  const GRAZE = 0.15;
+/* ── 헤드라인(핵심 한 문장) ── */
+'.chd-hero{background:linear-gradient(160deg,#1c1730,#151827);border:1px solid rgba(201,162,75,.4);',
+'  border-radius:18px;padding:30px 24px;text-align:center;margin-bottom:30px;}',
+'.chd-hero .t{color:#C9A24B;font:700 11px "Noto Sans KR",sans-serif;letter-spacing:.3em;margin-bottom:14px;}',
+'.chd-hero .h{color:#fff;font:700 19.5px/1.85 "Noto Serif KR",serif;letter-spacing:-.045em;word-break:keep-all;}',
+'.chd-hero .h b,.chd-hero .h strong{color:#E7CE8E;}',
 
-  for (let k = STEP; k <= limit; k += STEP) {
-    const lon = saturnLongitudeJD(jd0 + k);
-    /* 🚨 (lon - prevLon + 180) % 360 - 180 으로 쓰면 안 된다.
-       자바스크립트의 % 는 모듈로가 아니라 나머지라서 피제수의 부호를 그대로 남긴다.
-       토성이 359.9도 → 0.1도로 넘어가는 순간 lon-prevLon 이 -359.8 이 되는데,
-       위 식은 +0.2 대신 -359.8 을 돌려준다. 그 한 번의 오차로 누적각에 -360 이
-       통째로 꽂히고, 이미 한참 지나간 마일스톤이 다시 통과한 것처럼 잡힌다.
-       (실제로 만 12.9세에 '첫 번째 토성 스퀘어'가 또 왔다고 나왔다)
-       norm360 은 ((x%360)+360)%360 이라 진짜 모듈로다. */
-    let d = norm360(lon - prevLon);
-    if (d > 180) d -= 360;             // 역행이면 음수
-    cum += d;
-    prevLon = lon;
+/* ── 챕터 카드 ── */
+'.chd-card{background:#151827;border:1px solid rgba(201,162,75,.22);border-radius:16px;',
+'  padding:28px 22px 30px;margin-bottom:26px;opacity:0;transform:translateY(18px);',
+'  transition:opacity .7s ease,transform .7s ease;}',
+'.chd-card.show{opacity:1;transform:none;}',
+'.chd-no{color:#C9A24B;font:700 11px "Noto Sans KR",sans-serif;letter-spacing:.3em;margin-bottom:9px;}',
+'.chd-tt{color:#fff;font:900 20px/1.5 "Noto Serif KR",serif;letter-spacing:-.05em;margin-bottom:6px;word-break:keep-all;}',
+'.chd-lead{color:#9a93ad;font:500 13.5px/1.85 "Noto Sans KR",sans-serif;letter-spacing:-.03em;',
+'  margin:10px 0 20px;padding-left:12px;border-left:2px solid rgba(201,162,75,.45);word-break:keep-all;}',
+'.chd-ct{font-family:"Noto Serif KR",serif;font-weight:400;font-size:16.5px;line-height:2.06;',
+'  color:#ded7cc;letter-spacing:-.03em;text-align:left;word-break:keep-all;}',
+'.chd-ct b,.chd-ct strong{color:#E7CE8E;font-weight:700;',
+'  background:linear-gradient(transparent 62%,rgba(201,162,75,.22) 62%);}',
+'.chd-ct blockquote{margin:22px 0 6px;padding:16px 18px;border-left:3px solid #C9A24B;',
+'  background:rgba(201,162,75,.07);border-radius:0 10px 10px 0;color:#f0e9d8;',
+'  font-size:16px;line-height:1.95;}',
+'.chd-ct br+br{display:block;content:"";margin-top:20px;}',
 
-    for (const t of SAT_TARGETS) {
-      const crossed = (prevCum < t.deg && t.deg <= cum) || (cum < t.deg && t.deg <= prevCum);
-      if (crossed) {
-        const arr = hits[t.key];
-        /* 직전 통과 이후 목표각에서 충분히 멀어진 적이 없으면 = 스친 것이다.
-           그 짝을 통째로 지운다 (들어갔다 나온 두 번이 모두 허위). */
-        if (arr.length && dev[t.key] < GRAZE) arr.pop();
-        else arr.push(k / 365.25);
-        dev[t.key] = 0;
-      } else {
-        const away = Math.abs(cum - t.deg);
-        if (away > dev[t.key]) dev[t.key] = away;
+/* ── 원소 밸런스 바 (1장) ── */
+'.chd-bal{margin:22px 0 2px;}',
+'.chd-bal .row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}',
+'.chd-bal .nm{width:44px;flex:none;color:#9a93ad;font:700 12.5px "Noto Sans KR",sans-serif;}',
+'.chd-bal .tr{flex:1;height:9px;background:rgba(255,255,255,.06);border-radius:5px;overflow:hidden;}',
+'.chd-bal .fl{height:100%;border-radius:5px;width:0;transition:width 1.1s ease .25s;}',
+'.chd-bal .pc{width:38px;flex:none;text-align:right;color:#ded7cc;font:700 12.5px "Noto Sans KR",sans-serif;}',
+'.chd-bal-cap{color:#6b687a;font:500 11.5px/1.7 "Noto Sans KR",sans-serif;margin-top:8px;text-align:center;word-break:keep-all;}',
+'.chd-bal-cap b{color:#E7CE8E;}',
+
+/* ── 토성 타임라인 (8장) ── */
+'.chd-tl{margin-top:24px;}',
+'.chd-tl .it{position:relative;padding:0 0 26px 26px;}',
+'.chd-tl .it:before{content:"";position:absolute;left:6px;top:6px;bottom:-4px;width:1px;',
+'  background:linear-gradient(180deg,rgba(201,162,75,.6),rgba(201,162,75,.08));}',
+'.chd-tl .it:last-child:before{display:none;}',
+'.chd-tl .dot{position:absolute;left:0;top:3px;width:13px;height:13px;border-radius:50%;',
+'  background:radial-gradient(circle at 35% 35%,#fff,#E7CE8E 45%,#C9A24B 80%);',
+'  box-shadow:0 0 10px rgba(201,162,75,.7);}',
+'.chd-tl .when{color:#E7CE8E;font:900 15px "Noto Sans KR",sans-serif;letter-spacing:-.03em;margin-bottom:3px;}',
+'.chd-tl .lb2{color:#fff;font:700 14px "Noto Sans KR",sans-serif;margin-bottom:5px;}',
+'.chd-tl .ms{color:#9a93ad;font:500 13px/1.8 "Noto Sans KR",sans-serif;word-break:keep-all;}',
+'.chd-tl .ps{display:inline-block;margin-top:6px;padding:3px 10px;border-radius:20px;',
+'  border:1px solid rgba(201,162,75,.4);color:#C9A24B;font:700 11px "Noto Sans KR",sans-serif;}',
+
+/* ── 성장 곡선 (9장) ── */
+'.chd-curve{margin-top:24px;}',
+'.chd-curve svg{width:100%;height:auto;display:block;}',
+'.chd-curve .cap{color:#6b687a;font:500 11.5px/1.7 "Noto Sans KR",sans-serif;margin-top:10px;',
+'  text-align:center;word-break:keep-all;}',
+'.chd-curve .cap b{color:#E7CE8E;}',
+
+/* ── 맺음말 ── */
+'.chd-close{background:linear-gradient(160deg,#1c1730,#0f1120);border:1px solid rgba(201,162,75,.5);',
+'  border-radius:18px;padding:32px 24px;text-align:center;margin:34px 0 10px;}',
+'.chd-close .t{color:#C9A24B;font:700 11px "Noto Sans KR",sans-serif;letter-spacing:.3em;margin-bottom:16px;}',
+'.chd-close .ct2{color:#f0e9d8;font:500 16.5px/2.05 "Noto Serif KR",serif;letter-spacing:-.04em;word-break:keep-all;}',
+'.chd-close .ct2 b{color:#E7CE8E;}',
+
+/* ── 저장 버튼 ── */
+'#chd-save-wrap{text-align:center;margin-top:26px;}',
+'#chd-save-btn{background:linear-gradient(135deg,#E7CE8E,#C9A24B);color:#1a1206;border:none;',
+'  border-radius:12px;padding:16px 36px;font:900 15px "Noto Sans KR",sans-serif;cursor:pointer;letter-spacing:-.04em;}',
+'.chd-foot{text-align:center;color:#565368;font:500 11px "Noto Sans KR",sans-serif;',
+'  letter-spacing:.22em;margin-top:38px;}'
+  ].join('');
+
+  /* ══════════════════════════════════════════════════════════════
+     유틸
+     ══════════════════════════════════════════════════════════════ */
+  function h(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  /* 서버 원고는 <b>·<br>·<blockquote>·<p> 만 쓰기로 검증돼 있다.
+     그래도 다른 태그가 섞여 오면 화면을 깨지 못하게 걸러낸다. */
+  function safe(html) {
+    return String(html == null ? '' : html)
+      .replace(/<(?!\/?(b|strong|br|blockquote|p|em|i)\b)[^>]*>/gi, '');
+  }
+  function $(id) { return document.getElementById(id); }
+
+  /* ══════════════════════════════════════════════════════════════
+     골격 주입
+     ══════════════════════════════════════════════════════════════ */
+  function inject() {
+    if ($('chd')) return;
+    var st = document.createElement('style');
+    st.id = 'chd-style';
+    st.textContent = CSS;
+    document.head.appendChild(st);
+
+    var load = document.createElement('div');
+    load.id = 'chd-load';
+    load.innerHTML =
+      '<div class="chd-orb"><div class="r r1"></div><div class="r r2"></div><div class="r r3"></div><div class="c"></div></div>' +
+      '<h3>양육설명서를 만들고 있습니다</h3>' +
+      '<div id="chd-step">아이의 출생 순간 하늘을<br>다시 그리고 있습니다.</div>' +
+      '<div class="hint">약 2~3분 걸립니다. 완성되면 주문내역에서 언제든 다시 열 수 있습니다.</div>';
+
+    var retry = document.createElement('div');
+    retry.id = 'chd-retry';
+    retry.innerHTML =
+      '<h3>잠시 문제가 생겼습니다</h3>' +
+      '<p id="chd-retry-msg"><strong>결제는 정상 완료되었습니다.</strong><br>아래 버튼을 눌러 다시 시도해 주세요.</p>' +
+      '<button id="chd-retry-btn">다시 시도하기</button>' +
+      '<div class="oid" id="chd-oid"></div>';
+
+    var root = document.createElement('div');
+    root.id = 'chd';
+
+    function mount() {
+      document.body.appendChild(load);
+      document.body.appendChild(retry);
+      document.body.appendChild(root);
+      $('chd-retry-btn').onclick = function () {
+        $('chd-retry').classList.remove('on');
+        var l = $('chd-load'); l.style.display = 'flex'; l.style.opacity = '1';
+        start(true);
+      };
+      if (ORDER_ID) {
+        $('chd-oid').innerHTML = '계속 안 열리면 아래 주문번호로 문의해주세요.<br><b>' + h(ORDER_ID) + '</b>';
       }
     }
-    prevCum = cum;
+    if (document.body) mount();
+    else document.addEventListener('DOMContentLoaded', mount);
   }
 
-  return SAT_TARGETS.map(t => {
-    const ages = hits[t.key];
-    if (!ages.length) return null;
-    const first = ages[0], last = ages[ages.length - 1];
-    const yFirst = birth.y + Math.floor(first + (birth.m - 1) / 12);
-    const yLast = birth.y + Math.floor(last + (birth.m - 1) / 12);
-    return {
-      key: t.key,
-      label: t.label,
-      meaning: t.meaning,
-      ageFrom: +first.toFixed(1),
-      ageTo: +last.toFixed(1),
-      passes: ages.length,
-      yearFrom: yFirst,
-      yearTo: yLast,
-      // 부모에게 보여줄 문장
-      text: ages.length === 1
-        ? `만 ${first.toFixed(0)}세 무렵(${yFirst}년) — ${t.label}`
-        : `만 ${first.toFixed(0)}~${last.toFixed(0)}세(${yFirst}~${yLast}년) — ${t.label} · 토성이 역행하며 ${ages.length}번에 걸쳐 지나간다`
-    };
-  }).filter(Boolean);
-}
-
-/* --------------------------------------------------------------------------
-   목성 리턴 — 첫 개화. 약 11.9세.
-   VVIP 예시 리포트에서 "12살, 첫 번째 개화"로 쓰인 그 계산입니다.
--------------------------------------------------------------------------- */
-function jupiterReturn(natalJupiterAbs, birth, maxAge) {
-  const jd0 = julianDayFromYMD(birth.y, birth.m, birth.d);
-  const limit = Math.round((maxAge || 24) * 365.25);
-  const out = [];
-  let prev = null, prevD = null;
-  for (let k = 0; k <= limit; k += 3) {
-    const d = angleDiff(jupiterLongitudeJD(jd0 + k), natalJupiterAbs);
-    if (prevD !== null && prev !== null && prevD < prev && prevD < d && prevD < 2) {
-      const age = (k - 3) / 365.25;
-      if (age > 1 && (!out.length || age - out[out.length - 1].age > 6)) {
-        const yr = birth.y + Math.floor(age + (birth.m - 1) / 12);
-        out.push({ age: +age.toFixed(1), year: yr });
-      }
-    }
-    prev = prevD; prevD = d;
+  /* ── 로딩 메시지 ── */
+  var stepTimer = null;
+  function startLoading() {
+    var steps = [
+      '아이의 출생 순간 하늘을<br>다시 그리고 있습니다.',
+      '아이의 <b>달</b>이 어디서<br>쉬고 있는지 찾고 있습니다.',
+      '부모님과 아이의 별이<br>만나는 자리를 보고 있습니다.',
+      '<b>토성이 다가오는 해</b>를<br>날짜 단위로 계산하고 있습니다.',
+      '열 살 뒤의 두 사람을<br>미리 그려보고 있습니다.',
+      '한 문장 한 문장,<br>아이의 설명서를 쓰고 있습니다.'
+    ];
+    var i = 0, el = $('chd-step');
+    if (!el) return;
+    if (stepTimer) clearInterval(stepTimer);
+    stepTimer = setInterval(function () {
+      i = (i + 1) % steps.length;
+      el.style.opacity = '0';
+      setTimeout(function () { el.innerHTML = steps[i]; el.style.opacity = '1'; }, 400);
+    }, 4200);
   }
-  return out;
-}
-
-/* --------------------------------------------------------------------------
-   토성이 아이의 태양·달·상승점에 거는 하드각
-   7장에서 "왜 하필 그때인가"의 보조 근거로 씁니다.
--------------------------------------------------------------------------- */
-function saturnHardHits(chart, birth, maxAge) {
-  const jd0 = julianDayFromYMD(birth.y, birth.m, birth.d);
-  const limit = Math.round((maxAge || 20) * 365.25);
-  const bodies = ['태양', '달', '상승점'];
-  const ASPECTS = [{ a: 0, n: '합' }, { a: 90, n: '각' }, { a: 180, n: '대립' }];
-  const out = [];
-
-  for (const p of bodies) {
-    const n = chart.planets[p];
-    if (!n) continue;
-    for (const asp of ASPECTS) {
-      let inWin = false, startAge = 0;
-      for (let k = 0; k <= limit; k += 5) {
-        const lon = saturnLongitudeJD(jd0 + k);
-        const off = Math.abs(angleDiff(lon, n.abs) - asp.a);
-        const within = off <= 2;
-        if (within && !inWin) { inWin = true; startAge = k / 365.25; }
-        if (!within && inWin) {
-          inWin = false;
-          const endAge = k / 365.25;
-          if (endAge >= 1) {
-            out.push({
-              body: p, aspect: asp.n,
-              ageFrom: +startAge.toFixed(1), ageTo: +endAge.toFixed(1),
-              year: birth.y + Math.floor(startAge + (birth.m - 1) / 12)
-            });
-          }
-        }
-      }
-    }
-  }
-  out.sort((a, b) => a.ageFrom - b.ageFrom);
-
-  /* 🚨 역행 때문에 같은 각이 오브를 들락날락하며 여러 줄로 쪼개진다.
-     (검증에서 "만 1~1.2세 토성 각 → 달"이 두 번 연속 나왔다)
-     같은 행성·같은 각이고 1년 안에 붙어 있으면 한 구간으로 합친다.
-     또 만 3세 미만은 부모에게 쓸모가 없다. 그때 일을 기억하지도 못하고,
-     기억한들 지금 할 수 있는 일이 없다. */
-  const merged = [];
-  const idx = {};   // body|aspect → merged 안에서의 위치
-  for (const h of out) {
-    if (h.ageTo < 3) continue;
-    const key = h.body + '|' + h.aspect;
-    const at = idx[key];
-    /* 🚨 바로 앞 항목만 보면 안 된다. 목록이 나이순이라 다른 행성이 사이에 끼면
-       같은 각의 역행 통과가 따로 남는다(검증에서 "토성 합 → 달"이 세 줄로 나왔다).
-       같은 행성·같은 각을 찾아서 합친다. */
-    if (at !== undefined && h.ageFrom - merged[at].ageTo < 1.2) {
-      merged[at].ageTo = h.ageTo;
-      merged[at].passes = (merged[at].passes || 1) + 1;
-      continue;
-    }
-    idx[key] = merged.length;
-    merged.push(Object.assign({ passes: 1 }, h));
-  }
-  merged.sort((a, b) => a.ageFrom - b.ageFrom);
-  return merged;
-}
-
-/* ==========================================================================
-   [3] 기질 4축 — 부모가 내일 아침에 쓸 수 있는 형태로만 낸다
-   --------------------------------------------------------------------------
-   🚨 설계 원칙 : 모든 축은 양극이고, 양쪽 어디에도 우열이 없다.
-
-   "산만함 78점" 같은 값은 만들지 않는다. 그런 숫자가 리포트에 실리면
-   부모는 그걸 결함으로 읽고, 아이를 그렇게 대하기 시작한다.
-   대신 "재촉하면 느려지는 쪽"처럼 <b>대응 방법이 따라 나오는 형태</b>로만 낸다.
-
-   축과 근거
-     속도   재촉했을 때 빨라지나 느려지나   흙/고정궁·토성 ↔ 불/활동궁·화성
-     표현   감정을 밖에 내나 안에 삼키나    불/공기·1·5하우스 ↔ 물/흙·4·8·12하우스
-     자극   새것이 반가운가 불안한가        변통궁·공기·목성·3·9하우스 ↔ 고정궁·4하우스·토성
-     경계   규칙에 순응하나 부딪히나        토성 소프트·10하우스 ↔ 화성-토성 하드·1하우스 화성
-========================================================================== */
-const ELEM = { '양자리':'불','사자자리':'불','사수자리':'불',
-               '황소자리':'흙','처녀자리':'흙','염소자리':'흙',
-               '쌍둥이자리':'공기','천칭자리':'공기','물병자리':'공기',
-               '게자리':'물','전갈자리':'물','물고기자리':'물' };
-const MODE = { '양자리':'활동','게자리':'활동','천칭자리':'활동','염소자리':'활동',
-               '황소자리':'고정','사자자리':'고정','전갈자리':'고정','물병자리':'고정',
-               '쌍둥이자리':'변통','처녀자리':'변통','사수자리':'변통','물고기자리':'변통' };
-
-function elemOf(pl) { return pl ? ELEM[pl.sign] : null; }
-function modeOf(pl) { return pl ? MODE[pl.sign] : null; }
-
-/* 축 정의 : [축이름, 음수쪽 라벨, 양수쪽 라벨] */
-const AXES = {
-  '속도': ['재촉하면 느려지는 쪽', '재촉하면 빨라지는 쪽'],
-  '표현': ['안으로 삼키는 쪽', '밖으로 내는 쪽'],
-  '자극': ['익숙한 것이 편한 쪽', '새로운 것이 반가운 쪽'],
-  '경계': ['규칙에 부딪히는 쪽', '규칙에 순응하는 쪽']
-};
-
-function tempEngine(chart, selfAspects) {
-  const P = chart.planets;
-  const bag = { '속도': 0, '표현': 0, '자극': 0, '경계': 0 };
-  const ev = { '속도': [], '표현': [], '자극': [], '경계': [] };
-
-  function add(axis, v, why) { bag[axis] += v; ev[axis].push((v > 0 ? '+' : '') + v.toFixed(1) + ' ' + why); }
-
-  const moon = P['달'], asc = P['상승점'], mer = P['수성'], mars = P['화성'],
-        sat = P['토성'], ven = P['금성'], sun = P['태양'], jup = P['목성'];
-
-  /* ── 속도 ── */
-  for (const [pl, nm, w] of [[moon, '달', 3], [asc, '상승점', 2.5], [mer, '수성', 1.5]]) {
-    if (!pl) continue;
-    const e = elemOf(pl), m = modeOf(pl);
-    if (e === '흙') add('속도', -w, `${nm}이 ${pl.sign}(흙)`);
-    if (e === '불') add('속도', +w, `${nm}이 ${pl.sign}(불)`);
-    if (m === '고정') add('속도', -w * 0.6, `${nm}이 고정궁`);
-    if (m === '활동') add('속도', +w * 0.6, `${nm}이 활동궁`);
-  }
-  if (mars && asc && angleDiff(mars.abs, asc.abs) < 8) add('속도', +2.5, '화성이 상승점에 붙음');
-  if (sat && moon && angleDiff(sat.abs, moon.abs) < 8) add('속도', -2.5, '토성이 달에 붙음');
-
-  /* ── 표현 ── */
-  for (const [pl, nm, w] of [[moon, '달', 3.5], [asc, '상승점', 2]]) {
-    if (!pl) continue;
-    const e = elemOf(pl);
-    if (e === '불' || e === '공기') add('표현', +w, `${nm}이 ${pl.sign}(${e})`);
-    if (e === '물' || e === '흙') add('표현', -w, `${nm}이 ${pl.sign}(${e})`);
-  }
-  if (chart.ascSignIndex !== null) {
-    for (const [pl, nm] of [[moon, '달'], [sun, '태양'], [ven, '금성']]) {
-      if (!pl) continue;
-      const h = houseOf(chart, pl.abs);
-      if (h === 1 || h === 5 || h === 10) add('표현', +1.9, `${nm}이 ${h}하우스`);
-      if (h === 4 || h === 8 || h === 12) add('표현', -1.8, `${nm}이 ${h}하우스`);
-    }
-  }
-  if (sat && moon && angleDiff(sat.abs, moon.abs) < 8) add('표현', -2, '토성-달 접촉');
-  if (jup && moon && angleDiff(jup.abs, moon.abs) < 8) add('표현', +2, '목성-달 접촉');
-  if (mars && moon && angleDiff(mars.abs, moon.abs) < 7) add('표현', +1.6, '화성-달 접촉');
-
-  /* ── 자극 ── */
-  for (const [pl, nm, w] of [[moon, '달', 2.5], [mer, '수성', 2.5], [asc, '상승점', 2]]) {
-    if (!pl) continue;
-    const m = modeOf(pl), e = elemOf(pl);
-    if (m === '변통') add('자극', +w, `${nm}이 변통궁`);
-    if (m === '고정') add('자극', -w, `${nm}이 고정궁`);
-    if (e === '공기') add('자극', +w * 0.6, `${nm}이 ${e}`);
-    if (e === '흙')   add('자극', -w * 0.6, `${nm}이 ${e}`);
-  }
-  if (chart.ascSignIndex !== null && jup) {
-    const h = houseOf(chart, jup.abs);
-    if (h === 3 || h === 9) add('자극', +2, `목성이 ${h}하우스`);
-  }
-  if (chart.ascSignIndex !== null && moon) {
-    const h = houseOf(chart, moon.abs);
-    if (h === 4) add('자극', -2.2, '달이 4하우스');
+  function hideLoad() {
+    if (stepTimer) { clearInterval(stepTimer); stepTimer = null; }
+    var l = $('chd-load');
+    if (!l) return;
+    l.style.opacity = '0';
+    setTimeout(function () { l.style.display = 'none'; }, 500);
   }
 
-  /* ── 경계 ── */
-  if (sat) {
-    if (chart.ascSignIndex !== null) {
-      const h = houseOf(chart, sat.abs);
-      if (h === 10 || h === 6) add('경계', +2, `토성이 ${h}하우스`);
-      if (h === 1 || h === 4) add('경계', -1.6, `토성이 ${h}하우스`);
-    }
-  }
-  for (const a of (selfAspects || [])) {
-    const pair = [a.pA, a.pB].sort().join('-');
-    if (pair === '토성-화성') add('경계', a.hard ? -3 : +1.5, `화성-토성 ${a.aspect}`);
-    if (pair === '태양-토성') add('경계', a.hard ? -2 : +1.5, `태양-토성 ${a.aspect}`);
-    if (pair === '달-화성' && a.hard) add('경계', -1.8, `달-화성 ${a.aspect}`);
-  }
-  if (mars && chart.ascSignIndex !== null) {
-    const h = houseOf(chart, mars.abs);
-    if (h === 1) add('경계', -2, '화성이 1하우스');
-    if (h === 10 || h === 6) add('경계', +1.6, `화성이 ${h}하우스`);
-  }
-  /* 🚨 초기 버전은 경계축 규칙이 다섯 개뿐이라 평균강도가 21에 그쳤고
-     56%가 "중간"으로 나와 판정 자체가 성립하지 않았다. 아래를 보강한다. */
-  if (mars) {
-    const e = elemOf(mars), m = modeOf(mars);
-    if (e === '불') add('경계', -2.2, `화성이 ${mars.sign}(불)`);
-    if (e === '흙') add('경계', +2.2, `화성이 ${mars.sign}(흙)`);
-    if (m === '활동') add('경계', -1.4, '화성이 활동궁');
-    if (m === '고정') add('경계', +1.4, '화성이 고정궁');
-  }
-  if (sat) {
-    const e = elemOf(sat);
-    if (e === '흙') add('경계', +1.8, `토성이 ${sat.sign}(흙)`);
-    if (e === '불') add('경계', -1.8, `토성이 ${sat.sign}(불)`);
-  }
-  if (sun && sat && angleDiff(sun.abs, sat.abs) < 8) add('경계', +1.5, '태양-토성 접촉');
-
-  /* ── -100~100 으로 환산 ──
-     🚨 정규화 상수는 무작위 차트 600개에서 각 축 절대값의 90분위를 잡은 값이다.
-        (tools 로 재산출 가능) 이 값으로 나누면 대부분이 -100~100 안에 들어오고,
-        양극 어느 쪽으로도 치우치지 않는다. */
-  const SCALE = { '속도': 8.4, '표현': 11.8, '자극': 8.5, '경계': 6.9 };
-  const score = {}, side = {}, strength = {};
-  for (const k of Object.keys(bag)) {
-    const v = Math.max(-100, Math.min(100, Math.round((bag[k] / SCALE[k]) * 100)));
-    score[k] = v;
-    side[k] = v < 0 ? AXES[k][0] : AXES[k][1];
-    const a = Math.abs(v);
-    strength[k] = a >= 55 ? '뚜렷함' : (a >= 25 ? '어느 정도' : '중간 — 상황에 따라 달라짐');
-  }
-  return { score, side, strength, evidence: ev };
-}
-
-/* ==========================================================================
-   [4] 칭찬이 닿는 방식 — 6장
-   --------------------------------------------------------------------------
-   같은 칭찬도 아이마다 닿는 통로가 다릅니다. 엉뚱한 통로로 주면
-   부모는 "칭찬을 해도 반응이 없다"고 느끼고, 아이는 받은 적이 없다고 느낍니다.
-========================================================================== */
-const PRAISE_CH = {
-  '말': '말로 정확히 짚어 주기 — "잘했어"가 아니라 "여기 이 부분을 이렇게 한 게 좋았어"',
-  '몸': '몸으로 — 안아 주기, 옆에 앉기, 같이 먹기. 말보다 접촉이 먼저 닿는다',
-  '무대': '보는 앞에서 — 가족이나 사람들 있는 자리에서 인정해 주기',
-  '결과물': '만든 것을 남겨 주기 — 그림을 붙여 두거나 사진을 찍어 두는 방식',
-  '시간': '방해 없는 단둘의 시간 — 칭찬의 말보다 온전히 함께 있는 시간이 크게 닿는다'
-};
-
-function praiseChannel(chart) {
-  const P = chart.planets;
-  const s = { '말': 0, '몸': 0, '무대': 0, '결과물': 0, '시간': 0 };
-  const why = [];
-
-  const ven = P['금성'], mer = P['수성'], moon = P['달'], sun = P['태양'];
-
-  if (ven) {
-    const e = elemOf(ven);
-    if (e === '공기') { s['말'] += 3; why.push('금성이 ' + ven.sign + '(공기) — 말이 닿는다'); }
-    if (e === '흙')   { s['몸'] += 4; s['결과물'] += 2; why.push('금성이 ' + ven.sign + '(흙) — 만질 수 있는 것이 닿는다'); }
-    if (e === '불')   { s['무대'] += 3; why.push('금성이 ' + ven.sign + '(불) — 보는 앞에서 인정받는 것이 닿는다'); }
-    if (e === '물')   { s['시간'] += 3; s['몸'] += 1.5; why.push('금성이 ' + ven.sign + '(물) — 함께 있는 시간이 닿는다'); }
-  }
-  if (mer && elemOf(mer) === '공기') { s['말'] += 1.5; why.push('수성이 ' + mer.sign + ' — 말을 정확히 알아듣는다'); }
-  /* 🚨 '결과물' 통로가 3.6%밖에 안 나와 사실상 죽어 있었다.
-     만든 것을 남겨 주는 방식이 닿는 아이는 실제로 흔하므로 근거를 넓힌다. */
-  if (mer && elemOf(mer) === '흙') { s['결과물'] += 1.5; why.push('수성이 ' + mer.sign + ' — 눈에 보이는 결과로 확인받는다'); }
-  if (P['토성'] && elemOf(P['토성']) === '흙') { s['결과물'] += 1.5; why.push('토성이 ' + P['토성'].sign + ' — 쌓인 것이 남을 때 안심한다'); }
-  if (P['태양'] && elemOf(P['태양']) === '흙') { s['결과물'] += 0.8; why.push('태양이 ' + P['태양'].sign + ' — 해낸 것이 남아야 인정으로 느낀다'); }
-  if (moon) {
-    const e = elemOf(moon);
-    if (e === '물') { s['시간'] += 2; why.push('달이 ' + moon.sign + ' — 곁에 있어 주는 것이 크게 닿는다'); }
-    if (e === '흙') { s['몸'] += 3; why.push('달이 ' + moon.sign + ' — 반복되는 일상과 접촉이 닿는다'); }
-  }
-  if (chart.ascSignIndex !== null) {
-    for (const [pl, nm] of [[ven, '금성'], [sun, '태양']]) {
-      if (!pl) continue;
-      const h = houseOf(chart, pl.abs);
-      if (h === 5)  { s['무대'] += 2.5; why.push(`${nm}이 5하우스 — 드러내 놓고 칭찬받는 자리`); }
-      if (h === 2)  { s['결과물'] += 3; why.push(`${nm}이 2하우스 — 남는 것이 닿는다`); }
-      if (h === 6)  { s['결과물'] += 2; why.push(`${nm}이 6하우스 — 해낸 일이 쌓이는 것이 닿는다`); }
-      if (h === 10) { s['무대'] += 2; why.push(`${nm}이 10하우스 — 밖에서 인정받는 것이 닿는다`); }
-      if (h === 4)  { s['시간'] += 2; why.push(`${nm}이 4하우스 — 집 안에서의 시간이 닿는다`); }
-      if (h === 3)  { s['말'] += 2; why.push(`${nm}이 3하우스 — 말로 오가는 것이 닿는다`); }
-      if (h === 12) { s['시간'] += 1.5; why.push(`${nm}이 12하우스 — 조용한 둘만의 자리가 닿는다`); }
-    }
+  function showRetry(msg) {
+    if (rendered) return;
+    hideLoad();
+    if (msg) $('chd-retry-msg').innerHTML = msg;
+    $('chd-retry').classList.add('on');
   }
 
-  const ranked = Object.keys(s).sort((a, b) => s[b] - s[a]);
-  const top = ranked[0];
-  const second = ranked[1];
-  return {
-    top, second,
-    topText: PRAISE_CH[top],
-    secondText: PRAISE_CH[second],
-    decisive: s[top] - s[second] >= 2,
-    why,
-    raw: s
+  /* ══════════════════════════════════════════════════════════════
+     렌더링
+     ══════════════════════════════════════════════════════════════ */
+  var rendered = false;
+
+  var CH_DEF = [
+    { no: '01', body: 'ch1_nature' },
+    { no: '02', body: 'ch2_inside' },
+    { no: '03', body: 'ch3_outside' },
+    { no: '04', body: 'ch4_talent' },
+    { no: '05', body: 'ch5_chemistry' },
+    { no: '06', body: 'ch6_pace' },
+    { no: '07', body: 'ch7_love' },
+    { no: '08', body: 'ch8_timeline' },
+    { no: '09', body: 'ch9_tenyears' }
+  ];
+  var CH_FALLBACK_TITLE = {
+    '01': '타고난 결', '02': '겉과 속', '03': '밖에서의 얼굴',
+    '04': '재능이 사는 자리', '05': '부모와 아이의 케미스트리', '06': '이 아이의 속도',
+    '07': '사랑이 닿는 길', '08': '다가올 시기들', '09': '10년 뒤의 두 사람'
   };
-}
 
-/* ==========================================================================
-   [5] 아이가 말 안 하고 삼키는 것 — 5장
-========================================================================== */
-function swallowed(chart, selfAspects) {
-  const rows = [];
-  const P = chart.planets;
+  var ELEM_COLOR = { '불': '#E8654F', '흙': '#C9A24B', '공기': '#8cb4ff', '물': '#6fd3c7' };
 
-  if (chart.ascSignIndex !== null) {
-    for (const p of ['달', '태양', '수성', '금성', '화성', '토성']) {
-      const pl = P[p];
-      if (!pl) continue;
-      const h = houseOf(chart, pl.abs);
-      if (h === 12) {
-        rows.push({
-          key: p,
-          text: `${josa(p, '이', '가')} 12하우스에 있다 — 이 영역은 아이가 밖으로 잘 안 꺼낸다`
-        });
-      }
-    }
-  }
-  const moon = P['달'];
-  if (moon) {
-    const e = elemOf(moon);
-    if (e === '물') rows.push({ key: '달', text: `달이 ${moon.sign}(물) — 감정을 느끼는 폭은 크지만 말로 옮기는 데 시간이 걸린다` });
-    if (e === '흙') rows.push({ key: '달', text: `달이 ${moon.sign}(흙) — 힘들어도 "괜찮다"로 덮고 혼자 처리하려 한다` });
-  }
-  for (const a of (selfAspects || [])) {
-    const pair = [a.pA, a.pB].sort().join('-');
-    if (pair === '달-토성') rows.push({ key: '달-토성', text: `달과 토성이 ${a.aspect} — 응석을 부려도 되는 자리에서 먼저 참는다` });
-    if (pair === '수성-토성' && a.hard) rows.push({ key: '수성-토성', text: `수성과 토성이 ${a.aspect} — 말이 늦게 나오지만, 나오면 정확하다` });
+  function balanceHTML(bal) {
+    if (!bal || !bal.element) return '';
+    var order = ['불', '흙', '공기', '물'];
+    var rows = order.map(function (k) {
+      var v = Math.max(0, Math.min(100, bal.element[k] || 0));
+      return '<div class="row"><div class="nm">' + k + '</div>' +
+        '<div class="tr"><div class="fl" data-w="' + v + '" style="background:' + ELEM_COLOR[k] + '"></div></div>' +
+        '<div class="pc">' + v + '%</div></div>';
+    }).join('');
+    return '<div class="chd-bal">' + rows +
+      '<div class="chd-bal-cap">가장 강한 기운은 <b>' + h(bal.topElement || '') +
+      '</b>, 가장 옅은 기운은 ' + h(bal.lackElement || '') + '입니다.</div></div>';
   }
 
-  if (!rows.length) {
-    rows.push({ key: null, text: '숨기는 자리가 뚜렷하지 않다. 느낀 것을 대체로 그대로 표현하는 편이다.' });
-  }
-  return rows;
-}
-
-/* ==========================================================================
-   [6] 아이 차트 안의 각 (자기 차트 내부 어스펙트)
-   --------------------------------------------------------------------------
-   시너스트리(두 사람 사이)와 달리 한 차트 안의 각입니다.
-   기질 판정과 5장에서 씁니다.
-========================================================================== */
-const SELF_ASPECTS = [
-  { key: '합',   angle: 0,   orb: 7, hard: false },
-  { key: '대립', angle: 180, orb: 6, hard: true },
-  { key: '각',   angle: 90,  orb: 5, hard: true },
-  { key: '삼각', angle: 120, orb: 5, hard: false },
-  { key: '육각', angle: 60,  orb: 3, hard: false }
-];
-
-function selfAspects(chart) {
-  const list = SYN.SYN_PLANETS.filter(p => chart.planets[p]);
-  const out = [];
-  for (let i = 0; i < list.length; i++) {
-    for (let j = i + 1; j < list.length; j++) {
-      const A = chart.planets[list[i]], B = chart.planets[list[j]];
-      const d = angleDiff(A.abs, B.abs);
-      for (const asp of SELF_ASPECTS) {
-        let orb = asp.orb;
-        if (list[i] === '상승점' || list[j] === '상승점') orb -= 1;
-        if (chart.uncertain) {
-          if (chart.uncertain[list[i]]) orb -= chart.uncertain[list[i]];
-          if (chart.uncertain[list[j]]) orb -= chart.uncertain[list[j]];
-        }
-        orb = Math.max(1.5, orb);
-        const off = Math.abs(d - asp.angle);
-        if (off > orb) continue;
-        out.push({
-          pA: list[i], pB: list[j], aspect: asp.key, hard: asp.hard,
-          orb: +off.toFixed(1),
-          text: `${list[i]} — ${list[j]} : ${asp.key}(오차 ${off.toFixed(1)}도)`
-        });
-        break;
-      }
-    }
-  }
-  return out;
-}
-
-/* ==========================================================================
-   [7] 원소·성질 밸런스 (VVIP 리포트와 같은 형식)
-========================================================================== */
-function balance(chart) {
-  const el = { '불': 0, '흙': 0, '공기': 0, '물': 0 };
-  const md = { '활동': 0, '고정': 0, '변통': 0 };
-  const W = { '태양': 3, '달': 3, '상승점': 3, '수성': 2, '금성': 2, '화성': 2, '목성': 1, '토성': 1 };
-  let total = 0;
-  for (const p of SYN.SYN_PLANETS) {
-    const pl = chart.planets[p];
-    if (!pl) continue;
-    const w = W[p] || 1;
-    if (ELEM[pl.sign]) { el[ELEM[pl.sign]] += w; total += w; }
-    if (MODE[pl.sign]) md[MODE[pl.sign]] += w;
-  }
-  const pct = o => {
-    const s = Object.values(o).reduce((a, b) => a + b, 0) || 1;
-    const r = {};
-    for (const k of Object.keys(o)) r[k] = Math.round((o[k] / s) * 100);
-    return r;
-  };
-  const elP = pct(el), mdP = pct(md);
-  const topEl = Object.keys(elP).sort((a, b) => elP[b] - elP[a])[0];
-  const lackEl = Object.keys(elP).sort((a, b) => elP[a] - elP[b])[0];
-  return { element: elP, modality: mdP, topElement: topEl, lackElement: lackEl, weighted: total };
-}
-
-/* ==========================================================================
-   [7-A] 겉과 속 — 2장 "괜찮아라고 할 때, 정말 괜찮은 걸까"
-   --------------------------------------------------------------------------
-   시드니 리포트에서 어머니가 운 지점이 정확히 여기였다.
-
-     "안으로는 이토록 따뜻함을 바라면서도, 밖으로는 서늘한 얼굴을 내밉니다.
-      그래서 힘들 때 '괜찮아'라고 말하는 아이가 됩니다."
-
-   달(느끼는 것)과 상승점(보이는 것)이 어긋나면 이 현상이 생긴다.
-   지어낸 문장이 아니라 두 점의 각도와 원소에서 나온 계산 결과다.
-
-   🚨 그런데 이 어긋남은 500명 중 56%에서만 나온다.
-      독립 판정으로 두면 44%의 아이는 이 장이 비어 버린다.
-      그래서 '어긋남이 있다/없다'가 아니라 '감정이 밖으로 나오는 방식'으로 짠다.
-      일치하는 아이에게는 "느끼는 대로 보입니다. 표정을 믿으셔도 됩니다"가 되는데,
-      이것도 부모에게는 큰 안심이다. 어느 쪽이든 빈 장이 되지 않는다.
-========================================================================== */
-const ELEM_INNER = {
-  '물': '마음이 젖어 있고, 분위기로 먼저 느낀다',
-  '흙': '몸으로 느끼고, 안정된 반복에서 안심한다',
-  '불': '느끼면 바로 타오르고, 식는 것도 빠르다',
-  '공기': '느낌을 생각으로 바꿔 이해하려 한다'
-};
-const ELEM_OUTER = {
-  '물': '조심스럽게 다가가고, 분위기를 먼저 살핀다',
-  '흙': '차분하고 신중해 보인다',
-  '불': '밝고 활기차 보인다',
-  '공기': '가볍고 담담해 보인다'
-};
-
-function innerOuterGap(chart, selfAsp) {
-  const moon = chart.planets['달'], asc = chart.planets['상승점'];
-  const out = { has: false, lines: [], moonElem: null, ascElem: null, verdict: null };
-  if (!moon) {
-    out.verdict = '달을 계산할 수 없어 이 장은 다른 근거로 써야 한다.';
-    return out;
-  }
-  out.moonElem = elemOf(moon);
-  out.lines.push(`속(달) : ${moon.sign} — ${ELEM_INNER[out.moonElem] || ''}`);
-
-  if (!asc) {
-    out.verdict = '태어난 시간을 몰라 겉모습(상승점)을 계산할 수 없다. ' +
-                  '속마음만 다루고, 겉과의 차이는 언급하지 마라.';
-    return out;
-  }
-  out.ascElem = elemOf(asc);
-  out.lines.push(`겉(상승점) : ${asc.sign} — ${ELEM_OUTER[out.ascElem] || ''}`);
-
-  const d = angleDiff(moon.abs, asc.abs);
-  const hardAsp = Math.abs(d - 90) < 8 ? '각' : (Math.abs(d - 180) < 8 ? '대립' : null);
-  const inward = out.moonElem === '물' || out.moonElem === '흙';
-  const outward = out.ascElem === '불' || out.ascElem === '공기';
-  const elemGap = (inward && outward) || (!inward && !outward && out.moonElem !== out.ascElem &&
-                  ((out.moonElem === '불' || out.moonElem === '공기') && (out.ascElem === '물' || out.ascElem === '흙')));
-
-  if (hardAsp) {
-    out.has = true;
-    out.lines.push(`달과 상승점이 ${hardAsp}(오차 ${Math.abs(d - (hardAsp === '각' ? 90 : 180)).toFixed(1)}도)`);
-  }
-  if (elemGap) {
-    out.has = true;
-    out.lines.push(`속은 ${out.moonElem}, 겉은 ${out.ascElem} — 원소가 반대편이다`);
-  }
-
-  if (out.has) {
-    out.verdict =
-      `이 아이는 안에서 느끼는 것과 밖으로 보이는 것이 다르다. ` +
-      `그래서 힘들 때 "괜찮아"라고 말하고, 서운해도 티를 내지 않는다. ` +
-      `🚨 이것이 이 장의 핵심이며 이 리포트에서 가장 중요한 문장이 나올 자리다. ` +
-      `부모가 "우리 애가 참고 있었구나"를 깨닫는 지점이므로, 반드시 ` +
-      `"먼저 표현하지 않으니 먼저 다가가 주셔야 합니다" 같은 행동으로 닫아라. ` +
-      `죄책감만 남기고 끝내면 부모는 리포트를 덮는다.`;
-  } else {
-    out.verdict =
-      `이 아이는 안에서 느끼는 것과 밖으로 보이는 것이 대체로 일치한다. ` +
-      `웃으면 진짜 웃는 것이고, 싫으면 싫은 티가 난다. ` +
-      `🚨 이걸 "단순하다"로 쓰지 마라. 부모에게는 큰 안심거리다. ` +
-      `"표정을 믿으셔도 됩니다. 다만 티가 나는 만큼 감정이 클 때는 크게 흔들립니다" 로 써라.`;
-  }
-
-  /* 12하우스 — 이 장에 합친 '삼키는 것' */
-  if (chart.ascSignIndex !== null) {
-    const h12 = [];
-    for (const p of ['태양', '달', '수성', '금성', '화성', '토성']) {
-      const pl = chart.planets[p];
-      if (pl && houseOf(chart, pl.abs) === 12) h12.push(p);
-    }
-    if (h12.length) out.lines.push(`12하우스(혼자 삼키는 자리)에 ${h12.join('·')} 있음`);
-  }
-  for (const a of (selfAsp || [])) {
-    const k = [a.pA, a.pB].sort().join('-');
-    if (k === '달-토성') out.lines.push(`달-토성 ${a.aspect} — 응석 부려도 되는 자리에서 먼저 참는다`);
-    if (k === '수성-토성' && a.hard) out.lines.push(`수성-토성 ${a.aspect} — 말이 늦게 나오지만 나오면 정확하다`);
-  }
-  return out;
-}
-
-/* ==========================================================================
-   [7-B] 집 밖에서의 얼굴 — 3장
-   --------------------------------------------------------------------------
-   부모는 집에서의 아이만 본다. 학교와 또래 사이의 모습은 볼 수 없어서
-   늘 불안해한다. 그런데 그 자리는 차트에 있다.
-   3하우스(또래·일상 대화) · 7하우스(1:1 관계) · 11하우스(무리) · 상승점 · 수성.
-
-   하우스 근거가 없는 아이가 19% 있으므로, 그때는 별자리로 읽는다.
-   빈 장이 되지 않게 하는 것이 이 함수의 책임이다.
-========================================================================== */
-const OUT_HOUSE = {
-  3:  '또래와 주고받는 자리 · 교실 안의 일상 대화',
-  7:  '단짝·짝꿍 같은 1:1 관계의 자리',
-  11: '무리·동아리·여럿이 어울리는 자리'
-};
-
-function outsideFace(chart) {
-  const rows = [], P = chart.planets;
-  const asc = P['상승점'], mer = P['수성'];
-
-  if (asc) rows.push(`첫인상(상승점) : ${asc.sign} — 처음 보는 사람에게 이렇게 비친다`);
-  if (mer) rows.push(`말하는 방식(수성) : ${mer.sign} — 생각을 이런 속도와 결로 꺼낸다`);
-
-  let houseHits = 0;
-  if (chart.ascSignIndex !== null) {
-    for (const p of ['태양', '달', '수성', '금성', '화성', '목성', '토성']) {
-      const pl = P[p];
-      if (!pl) continue;
-      const h = houseOf(chart, pl.abs);
-      if (OUT_HOUSE[h]) {
-        houseHits++;
-        rows.push(`${josa(p, '이', '가')} ${h}하우스 — ${OUT_HOUSE[h]}`);
-      }
-    }
-  }
-
-  /* 하우스 근거가 없으면 별자리로 대체한다. 없는 걸 지어내지 않으면서도 빈 장을 막는다. */
-  if (!houseHits) {
-    rows.push('밖에서의 자리에 들어간 별이 없다 — 밖에서 유난히 튀거나 무리에 휩쓸리는 편이 아니다.');
-    if (asc) rows.push(`대신 상승점 ${asc.sign} 하나로 첫인상을 읽어라. 억지로 사교성을 논하지 마라.`);
-  }
-  return { rows, houseHits, hasAsc: !!asc };
-}
-
-/* ==========================================================================
-   [7-C] 타고난 것이 있는 자리 — 4장
-   --------------------------------------------------------------------------
-   "뭘 시켜야 할지 모르겠어요" 가 부모의 가장 큰 질문 중 하나다.
-   2하우스(손에 쥐는 것) · 5하우스(표현·창작) · 6하우스(기술의 숙련)
-   10하우스(사회적 성취) + 수성(배우는 방식) · 금성(좋아하는 것) · 화성(밀어붙이는 힘)
-
-   🚨 여기서 절대 하면 안 되는 것 : 직업을 못 박는 것.
-      "이 아이는 의사가 됩니다" 는 아이의 인생을 좁힌다.
-      '자리'와 '방식'만 말하고 직업은 예시로만 든다.
-========================================================================== */
-const TALENT_HOUSE = {
-  2:  '손으로 쥐고 만드는 자리 · 자기 것으로 만들어 쌓는 힘',
-  5:  '표현하고 만들어 내보이는 자리 · 놀이가 곧 재능이 되는 곳',
-  6:  '반복해서 숙련되는 자리 · 꾸준함이 실력이 되는 곳',
-  10: '밖에서 인정받는 자리 · 남들 앞에 서는 힘'
-};
-const MERCURY_LEARN = {
-  '불': '먼저 해보고 몸으로 익힌다. 설명이 길면 집중이 흩어진다.',
-  '흙': '차근차근 순서대로 익힌다. 건너뛰면 불안해한다.',
-  '공기': '설명을 듣고 이해한 다음에 움직인다. 왜인지를 알아야 한다.',
-  '물': '분위기와 이미지로 통째로 흡수한다. 좋아하는 사람에게 더 잘 배운다.'
-};
-
-function talentPlaces(chart) {
-  const rows = [], P = chart.planets;
-  let hits = 0;
-
-  if (chart.ascSignIndex !== null) {
-    for (const p of ['태양', '달', '수성', '금성', '화성', '목성']) {
-      const pl = P[p];
-      if (!pl) continue;
-      const h = houseOf(chart, pl.abs);
-      if (TALENT_HOUSE[h]) {
-        hits++;
-        rows.push(`${josa(p, '이', '가')} ${h}하우스 — ${TALENT_HOUSE[h]}`);
-      }
-    }
-  }
-
-  const mer = P['수성'], ven = P['금성'], mars = P['화성'], jup = P['목성'];
-  if (mer) rows.push(`배우는 방식(수성 ${mer.sign}) : ${MERCURY_LEARN[elemOf(mer)] || ''}`);
-  if (ven) rows.push(`끌리는 것(금성 ${ven.sign}) : 이 아이가 예쁘다고 느끼고 오래 붙잡는 결`);
-  if (mars) rows.push(`밀어붙이는 방식(화성 ${mars.sign}) : 하고 싶을 때 이렇게 달려든다`);
-  if (jup && chart.ascSignIndex !== null) {
-    const h = houseOf(chart, jup.abs);
-    if (h) rows.push(`목성이 ${h}하우스 — 이 영역은 넓혀 주면 아이가 스스로 뻗어 나간다`);
-  }
-
-  if (!hits) {
-    rows.push('재능의 방에 들어간 별이 없다 — 한 분야에 몰린 유형이 아니라 여러 곳에 고루 퍼진 아이다.');
-    rows.push('이럴 때는 하나를 골라 주기보다 여러 개를 얕게 경험시키는 편이 맞다. 억지로 한 가지를 지목하지 마라.');
-  }
-  return { rows, hits };
-}
-
-/* ==========================================================================
-   [7-D] 케미스트리 — 5장 "붙는 자리와 거리를 둘 자리"
-   --------------------------------------------------------------------------
-   🚨 초기 설계는 "왜 유독 나와 부딪힐까" 였고 마찰각만 뽑았다.
-      그런데 실제로 세어 보면 소프트각이 훨씬 많다(어떤 가족은 17개 중 15개).
-      잘 맞는 자리를 통째로 버리고 있었던 셈이고, 부모는 리포트를 읽는 내내
-      자기가 잘못하고 있다는 느낌만 받는다.
-
-      그래서 양쪽을 다 읽는다.
-        붙는 자리     소프트각 — 서로 편해지는 지점, 여기를 늘리면 된다
-        거리를 둘 자리 하드각  — 가까울수록 부딪히는 주제, 그 주제에서만 한 발 뒤로
-
-      "거리를 둔다"는 멀어지라는 뜻이 아니라 그 주제에서만 물러서라는 뜻이다.
-      그래서 실행 가능한 조언이 된다.
-========================================================================== */
-const SOFT = ['합', '삼각', '육각'];
-const HARD = ['각', '대립'];
-
-function chemistry(parentChart, childChart, parentName, childName) {
-  const asp = SYN.synastryAspects(parentChart, childChart, parentName, childName);
-  const soft = asp.filter(a => SOFT.includes(a.aspect));
-  const hard = asp.filter(a => HARD.includes(a.aspect));
-
-  const ov = []
-    .concat(SYN.houseOverlay(parentChart, childChart, parentName, childName) || [])
-    .concat(SYN.houseOverlay(childChart, parentChart, childName, parentName) || []);
-
-  return {
-    all: asp,
-    soft: soft.slice(0, 8),
-    hard: hard.slice(0, 5),
-    overlay: ov.slice(0, 10),
-    softCount: soft.length,
-    hardCount: hard.length,
-    /* 비율로 관계의 성격을 한 줄 판정 */
-    tone: soft.length >= hard.length * 2
-      ? '맞물리는 자리가 부딪히는 자리보다 훨씬 많다. 기본적으로 편한 조합이다.'
-      : (hard.length > soft.length
-        ? '부딪히는 자리가 많은 조합이다. 그만큼 서로에게 무심할 수 없는 사이이기도 하다.'
-        : '맞물리는 자리와 부딪히는 자리가 비슷하다. 날에 따라 다르게 느껴지는 조합이다.')
-  };
-}
-
-/* --------------------------------------------------------------------------
-   물려받은 자리 — 5장 안의 조건부 삽입 (500가족 중 32%에서 발견)
-   "어머니도 달이 게자리입니다. 두 분은 같은 방식으로 마음이 움직입니다."
-   터질 때 위력이 크지만 흔하지 않으므로 장으로 만들지 않고 박스로 넣는다.
--------------------------------------------------------------------------- */
-const INHERIT_MEAN = {
-  '태양': '자기다움을 느끼는 지점이 같다',
-  '달': '마음이 움직이는 방식이 같다',
-  '수성': '생각하고 말하는 결이 같다',
-  '금성': '예쁘다고 느끼는 것이 같다',
-  '화성': '화가 나고 달려드는 방식이 같다'
-};
-
-function inherited(parentChart, childChart, parentName, childName) {
-  const rows = [];
-  for (const p of ['태양', '달', '수성', '금성', '화성']) {
-    const a = parentChart.planets[p], b = childChart.planets[p];
-    if (!a || !b) continue;
-    if (a.sign === b.sign) {
-      rows.push({ planet: p, kind: '같은 별자리',
-        text: `${parentName}도 ${childName}도 ${p}이 ${a.sign} — ${INHERIT_MEAN[p]}` });
-    } else if (angleDiff(a.abs, b.abs) < 6) {
-      rows.push({ planet: p, kind: '합',
-        text: `${parentName}의 ${p}과 ${childName}의 ${p}이 같은 자리에 겹침 — ${INHERIT_MEAN[p]}` });
-    }
-  }
-  return rows;
-}
-
-/* ==========================================================================
-   [7-E] 성장 곡선 — 8장 그래프
-   --------------------------------------------------------------------------
-   🚨 점수를 매기지 않는다. VVIP 는 10대~80대를 100점 만점으로 끊지만,
-      아이에게 점수를 붙이는 순간 그것이 낙인이 된다.
-      ("우리 애 열두 살은 62점" 이라는 문장이 부모 머리에 남으면 끝이다)
-
-      그래서 숫자 없이 '모양'만 낸다. 어디가 열리고 어디가 다지는 때인지
-      곡선으로만 보여주고, 축에는 나이만 적는다.
-
-   목성이 아이의 태양·달·금성에 조화각 → 열리는 때
-   토성이 하드각                      → 안으로 다지는 때
-========================================================================== */
-function growthCurve(chart, birth, fromAge, toAge) {
-  const jd0 = julianDayFromYMD(birth.y, birth.m, birth.d);
-  const pts = [];
-  const bodies = ['태양', '달', '금성', '상승점'];
-
-  for (let a = fromAge; a <= toAge; a += 0.25) {
-    const jd = jd0 + a * 365.25;
-    const jup = jupiterLongitudeJD(jd), sat = saturnLongitudeJD(jd);
-    let v = 0;
-    for (const p of bodies) {
-      const n = chart.planets[p];
-      if (!n) continue;
-      const dj = angleDiff(jup, n.abs), ds = angleDiff(sat, n.abs);
-      for (const [ang, w] of [[0, 1], [120, 0.8], [60, 0.5]]) {
-        if (Math.abs(dj - ang) < 7) v += w * (1 - Math.abs(dj - ang) / 7);
-      }
-      for (const [ang, w] of [[90, 1], [180, 1], [0, 0.6]]) {
-        if (Math.abs(ds - ang) < 6) v -= w * (1 - Math.abs(ds - ang) / 6);
-      }
-    }
-    pts.push({ age: +a.toFixed(2), raw: v });
-  }
-  /* 0~100 으로 정규화 — 화면에 숫자를 쓰지 않고 곡선 모양에만 쓴다 */
-  const vals = pts.map(p => p.raw);
-  const mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals);
-  const span = (mx - mn) || 1;
-  pts.forEach(p => { p.y = Math.round(((p.raw - mn) / span) * 100); });
-  return pts;
-}
-
-/* ==========================================================================
-   [8] 다이제스트 조립
-========================================================================== */
-const AGE_GUIDE = {
-  '미취학': '아직 학교에 들어가기 전이다. 이 시기의 부모가 가장 궁금한 건 "이게 정상인가"이다. 비교하지 말고, 이 아이의 속도가 원래 이렇다는 것을 알려 주는 데 집중하라.',
-  '초등':   '학교에 다니고 있다. 규칙·또래·성적이 한꺼번에 들어오는 시기다. 첫 번째 토성 시험이 이 구간에 걸린다면 그 얘기를 반드시 하라.',
-  '중고등': '사춘기 한복판이거나 그 문턱이다. 부모가 이미 부딪히고 있을 가능성이 높다. "왜 갑자기 변했나"에 답하는 것이 이 리포트의 몫이다.',
-  '성인':   '이미 성인이다. 훈육이 아니라 관계의 문제다. 조언이 아니라 이해로 방향을 잡아라. 바꾸려는 조언은 쓰지 마라.'
-};
-
-function buildChildDigest(parentChart, childChart, parentName, childName, ageBand, childBirth) {
-  const L = [];
-  const hasParent = parentChart && Object.keys(parentChart.planets || {}).length > 0;
-
-  /* ── 계산 ── */
-  const selfA   = selfAspects(childChart);
-  const temp    = tempEngine(childChart, selfA);
-  const praise  = praiseChannel(childChart);
-  const bal     = balance(childChart);
-  const gap     = innerOuterGap(childChart, selfA);
-  const outside = outsideFace(childChart);
-  const talent  = talentPlaces(childChart);
-
-  const parentTemp = hasParent ? tempEngine(parentChart, selfAspects(parentChart)) : null;
-  const chem   = hasParent ? chemistry(parentChart, childChart, parentName, childName) : null;
-  const inher  = hasParent ? inherited(parentChart, childChart, parentName, childName) : [];
-
-  /* 오늘 기준 아이 나이 → 앞으로 10년 */
-  const now = new Date();
-  const ageNow = Math.max(0,
-    (now - new Date(childBirth.y, childBirth.m - 1, childBirth.d)) / (365.25 * 86400000));
-  const ageTo = Math.min(28, ageNow + 10);
-
-  const natalSat = childChart.planets['토성'];
-  const natalJup = childChart.planets['목성'];
-  const sats  = natalSat ? saturnMilestones(natalSat.abs, childBirth, 24) : [];
-  const jups  = natalJup ? jupiterReturn(natalJup.abs, childBirth, 24) : [];
-  const hits  = saturnHardHits(childChart, childBirth, 22);
-  const curve = growthCurve(childChart, childBirth, Math.floor(ageNow), Math.ceil(ageTo));
-
-  /* ── 정보 한계 ── */
-  const limits = [];
-  for (const [c, n] of [[parentChart, parentName], [childChart, childName]]) {
-    if (c) (c.notes || []).forEach(note => limits.push(`- ${n}: ${note}`));
-  }
-  if (!hasParent) limits.push(`- ${parentName}의 출생정보가 없다`);
-  if (limits.length) {
-    L.push('[🚨 정보 한계 — 반드시 지켜라]');
-    limits.forEach(x => L.push(x));
-    L.push('제외된 항목은 계산 자체가 불가능하다. 절대 추측해서 채우지 마라.');
-    if (!hasParent) L.push('🚨 5장(케미스트리)을 통째로 빼라. 부모 차트 없이 관계를 쓰면 그건 지어내는 것이다.');
-    L.push('');
-  }
-
-  const line = (c, n) => {
-    const parts = [];
-    for (const p of SYN.SYN_PLANETS) if (c.planets[p]) parts.push(`${p} ${c.planets[p].sign} ${c.planets[p].deg}도`);
-    return `[${n} 차트] ${parts.join(' / ')}`;
-  };
-  L.push(line(childChart, childName + '(아이)'));
-  if (hasParent) L.push(line(parentChart, parentName + '(부모)'));
-  L.push(`\n오늘 기준 ${childName}의 나이 : 만 ${ageNow.toFixed(1)}세 · 이 리포트는 만 ${ageTo.toFixed(0)}세까지를 본다`);
-
-  /* ── 1장 ── */
-  L.push('\n════ 1장 · 우리 아이의 타고난 기질과 성향 ════');
-  L.push(`원소  불 ${bal.element['불']}% / 흙 ${bal.element['흙']}% / 공기 ${bal.element['공기']}% / 물 ${bal.element['물']}%`);
-  L.push(`성질  활동 ${bal.modality['활동']}% / 고정 ${bal.modality['고정']}% / 변통 ${bal.modality['변통']}%`);
-  L.push(`가장 강한 원소 ${bal.topElement} · 가장 적은 원소 ${bal.lackElement}`);
-  L.push('[★ 확정 판정 — 네 축. 어느 쪽도 우열이 없다. 한쪽을 문제로 규정하면 실패다]');
-  for (const k of Object.keys(temp.score)) {
-    L.push(`· ${k} : ${temp.side[k]} (${temp.strength[k]})`);
-    temp.evidence[k].slice(0, 3).forEach(e => L.push(`   근거: ${e}`));
-  }
-  L.push('🚨 숫자와 축 이름(속도축 등)을 본문에 쓰지 마라. 부모에게 성적표로 보인다.');
-  L.push('🚨 "중간 — 상황에 따라 달라짐" 인 축은 단정하지 말고 그대로 "상황에 따라 달라지는 편"으로 써라.');
-
-  /* ── 2장 ── */
-  L.push('\n════ 2장 · "괜찮아"라고 할 때, 정말 괜찮은 걸까 ★ ════');
-  gap.lines.forEach(x => L.push(`- ${x}`));
-  L.push(`판정: ${gap.verdict}`);
-
-  /* ── 3장 ── */
-  L.push('\n════ 3장 · 집 밖에서 이 아이는 어떤 얼굴일까 ════');
-  outside.rows.forEach(x => L.push(`- ${x}`));
-  L.push('🚨 부모는 집에서의 아이만 본다. 여기서는 밖에서의 모습만 다뤄라.');
-  L.push('🚨 친구가 많다/적다를 단정하지 마라. 어떤 방식으로 관계를 맺는지만 써라.');
-
-  /* ── 4장 ── */
-  L.push('\n════ 4장 · 이 아이가 타고난 것은 어디에 있을까 ════');
-  talent.rows.forEach(x => L.push(`- ${x}`));
-  L.push('🚨 직업을 못 박지 마라. "이 아이는 의사가 됩니다" 는 아이의 인생을 좁힌다.');
-  L.push('   자리와 방식만 말하고, 직업은 "예를 들면" 수준으로만 들어라.');
-  L.push('🚨 성적·학업 능력을 평가하지 마라. 무엇을 잘한다가 아니라 어떻게 배우는 아이인가를 써라.');
-
-  /* ── 5장 ── */
-  if (hasParent) {
-    L.push('\n════ 5장 · 나와 이 아이의 케미스트리 ════');
-    L.push(`관계의 성격: ${chem.tone} (맞물림 ${chem.softCount}개 / 부딪힘 ${chem.hardCount}개)`);
-    L.push(`[${parentName}의 기질 — 아이만 분석하면 실패다. 부모도 같이 읽어라]`);
-    for (const k of Object.keys(parentTemp.score)) L.push(`· ${k} : ${parentTemp.side[k]} (${parentTemp.strength[k]})`);
-    L.push('[붙는 자리 — 서로 편해지는 지점. 여기를 늘리면 된다]');
-    if (chem.soft.length) chem.soft.forEach(a => L.push(`- ${a.text}`));
-    else L.push('- 뚜렷한 맞물림이 없다. 억지로 만들지 말고 "서로 다른 세계를 가진 사이"로 써라.');
-    L.push('[거리를 둘 자리 — 가까울수록 부딪히는 주제]');
-    if (chem.hard.length) {
-      chem.hard.forEach(a => L.push(`- ${a.text}`));
-      L.push('🚨 "거리를 둔다"를 멀어지라는 뜻으로 쓰지 마라. 그 주제에서만 한 발 물러서라는 뜻이다.');
-      L.push('🚨 아이의 문제로 쓰지 마라. 두 기질이 어긋날 뿐이고 둘 다 잘못이 없다.');
-    } else {
-      L.push('- 강한 마찰이 없다. 부딪힘보다 서로를 잘 모르는 것이 과제다.');
-    }
-    if (chem.overlay.length) {
-      L.push('[상대가 내 인생의 어느 방에 들어와 있는가]');
-      chem.overlay.forEach(r => L.push(`- ${r.text}`));
-      L.push('같은 부모라도 아이마다 들어오는 방이 다르다. 그래서 형제 중 유독 다르게 느껴지는 아이가 생긴다.');
-    }
-    if (inher.length) {
-      L.push('[★ 물려받은 자리 — 이 항목이 있으면 반드시 써라. 부모가 가장 뭉클해하는 대목이다]');
-      inher.forEach(r => L.push(`- ${r.text}`));
-    }
-  }
-
-  /* ── 6장 ── */
-  L.push('\n════ 6장 · 기다려야 할 때와, 밀어줘야 할 때 ════');
-  L.push(`· 속도 판정: ${temp.side['속도']} (${temp.strength['속도']})`);
-  const mars = childChart.planets['화성'], sat2 = childChart.planets['토성'];
-  if (mars) L.push(`· 화성 ${mars.sign} ${mars.deg}도 — 스스로 밀어붙일 때의 방식`);
-  if (sat2) L.push(`· 토성 ${sat2.sign} ${sat2.deg}도 — 겁내고 미루는 자리`);
-  if (childChart.ascSignIndex !== null && sat2) {
-    const h = houseOf(childChart, sat2.abs);
-    if (h) L.push(`· 토성이 ${h}하우스 — 이 영역에서 자신 없어 하고, 재촉하면 더 굳는다`);
-  }
-  L.push('🚨 두 소제목을 그대로 쓰고 순서도 바꾸지 마라 — "기다려야 할 것" 3가지 / "밀어줘도 되는 것" 3가지.');
-
-  /* ── 7장 ── */
-  L.push('\n════ 7장 · 이 아이에게 사랑이 도착하는 통로 ════');
-  L.push(`가장 잘 닿는 통로: ${praise.top} — ${praise.topText}`);
-  L.push(`두 번째: ${praise.second} — ${praise.secondText}`);
-  if (!praise.decisive) L.push('(1·2위 차이가 크지 않다. 둘을 섞어 안내하라)');
-  praise.why.slice(0, 4).forEach(w => L.push(`   근거: ${w}`));
-  L.push('🚨 반응이 시원찮은 아이로 몰지 마라. 잘 반응하는 아이에게는 "지금 방식이 맞습니다"가 답이다.');
-  L.push('🚨 같은 사랑도 문이 어긋나면 도착하지 않는다 — 부모가 사랑을 안 준 게 아니라 다른 문으로 넣었을 뿐이다.');
-
-  /* ── 8장 ── */
-  L.push('\n════ 8장 · 앞으로 열리는 시기와, 잠깐 단단해질 시기 ★★ ════');
-  L.push('🚨 반드시 열리는 시기를 먼저 쓰고 단단해질 시기를 뒤에 써라. 고비로 열면 부모가 불안해진다.');
-  if (jups.length) {
-    L.push('[열리는 시기 — 목성]');
-    jups.forEach(j => L.push(`▸ 만 ${j.age}세(${j.year}년) — 세계가 한 뼘 넓어진다. 이때 좋아하는 것을 만나게 해주면 오래 간다.`));
-    L.push('🚨 이때를 "정점"으로 쓰지 마라. 첫 개화일 뿐이고 진짜 절정은 훨씬 뒤다.');
-  }
-  if (sats.length) {
-    L.push('[단단해지는 시기 — 토성]');
-    sats.forEach(s => {
-      L.push(`▸ ${s.text}`);
-      L.push(`   의미: ${s.meaning}`);
-      if (s.passes > 1) L.push(`   🚨 ${s.passes}번에 걸쳐 온다. "한 번 지나갔다고 끝난 게 아니다"를 반드시 알려라.`);
+  function timelineHTML(meta) {
+    var items = [];
+    (meta.saturn || []).forEach(function (s) {
+      items.push({
+        age: s.ageFrom,
+        when: '만 ' + s.ageFrom + (s.ageTo && s.ageTo !== s.ageFrom ? '~' + s.ageTo : '') + '세 · ' +
+              s.yearFrom + (s.yearTo && s.yearTo !== s.yearFrom ? '~' + s.yearTo : '') + '년',
+        label: s.label || '',
+        meaning: s.meaning || '',
+        passes: s.passes
+      });
     });
-    L.push('🚨 이미 지나간 시기가 있으면 그것부터 짚어라. 부모가 "맞다"고 확인하는 순간 앞으로의 예고가 믿음이 된다.');
-    L.push('🚨 불행 예고로 쓰지 마라. 성장통이고, 미리 알면 훨씬 수월하게 지나간다는 톤으로.');
-    L.push('🚨 각 시기마다 그때 부모가 할 일을 반드시 붙여라.');
+    (meta.jupiter || []).forEach(function (j) {
+      items.push({
+        age: j.age,
+        when: '만 ' + j.age + '세 무렵 · ' + j.year + '년',
+        label: '첫 개화 — 목성이 제자리로 돌아오는 해',
+        meaning: '시야가 한 뼘 넓어지고, 아이가 스스로 원하는 것을 처음으로 또렷하게 말하기 시작하는 시기입니다.',
+        passes: null
+      });
+    });
+    if (!items.length) return '';
+    items.sort(function (a, b) { return (a.age || 0) - (b.age || 0); });
+    return '<div class="chd-tl">' + items.map(function (it) {
+      return '<div class="it"><div class="dot"></div>' +
+        '<div class="when">' + h(it.when) + '</div>' +
+        '<div class="lb2">' + h(it.label) + '</div>' +
+        '<div class="ms">' + h(it.meaning) + '</div>' +
+        (it.passes > 1 ? '<span class="ps">토성 역행 — ' + it.passes + '번에 걸쳐 지나갑니다</span>' : '') +
+        '</div>';
+    }).join('') + '</div>';
   }
-  if (hits.length) {
-    L.push('[보조 근거 — 토성이 아이의 태양·달·상승점에 거는 각]');
-    hits.slice(0, 6).forEach(h => L.push(`   만 ${h.ageFrom}~${h.ageTo}세(${h.year}년) 토성 ${h.aspect} → ${h.body}`));
+
+  function curveHTML(meta) {
+    var pts = meta.curve || [];
+    if (pts.length < 4) return '';
+    var W = 600, H = 190, PADX = 34, PADY = 18;
+    var a0 = pts[0].age, a1 = pts[pts.length - 1].age, span = (a1 - a0) || 1;
+    function X(a) { return PADX + ((a - a0) / span) * (W - PADX * 2); }
+    function Y(v) { return H - PADY - (Math.max(0, Math.min(100, v)) / 100) * (H - PADY * 2); }
+    var d = pts.map(function (p, i) {
+      return (i ? 'L' : 'M') + X(p.age).toFixed(1) + ',' + Y(p.y || 0).toFixed(1);
+    }).join(' ');
+    var area = d + ' L' + X(a1).toFixed(1) + ',' + (H - PADY) + ' L' + X(a0).toFixed(1) + ',' + (H - PADY) + ' Z';
+    var ticks = '';
+    for (var a = Math.ceil(a0); a <= Math.floor(a1); a++) {
+      if ((a - Math.ceil(a0)) % 2 !== 0) continue;
+      ticks += '<text x="' + X(a).toFixed(1) + '" y="' + (H - 3) +
+        '" fill="#6b687a" font-size="10" text-anchor="middle" font-family="sans-serif">' + a + '세</text>';
+    }
+    return '<div class="chd-curve"><svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg">' +
+      '<defs><linearGradient id="chdG" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0" stop-color="rgba(201,162,75,.34)"/><stop offset="1" stop-color="rgba(201,162,75,0)"/>' +
+      '</linearGradient></defs>' +
+      '<line x1="' + PADX + '" y1="' + (H - PADY) + '" x2="' + (W - PADX) + '" y2="' + (H - PADY) +
+      '" stroke="rgba(255,255,255,.14)" stroke-width="1"/>' +
+      '<path d="' + area + '" fill="url(#chdG)"/>' +
+      '<path d="' + d + '" fill="none" stroke="#E7CE8E" stroke-width="2.4" stroke-linecap="round"/>' +
+      ticks + '</svg>' +
+      '<div class="cap">순풍(목성)과 시험(토성)이 겹쳐 만드는 흐름입니다. 낮은 구간은 나쁜 때가 아니라 <b>단단해지는 때</b>입니다.</div></div>';
   }
-  L.push(`[성장 곡선 데이터] 만 ${Math.floor(ageNow)}세~${Math.ceil(ageTo)}세, ${curve.length}점 계산됨 (화면 그래프용)`);
-  L.push('🚨 곡선에 점수를 붙이지 마라. 아이에게 점수를 매기는 순간 그것이 낙인이 된다. 모양만 말하라.');
 
-  /* ── 9장 ── */
-  L.push('\n════ 9장 · 10년 뒤, 이 아이와 나 ════');
-  L.push(`오늘 만 ${ageNow.toFixed(0)}세인 ${childName}는 10년 뒤 만 ${ageTo.toFixed(0)}세가 된다.`);
-  L.push('지금의 기질이 그때 어떤 모습이 되는지를 쓴다. 관계를 "지키는 법"이 아니라 "그때의 두 사람"을 그려라.');
-  L.push(`🚨 마지막 문장은 ${parentName}에 대한 것으로 끝내라. 아이가 아니라 부모가 주어여야 한다.`);
+  function render(payload) {
+    if (rendered) return true;
+    if (!payload || payload.error) return false;
+    var rep = payload.report || payload;      // report 껍데기 없이 와도 산다
+    var meta = payload.meta || {};
+    if (!rep.headline && !rep.ch1_nature) return false;
 
-  L.push(`\n[아이 나이대: ${ageBand}]`);
-  L.push(AGE_GUIDE[ageBand] || AGE_GUIDE['초등']);
+    try {
+      var root = $('chd');
+      if (!root) return false;
+      var parts = [];
 
-  return {
-    text: L.join('\n'),
-    hasParent, ageNow: +ageNow.toFixed(1), ageTo: +ageTo.toFixed(1),
-    temperament: temp, parentTemperament: parentTemp,
-    praise, balance: bal, gap, outside, talent,
-    chemistry: chem, inherited: inher,
-    saturn: sats, jupiter: jups, saturnHits: hits, curve
-  };
-}
+      var childName = meta.childName || (DATA && DATA.child && DATA.child.name) || '아이';
+      var parentName = meta.parentName || (DATA && DATA.parent && DATA.parent.name) || '부모님';
 
-module.exports = {
-  ELEM, MODE, AXES, PRAISE_CH, AGE_GUIDE,
-  julianDayFromYMD, saturnLongitudeJD, jupiterLongitudeJD,
-  saturnMilestones, jupiterReturn, saturnHardHits,
-  selfAspects, tempEngine, praiseChannel, swallowed, balance,
-  innerOuterGap, outsideFace, talentPlaces, chemistry, inherited, growthCurve,
-  buildChildDigest
-};
+      /* 표지 */
+      parts.push(
+        '<div class="chd-cover">' +
+        '<div class="lb">ASTRANOTE PARENTING MANUAL</div>' +
+        '<h1><em>' + h(childName) + '</em> 양육설명서</h1>' +
+        '<div class="who"><b>' + h(parentName) + '</b>님께 드리는, 세상에 한 부뿐인 기록</div>' +
+        '<div class="chd-line"></div></div>');
+
+      /* 핵심 한 문장 */
+      if (rep.headline) {
+        parts.push('<div class="chd-hero"><div class="t">이 아이를 한 문장으로</div>' +
+          '<div class="h">' + safe(rep.headline) + '</div></div>');
+      }
+
+      /* 9개 챕터 */
+      CH_DEF.forEach(function (c, idx) {
+        var n = idx + 1;
+        var body = rep[c.body];
+        var title = rep['ch' + n + '_title'] || CH_FALLBACK_TITLE[c.no];
+        var lead = rep['ch' + n + '_lead'] || '';
+
+        /* 5장: 부모 차트가 없으면 원고가 없다 — 빈 카드 대신 정직한 안내 */
+        if (c.body === 'ch5_chemistry' && !body) {
+          if (meta.hasParent === false) {
+            parts.push('<div class="chd-card"><div class="chd-no">CHAPTER 05</div>' +
+              '<div class="chd-tt">부모와 아이의 케미스트리</div>' +
+              '<div class="chd-ct">이 장은 부모님의 출생 정보(생년월일·태어난 시각)가 함께 있어야 쓸 수 있는 장입니다.<br><br>' +
+              '이번 리포트에는 부모님의 정보가 없어 비워두었습니다. 지어내서 채우는 것보다 비워두는 쪽이 옳다고 판단했습니다.</div></div>');
+          }
+          return;
+        }
+        if (!body) return;
+
+        var extra = '';
+        if (c.body === 'ch1_nature') extra = balanceHTML(meta.balance);
+        if (c.body === 'ch8_timeline') extra = timelineHTML(meta);
+        if (c.body === 'ch9_tenyears') extra = curveHTML(meta);
+
+        parts.push('<div class="chd-card"><div class="chd-no">CHAPTER ' + c.no + '</div>' +
+          '<div class="chd-tt">' + h(title) + '</div>' +
+          (lead ? '<div class="chd-lead">' + safe(lead) + '</div>' : '') +
+          '<div class="chd-ct">' + safe(body) + '</div>' +
+          extra + '</div>');
+      });
+
+      /* 맺음말 */
+      if (rep.closing) {
+        parts.push('<div class="chd-close"><div class="t">마지막으로</div>' +
+          '<div class="ct2">' + safe(rep.closing) + '</div></div>');
+      }
+
+      parts.push('<div id="chd-save-wrap"><button id="chd-save-btn">📥 설명서 이미지로 저장하기</button></div>');
+      parts.push('<div class="chd-foot">ASTRANOTE · WESTERN ASTROLOGY</div>');
+
+      root.innerHTML = parts.join('');
+      rendered = true;
+
+      /* 로컬 저장 — 재방문 즉시 표시 (주문번호별 칸) */
+      try {
+        if (ORDER_ID) localStorage.setItem(REP_KEY_PREFIX + ORDER_ID, JSON.stringify(payload));
+      } catch (e) {}
+
+      hideLoad();
+
+      /* 카드 등장 + 밸런스 바 채우기 */
+      var cards = root.querySelectorAll('.chd-card');
+      Array.prototype.forEach.call(cards, function (card, i) {
+        setTimeout(function () { card.classList.add('show'); }, 120 + i * 160);
+      });
+      if ('IntersectionObserver' in window) {
+        var ob = new IntersectionObserver(function (es) {
+          es.forEach(function (e) { if (e.isIntersecting) e.target.classList.add('show'); });
+        }, { threshold: 0.08 });
+        Array.prototype.forEach.call(cards, function (c) { ob.observe(c); });
+      } else {
+        Array.prototype.forEach.call(cards, function (c) { c.classList.add('show'); });
+      }
+      setTimeout(function () {
+        Array.prototype.forEach.call(root.querySelectorAll('.chd-bal .fl'), function (f) {
+          f.style.width = (f.getAttribute('data-w') || 0) + '%';
+        });
+      }, 600);
+
+      /* 저장 버튼 — save.js 갤러리가 있으면 그쪽, 없으면 기본 캡처 */
+      var sb = $('chd-save-btn');
+      if (sb) sb.onclick = function () {
+        if (typeof window.__astroSaveOpen === 'function') { window.__astroSaveOpen('16'); return; }
+        basicSave();
+      };
+
+      return true;
+    } catch (err) {
+      console.error('[양육설명서] 렌더 실패:', err);
+      rendered = false;
+      return false;
+    }
+  }
+
+  /* save.js 가 없을 때의 최소 저장 경로 */
+  function basicSave() {
+    var el = $('chd');
+    if (!el || typeof html2canvas !== 'function') {
+      alert('저장 기능을 불러오는 중입니다. 잠시 후 다시 눌러주세요.');
+      return;
+    }
+    html2canvas(el, { backgroundColor: '#0A0C16', scale: 2, useCORS: true }).then(function (cv) {
+      var img = cv.toDataURL('image/png');
+      var a = document.createElement('a');
+      a.download = '양육설명서.png'; a.href = img; a.click();
+    }).catch(function () { alert('이미지 저장에 실패했습니다. 화면을 직접 캡처해 주세요.'); });
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     구동 — 로컬 저장본 → 서버 저장본 → 신규 생성(+폴링)
+
+     🚨 서버는 Gemini 과부하 때 20초+45초를 기다린 뒤 3차 시도를 한다.
+        최악의 경우 4분 가까이 걸린다. 그래서 POST 하나에 목숨 걸지 않고
+        8초 간격 폴링을 함께 돌려, POST 연결이 끊겨도 완성본을 잡는다.
+        (배우자 리포트 8/2 문의의 교훈을 처음부터 반영)
+     ══════════════════════════════════════════════════════════════ */
+  var polls = 0, MAX_POLL = 34;   // 8초 × 34 ≈ 4.5분
+
+  function poll() {
+    if (rendered) return;
+    if (!ORDER_ID || ++polls > MAX_POLL) { showRetry(null); return; }
+    fetch(API + '?orderId=' + encodeURIComponent(ORDER_ID), { cache: 'no-store' })
+      .then(function (r) { return r.status === 200 ? r.json().catch(function () { return null; }) : null; })
+      .then(function (d) {
+        if (d && !d.error && d.status === 'completed' && render(d)) return;
+        setTimeout(poll, 8000);
+      })
+      .catch(function () { setTimeout(poll, 8000); });
+  }
+
+  function start(isRetry) {
+    rendered = false; polls = 0;
+    startLoading();
+
+    /* 0순위: 이 기기 저장본 */
+    if (!isRetry && ORDER_ID) {
+      try {
+        var s = localStorage.getItem(REP_KEY_PREFIX + ORDER_ID);
+        if (s && render(JSON.parse(s))) return;
+      } catch (e) {}
+    }
+
+    /* 1순위: 서버 저장본 */
+    var pre = ORDER_ID
+      ? fetch(API + '?orderId=' + encodeURIComponent(ORDER_ID), { cache: 'no-store' })
+          .then(function (r) { return r.json().catch(function () { return null; }); })
+          .catch(function () { return null; })
+      : Promise.resolve(null);
+
+    pre.then(function (cached) {
+      if (cached && !cached.error && cached.status === 'completed' && render(cached)) return;
+
+      /* 2순위: 신규 생성 — 출생정보가 필요하다 */
+      if (!DATA || !DATA.child) {
+        showRetry('입력하신 정보를 불러오지 못했습니다.<br><strong>결제는 정상 완료되었습니다.</strong><br>' +
+                  '아래 버튼을 눌러 정보를 다시 입력해 주세요.');
+        var b = $('chd-retry-btn');
+        if (b) {
+          b.textContent = '정보 다시 입력하기';
+          b.onclick = function () { location.href = '/product/detail.html?product_no=' + NO; };
+        }
+        return;
+      }
+
+      var body = {
+        parent: DATA.parent || null,
+        child: DATA.child,
+        ageBand: DATA.ageBand || '초등'
+      };
+      if (ORDER_ID) body.orderId = ORDER_ID;
+
+      return fetch(API, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+        .then(function (res) {
+          if (res.status === 202) { setTimeout(poll, 6000); return null; }
+          return res.json().catch(function () { return null; });
+        })
+        .then(function (d) {
+          if (!d) return;
+          if (d.status === 'pending') { setTimeout(poll, 6000); return; }
+          if (!d.error && render(d)) return;
+          /* POST 가 에러라도 서버는 만들고 있을 수 있다 — 폴링이 잡는다 */
+          if (ORDER_ID) setTimeout(poll, 8000);
+          else showRetry(d && d.error ? h(d.error) + '<br><strong>결제는 정상 완료되었습니다.</strong>' : null);
+        });
+    }).catch(function (e) {
+      console.warn('[양육설명서] 통신 실패:', e);
+      if (ORDER_ID) setTimeout(poll, 8000); else showRetry(null);
+    });
+  }
+
+  function ensureH2C() {
+    if (typeof html2canvas === 'function') return;
+    var sc = document.createElement('script');
+    sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    document.head.appendChild(sc);
+  }
+
+  function boot() { inject(); ensureH2C(); startLoading(); start(false); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
