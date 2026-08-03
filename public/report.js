@@ -16,14 +16,21 @@
       지금은 기존 키(astro_report_saved)를 그대로 유지 — 호환성 우선.
    ========================================================================== */
 
-const REPORT_KEY = 'astro_report_saved';
+const LEGACY_REPORT_KEY = 'astro_report_saved';   // 예전 단일 키 (읽기 전용 호환)
 const USER_KEY   = 'astro_user_data';
 const API_BASE   = 'https://astranote-server.vercel.app';
+
+/* 🚨 예전에는 모든 주문이 'astro_report_saved' 한 칸을 같이 썼다.
+   배우자 리포트를 산 손님이 나중에 궁합을 사면, 새 주문 화면에
+   예전 배우자 리포트가 그대로 떴다. 주문번호로 칸을 나눈다. */
+let REPORT_KEY = LEGACY_REPORT_KEY;
 
 let ASTRO_USER_DATA = null;
 let isRendered = false;
 let safetyTimer = null;
 let loadingMsgTimer = null;
+let pollTimer = null;
+let pollStopped = false;
 
 /* ---------------------------------------------------------------------------
    유틸: 안전 DOM 주입 (요소가 없어도 예외를 던지지 않음)
@@ -47,6 +54,7 @@ function hideLoader() {
     setTimeout(function () { loader.style.display = 'none'; }, 500);
 }
 function stopTimers() {
+    stopPolling();
     if (loadingMsgTimer) { clearInterval(loadingMsgTimer); loadingMsgTimer = null; }
     if (safetyTimer)     { clearTimeout(safetyTimer);      safetyTimer = null; }
 }
@@ -120,9 +128,15 @@ document.addEventListener('DOMContentLoaded', async function () {
     const orderId = getOrderId();
     if (orderId && ASTRO_USER_DATA) ASTRO_USER_DATA.orderId = orderId;
 
+    /* 주문번호가 있으면 이 주문 전용 칸을 쓴다 */
+    if (orderId) REPORT_KEY = 'astro_report_9_' + orderId;
+
     /* 1순위: 이 기기에 이미 저장된 리포트 (가장 빠름, API 비용 0) */
     try {
-        const savedReport = localStorage.getItem(REPORT_KEY);
+        /* 주문 전용 칸이 비어 있고 주문번호도 없을 때만 예전 칸을 본다.
+           주문번호가 있는데 예전 칸을 읽으면 남의 주문 리포트가 뜬다. */
+        let savedReport = localStorage.getItem(REPORT_KEY);
+        if (!savedReport && !orderId) savedReport = localStorage.getItem(LEGACY_REPORT_KEY);
         if (savedReport) {
             const parsed = JSON.parse(savedReport);
             if (bindDataToUI(parsed)) return;          // 성공했을 때만 종료
@@ -206,14 +220,66 @@ function startLoadingMessages() {
 --------------------------------------------------------------------------- */
 function runAnalysis() {
     isRendered = false;
+    pollStopped = false;
+
+    const orderId = getOrderId();
+
+    /* ────────────────────────────────────────────────────────────────
+       ★ 2026-08-02 문의의 진짜 원인이 여기 있었다.
+
+       서버는 Gemini 가 과부하(503)일 때 20초 → 45초를 기다린 뒤
+       3차 시도를 한다. 최악의 경우 65초 대기 + 생성 90초 ≈ 155초.
+       그런데 이 화면은 90초에 손을 들고 "실패" 화면을 띄우고 있었다.
+
+       즉 서버는 155초쯤 리포트를 정상 완성해 KV 에 저장하는데,
+       손님은 이미 90초에 실패 화면을 보고 창을 닫아버렸다.
+       (실제로 리포트는 서버에 멀쩡히 저장되어 있었다)
+
+       그래서 두 가지를 바꾼다.
+        1) POST 를 던져놓고 동시에 8초마다 GET 으로 완성 여부를 확인한다.
+           POST 응답이 끊겨도 폴링이 리포트를 잡아낸다.
+        2) 90초에 실패 화면 대신 "조금 더 걸립니다" 안내로 바꾸고,
+           진짜 포기는 4분 뒤에 한다.
+       ──────────────────────────────────────────────────────────────── */
 
     if (safetyTimer) clearTimeout(safetyTimer);
     safetyTimer = setTimeout(function () {
         if (!isRendered) {
-            console.warn('서버 타임아웃 → 재시도 안내 표시');
+            console.warn('4분 초과 → 재시도 안내 표시');
+            stopPolling();
             showRetryScreen();
         }
-    }, 90000);   // 리포트 생성은 1~2분 걸릴 수 있어 90초로 여유를 둠
+    }, 240000);
+
+    /* 90초 지점: 실패가 아니라 안심시키는 안내로 교체 */
+    setTimeout(function () {
+        if (isRendered) return;
+        const el = document.getElementById('loading-step-text');
+        if (loadingMsgTimer) { clearInterval(loadingMsgTimer); loadingMsgTimer = null; }
+        if (el) {
+            el.innerHTML = "천체 데이터가 몰리는 시간대입니다.<br>" +
+                           "<b style='color:#d4af37;'>리포트는 정상적으로 만들어지고 있습니다.</b><br>" +
+                           "창을 닫지 마시고 조금만 기다려주세요.";
+            el.style.opacity = '1';
+        }
+    }, 90000);
+
+    /* ── 폴링: 서버에 완성본이 올라왔는지 8초마다 확인 ── */
+    if (orderId) {
+        pollTimer = setInterval(function () {
+            if (isRendered || pollStopped) { stopPolling(); return; }
+            fetch(API_BASE + '/api/gemini?orderId=' + encodeURIComponent(orderId), { cache: 'no-store' })
+                .then(function (r) { return r.status === 200 ? r.json() : null; })
+                .then(function (d) {
+                    if (!d || d.error || isRendered) return;
+                    console.log('✅ 폴링으로 완성본 확보');
+                    stopPolling();
+                    if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null; }
+                    bindDataToUI(d);
+                })
+                .catch(function () {});
+        }, 8000);
+    }
 
     fetch(API_BASE + '/api/gemini', {
         method: 'POST',
@@ -221,19 +287,33 @@ function runAnalysis() {
         body: JSON.stringify(ASTRO_USER_DATA)
     })
     .then(function (res) {
+        /* 202 = 다른 창이 이미 만들고 있다. 실패가 아니다 → 폴링에 맡긴다. */
+        if (res.status === 202) return null;
         if (!res.ok) throw new Error('서버 통신 지연 (' + res.status + ')');
         return res.json();
     })
     .then(function (data) {
+        if (data === null) return;                       // 폴링이 이어받는다
         if (!data || data.error) throw new Error(data && data.error ? data.error : '빈 응답');
+        stopPolling();
         if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null; }
         if (!bindDataToUI(data)) showRetryScreen();
     })
     .catch(function (err) {
-        console.warn('API 실패:', err);
-        if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null; }
-        showRetryScreen();
+        console.warn('POST 실패:', err);
+        /* 🚨 여기서 바로 실패 화면을 띄우면 안 된다.
+           서버가 아직 만들고 있는 중일 수 있다(연결만 끊긴 경우가 많다).
+           주문번호가 있으면 폴링이 계속 돌게 두고, safetyTimer 에 맡긴다. */
+        if (!orderId) {
+            if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null; }
+            showRetryScreen();
+        }
     });
+}
+
+function stopPolling() {
+    pollStopped = true;
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
 }
 
 function showRetryScreen() {
@@ -241,7 +321,21 @@ function showRetryScreen() {
     stopTimers();
     hideLoader();
     const rs = document.getElementById('retry-screen');
-    if (rs) rs.style.display = 'flex';
+    if (!rs) return;
+    rs.style.display = 'flex';
+    /* 손님이 문의할 때 주문번호를 함께 보내면 우리가 서버에서 바로 복구할 수 있다.
+       이 한 줄이 "확인 부탁드립니다" 왕복 3~4회를 없앤다. */
+    try {
+        const oid = getOrderId();
+        if (oid && !document.getElementById('astro-oid')) {
+            const p = document.createElement('div');
+            p.id = 'astro-oid';
+            p.style.cssText = 'margin-top:14px;font-size:12px;color:#8b829e;letter-spacing:-.03em;line-height:1.7';
+            p.innerHTML = '결제는 정상 완료되었습니다.<br>계속 열리지 않으면 아래 주문번호로 문의해주세요.<br>' +
+                          '<b style="color:#d4af37">' + String(oid).replace(/[<>&"]/g, '') + '</b>';
+            rs.appendChild(p);
+        }
+    } catch (e) {}
 }
 
 function retryAnalysis() {
