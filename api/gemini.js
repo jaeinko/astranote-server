@@ -65,10 +65,18 @@ function signDeg(lon) {
   const l = ((lon % 360) + 360) % 360;
   return { sign: SIGNS_KR[Math.floor(l / 30)], deg: (l % 30).toFixed(1), abs: l };
 }
-/* buildChartDigest 가 만든 행성 맵을 응답 조립 때 다시 쓰기 위해 보관한다.
-   명세표는 AI 가 아니라 이 값으로 만든다. 그래야 지어낼 수 없다. */
-let CHART_SNAPSHOT = null;
-let STRONGEST_MARRIAGE_YEAR = null;   // 가장 강력한 결혼 적기의 연도. gateCheck 가 card5 인용 여부를 검사한다.
+/* 🚨 v2.1 (2026-08-04) — 전역변수 → 요청별 컨텍스트
+   ------------------------------------------------------------------
+   원래 CHART_SNAPSHOT · STRONGEST_MARRIAGE_YEAR 가 모듈 전역이었다.
+   Vercel Fluid compute 는 한 프로세스가 여러 요청을 '동시에' 처리한다.
+   (8/2 손님 로그의 "Fluid" 표기가 그 증거다)
+
+   Gemini 생성은 60~150초 걸린다. 그 사이 다른 손님 주문이 들어오면 —
+     · 손님 A 의 리포트에 손님 B 의 행성 명세표가 붙고 (개인정보 사고)
+     · A 의 gateCheck 가 B 의 결혼 적기 연도를 요구해 멀쩡한 원고를 반려한다
+   지금은 주문이 겹칠 확률이 낮지만, 쓰레드 글 하나 터지는 순간
+   주문이 몰리면서 정확히 이 사고가 난다. 그래서 요청마다 자기만의
+   컨텍스트 객체(chartCtx)를 만들어 들고 다니게 바꿨다. */
 
 /* ── 각도(어스펙트) 계산 ────────────────────────────────────────
    "오차 0.3도로 맺혀 있습니다" 같은 근거를 쓰려면 이게 있어야 한다.
@@ -200,7 +208,7 @@ function localPlanetList(dateTimeIso) {
   return out;
 }
 
-function buildChartDigest(data, dateTimeIso, location) {
+function buildChartDigest(data, dateTimeIso, location, ctx) {
   try {
     const list = data.planet_position || data.planet_positions || [];
     if (!list.length) return null;
@@ -225,8 +233,7 @@ function buildChartDigest(data, dateTimeIso, location) {
       console.error('🔥 상승점을 계산하지 못했습니다 → 하우스 없는 리포트를 내보내지 않습니다');
       return null;   // 지어내느니 실패시킨다
     }
-    CHART_SNAPSHOT = { planets: planets, ascAbs: asc.abs };
-    STRONGEST_MARRIAGE_YEAR = null;   // 🚨 웜 컨테이너에 이전 손님 값이 남는 것 방지. 매 요청 리셋.
+    if (ctx) ctx.snapshot = { planets: planets, ascAbs: asc.abs };
     const lines = [];
     if (asc) {
       const dsc = signDeg(asc.abs + 180);
@@ -235,7 +242,7 @@ function buildChartDigest(data, dateTimeIso, location) {
       if (planets['천정']) lines.push(`천정(MC): ${planets['천정'].sign} ${planets['천정'].deg}도`);
 
       // 🪐 실제 계산된 목성 트랜짓 (사람마다 달라야 하는 만남 시기의 유일한 근거)
-      const jupiterWindows = findJupiterTransitWindows(dsc.abs);
+      const jupiterWindows = findJupiterTransitWindows(dsc.abs, ctx);
       // 🚨 안전장치: 결과가 비었거나 undefined가 섞이면 '없음'으로 처리 (리포트에 undefined 노출 방지)
       const validWindows = (jupiterWindows || []).filter(function(w) {
         return typeof w === 'string' && w.length > 0 && w.indexOf('undefined') === -1;
@@ -430,7 +437,7 @@ function angleDiff(a, b) {
   return d > 180 ? 360 - d : d;
 }
 
-function findJupiterTransitWindows(targetDeg) {
+function findJupiterTransitWindows(targetDeg, ctx) {
   // 여러 각도를 모두 수집한 뒤 시간순 정렬 → 가까운 미래부터 제시
   const aspects = [
     { name: '합 · 강력', angle: 0, orb: 6, weight: 3 },
@@ -467,7 +474,7 @@ function findJupiterTransitWindows(targetDeg) {
      기존에는 weight(합3·삼각2·육각1)를 계산해놓고 버렸다.
      상위 3개 중 weight 최고(동률이면 더 가까운 미래)를 ★로 표시해
      card5가 '가장 강력한 시기'를 빨간 강조로 못 박을 수 있게 한다.
-     연도는 STRONGEST_MARRIAGE_YEAR 에 저장해 gateCheck 가 인용 여부를 검사한다. */
+     연도는 ctx.strongestYear 에 저장해 gateCheck 가 인용 여부를 검사한다. */
   /* 전체 창 중 최강(합>삼각>육각, 동률이면 더 가까운 미래)을 먼저 확정하고,
      시간순 상위 3개에 없으면 마지막 자리를 밀어내고 강제 포함한다.
      (예: 삼각 2028·2028, 육각 2030, 합 2032 → 합이 잘려나가 차상위에 ★가 붙던 결함 수정) */
@@ -493,7 +500,7 @@ function findJupiterTransitWindows(targetDeg) {
     let out = period + ' (목성 ' + w.name + ')';
     if (idx === strongestIdx) {
       out += ' ★★각도상 가장 강력한 결혼·만남의 창★★';
-      STRONGEST_MARRIAGE_YEAR = String(sy);
+      if (ctx) ctx.strongestYear = String(sy);
     }
     return out;
   });
@@ -609,6 +616,8 @@ const handler = async (req, res) => {
     const dateTimeIso = buildBirthIso(date, time, city);
 
     let astrologyDataText = null;   // 🚨 기본값을 문장으로 두면 데이터 없이도 리포트가 나간다
+    /* 이 요청 전용 차트 컨텍스트 — 동시 주문끼리 절대 섞이지 않는다 */
+    const chartCtx = { snapshot: null, strongestYear: null };
     try {
       if (process.env.PROKERALA_CLIENT_ID && process.env.PROKERALA_CLIENT_SECRET) {
         const tokenResponse = await fetch('https://api.prokerala.com/token', {
@@ -626,7 +635,7 @@ const handler = async (req, res) => {
             const astroJson = await astroResponse.json();
             /* 🚨 예전에는 digest 가 null 이면 원본 JSON 을 그대로 프롬프트에 부었다.
                   사이더리얼 좌표에 하우스도 없는 덩어리라 AI 가 지어낼 수밖에 없었다. */
-            const digest = buildChartDigest(astroJson.data, dateTimeIso, location);
+            const digest = buildChartDigest(astroJson.data, dateTimeIso, location, chartCtx);
             if (digest) {
               astrologyDataText = digest;
               console.log("📊 차트 다이제스트(Prokerala):\n" + digest);
@@ -643,7 +652,7 @@ const handler = async (req, res) => {
     if (!astrologyDataText) {
       try {
         const localDigest = buildChartDigest(
-          { planet_position: localPlanetList(dateTimeIso) }, dateTimeIso, location);
+          { planet_position: localPlanetList(dateTimeIso) }, dateTimeIso, location, chartCtx);
         if (localDigest) {
           astrologyDataText = localDigest;
           console.log("📊 차트 다이제스트(자체 계산):\n" + localDigest);
@@ -723,8 +732,8 @@ function emphasisIssue(text) {
       if (!/오차\s*[\d.]+\s*도/.test(all)) return '각도 오차 인용 없음';
       /* v2: 가장 강력한 결혼 적기가 계산됐는데 card5가 그 연도를 인용하지 않으면 실패.
          모델이 ★★ 구간을 무시하고 딴 연도를 최강으로 쓰는 사고를 서버가 막는다. */
-      if (STRONGEST_MARRIAGE_YEAR && strip(d.card5_timing).indexOf(STRONGEST_MARRIAGE_YEAR) === -1)
-        return 'card5 가장 강력한 시기(' + STRONGEST_MARRIAGE_YEAR + '년) 미인용';
+      if (chartCtx.strongestYear && strip(d.card5_timing).indexOf(chartCtx.strongestYear) === -1)
+        return 'card5 가장 강력한 시기(' + chartCtx.strongestYear + '년) 미인용';
       /* 강조 남용 */
       for (const k in NEED_LEN) {
         const em = emphasisIssue(d[k]);
@@ -931,8 +940,8 @@ ${astrologyDataText}
     /* ── 서버가 만든 사실 자료를 응답에 붙인다 ──
        AI 가 손대지 않으므로 지어낼 수 없다. VVIP 와 같은 장치다. */
     try {
-      if (CHART_SNAPSHOT && CHART_SNAPSHOT.planets) {
-        parsedData.chart_table = buildChartTable(CHART_SNAPSHOT.planets, CHART_SNAPSHOT.ascAbs);
+      if (chartCtx.snapshot && chartCtx.snapshot.planets) {
+        parsedData.chart_table = buildChartTable(chartCtx.snapshot.planets, chartCtx.snapshot.ascAbs);
         parsedData.method_note = buildMethodNote(dateTimeIso, cityResolved, !!isTimeUnknown);
         parsedData.time_unknown = !!isTimeUnknown;
       }
