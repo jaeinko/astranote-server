@@ -90,9 +90,20 @@
 '.chd-orb .r3{width:124px;height:124px;border-top-color:rgba(201,162,75,.55);animation:chdS 3.8s linear infinite;}',
 '@keyframes chdS{to{transform:rotate(360deg)}}',
 '#chd-load h3{color:#E7CE8E;font:900 20px "Noto Sans KR",sans-serif;margin:0 0 13px;letter-spacing:-.05em;}',
+/* 🚨 2026-08-04 글자 흩어짐 수정 — display:flex 를 쓰면 안 되는 자리였다.
+   ------------------------------------------------------------------
+   flex 컨테이너 안에서는 자식이 전부 '플렉스 아이템'이 된다.
+   "각이 <b>가장 정확해지는 날짜</b>를<br>하루 단위로 찾습니다." 는
+   [각이] [가장 정확해지는 날짜] [를] [하루 단위로 찾습니다.] 네 덩어리로
+   쪼개져 가로로 늘어서고, <br> 은 무시된다. 손님 화면에서 글자가
+   제멋대로 흩어져 보인 이유가 이것이다.
+   게다가 height:50px + overflow:hidden 이라 3줄짜리 문구는 마지막 줄이 잘렸다.
+
+   → block 으로 되돌리고, 가장 긴 3줄 문구 기준으로 min-height 를 잡아
+     문구가 바뀔 때 진행바가 위아래로 튀지 않게 한다. */
 '#chd-step{color:#ddd;font:500 14.5px/1.7 "Noto Sans KR",sans-serif;max-width:330px;',
-'  height:52px;display:flex;align-items:center;justify-content:center;text-align:center;',
-'  word-break:keep-all;transition:opacity .4s ease;margin-bottom:24px;overflow:hidden;}',
+'  display:block;min-height:76px;text-align:center;margin-left:auto;margin-right:auto;',
+'  word-break:keep-all;transition:opacity .4s ease;margin-bottom:24px;}',
 '#chd-step b{color:#E7CE8E;}',
 '#chd-load .hint{color:#6b687a;font:500 12px/1.7 "Noto Sans KR",sans-serif;max-width:300px;word-break:keep-all;}',
 
