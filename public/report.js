@@ -165,18 +165,12 @@ document.addEventListener('DOMContentLoaded', async function () {
                    이제는 서버가 보관 중인 출생정보를 그대로 받아 말없이 다시 만든다.
                    손님은 아무것도 입력할 필요가 없다. */
                 const body = await res.json().catch(function () { return null; });
-                if (body && body.canRegenerate && body.intake) {
-                    const k = body.intake;
-                    ASTRO_USER_DATA = {
-                        name: k.name, date: k.date, time: k.time,
-                        city: k.city || 'Seoul',
-                        myGender: k.myGender || '여성',
-                        targetGender: k.targetGender || '남성',
-                        timeUnknown: !!k.timeUnknown,
-                        orderId: orderId
-                    };
-                    try { localStorage.setItem(USER_KEY, JSON.stringify(ASTRO_USER_DATA)); } catch (e) {}
-                    console.log('♻️ 서버에 보관된 출생정보로 자동 복구');
+                if (body && body.canRegenerate) {
+                    /* 서버가 출생정보를 보관 중이다. 다만 그 내용을 받아오지는 않는다
+                       (주문번호를 순서대로 찍으면 남의 개인정보가 새기 때문).
+                       주문번호만 보내면 서버가 제 KV 를 읽어 다시 만든다. */
+                    ASTRO_USER_DATA = { orderId: orderId, __serverIntake: true };
+                    console.log('♻️ 서버 보관 정보로 재생성 요청');
                 }
             }
         } catch (e) {
