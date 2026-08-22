@@ -1,5 +1,5 @@
 /* ============================================================================
-   ASTRANOTE — 우리 아이 양육설명서 결과화면 (product_no=16 · 29,900원)
+   ASTRANOTE — 우리 아이 양육설명서 결과화면 (product_no=17 · 24,900원)
    ----------------------------------------------------------------------------
    ▣ 배포 위치 : public/child.js  (GitHub 저장소)
    ▣ 카페24 order_result.html 에 한 줄:
@@ -36,10 +36,11 @@
 (function () {
   'use strict';
 
-  var NO = '16';
+  var NO = '17';   // 🚨 2026-08-22 정정: 카페24 실제 번호는 17(24,900원). 16은 재회운이다.
   var API = 'https://astranote-server.vercel.app/api/gemini-child';
   var DATA_KEY = 'astro_child_data';
-  var REP_KEY_PREFIX = 'astro_rep:16:';
+  var REP_KEY_PREFIX = 'astro_rep:17:';
+  var LEGACY_REP_PREFIX = 'astro_rep:16:';   // 번호 정정 전에 저장된 캐시도 읽어준다
 
   function qs(k) {
     try { return new URLSearchParams(location.search).get(k); } catch (e) { return null; }
@@ -50,7 +51,15 @@
   var stored = null;
   try { stored = JSON.parse(localStorage.getItem(DATA_KEY) || 'null'); } catch (e) {}
   var hinted = urlHint || (stored && stored.productNo) || null;
-  if (String(hinted) !== NO) return;
+
+  /* 🚨 2026-08-22 — 예전 코드가 이 상품을 16번으로 잘못 알고 있었다.
+     그래서 정정 전에 만들어진 링크에는 product_no=16 이 붙어 있을 수 있다.
+     하지만 16번은 이제 재회운(다른 상품)이다. 무조건 받아주면
+     재회운을 산 손님에게 양육설명서 화면이 뜬다.
+     그래서 16번은 "이 기기에 양육설명서 입력값이 실제로 있을 때"만 받는다.
+     재회운 손님에게는 astro_child_data 가 없으므로 안전하게 갈린다. */
+  var legacyOk = (String(hinted) === '16') && !!(stored && stored.child);
+  if (String(hinted) !== NO && !legacyOk) return;
   if (window.__astroReportInit) return;
   window.__astroChildV1 = true;
   window.__astroReportInit = true;
@@ -499,7 +508,7 @@
       /* 저장 버튼 — save.js 갤러리가 있으면 그쪽, 없으면 기본 캡처 */
       var sb = $('chd-save-btn');
       if (sb) sb.onclick = function () {
-        if (typeof window.__astroSaveOpen === 'function') { window.__astroSaveOpen('16'); return; }
+        if (typeof window.__astroSaveOpen === 'function') { window.__astroSaveOpen(NO); return; }
         basicSave();
       };
 
@@ -554,7 +563,8 @@
     /* 0순위: 이 기기 저장본 */
     if (!isRetry && ORDER_ID) {
       try {
-        var s = localStorage.getItem(REP_KEY_PREFIX + ORDER_ID);
+        var s = localStorage.getItem(REP_KEY_PREFIX + ORDER_ID)
+             || localStorage.getItem(LEGACY_REP_PREFIX + ORDER_ID);   // 번호 정정 전 캐시도 살린다
         if (s && render(JSON.parse(s))) return;
       } catch (e) {}
     }
