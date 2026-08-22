@@ -59,6 +59,7 @@ const RETRY_WAIT_MS = [20000, 45000, 0];   // 1·2차 실패 후 대기. 3차는
 /* 🚨 CORS 는 lib/cors.js 화이트리스트 정본 하나만 씁니다.
    예전의 '*' 는 아무 사이트나 우리 Gemini 크레딧을 태울 수 있게 했습니다. */
 const { allowCors } = require('../lib/cors.js');
+const { normalizeDate, normalizeTime, cleanName } = require('../lib/validate.js');
 
 // ── 공용 모듈 ──────────────────────────────────────────────────────────
 //  도시 좌표와 시간대 변환은 lib/ 아래 정본 하나만 씁니다.
@@ -1150,12 +1151,25 @@ const handler = async (req, res) => {
   console.log('✅ [1] gemini-vip 진입');
   try {
     const b = req.body || {};
-    const { name, date, city, myGender } = b;
+    let { name, date, city, myGender } = b;
     let time = b.time;
     // 🚨 출생시간 미상 처리: 상승점·천정·하우스가 무의미해지므로 정밀도를 주장하지 않는다.
     const timeUnknown = !!b.timeUnknown || !time || String(time).trim() === '';
     if (timeUnknown) time = '12:00';
     if (!name || !date) return res.status(400).json({ error: '이름과 생년월일은 필수입니다.' });
+
+    /* 🚨 2026-08-21 — 달력에 없는 날짜(1990-02-31 등)가 조용히 통과해
+       엉뚱한 날짜의 차트가 나가던 구멍. lib/validate.js 를 연결한다. */
+    const vDate = normalizeDate(date);
+    if (!vDate) return res.status(400).json({ error: '생년월일을 다시 확인해 주세요. 달력에 없는 날짜입니다.' });
+    date = vDate;
+    if (!timeUnknown) {
+      const vTime = normalizeTime(time);
+      if (!vTime) return res.status(400).json({ error: '태어난 시각을 다시 확인해 주세요. (예: 14:30)' });
+      time = vTime;
+    }
+    name = cleanName(name, 20);
+    if (!name) return res.status(400).json({ error: '이름을 다시 입력해 주세요.' });
     if (!process.env.GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY 없음' });
 
     let location = cityCoordinates[city];
