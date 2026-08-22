@@ -522,7 +522,19 @@ const handler = async (req, res) => {
       if (st && st.state === 'pending') {
         return res.status(202).json({ status: 'pending' });
       }
-      return res.status(404).json({ error: '저장된 리포트 없음', state: st ? st.state : 'none' });
+      /* 🚨 2026-08-21 — "정보를 다시 입력하세요 → 결제페이지" 사고의 근본 원인.
+         출생정보(intake)는 서버에 멀쩡히 있는데 프론트가 조회조차 하지 않아,
+         기기를 바꾸거나 브라우저 저장소가 비워진 손님은 전부 재입력 화면으로 튕겼다.
+         리포트가 없을 땐 intake 를 함께 내려보내 프론트가 말없이 재생성하게 한다.
+         (비밀번호 같은 민감정보가 아니고, 주문번호를 아는 본인만 조회 가능하다) */
+      let intake = null;
+      try { intake = await kv.get(`intake:${orderId}`); } catch (e) {}
+      return res.status(404).json({
+        error: '저장된 리포트 없음',
+        state: st ? st.state : 'none',
+        intake: intake || null,
+        canRegenerate: !!(intake && intake.name && intake.date && intake.time)
+      });
     } catch (e) {
       return res.status(500).json({ error: 'KV 조회 실패: ' + e.message });
     }
@@ -571,7 +583,7 @@ const handler = async (req, res) => {
          · 우리도 그 손님이 누구인지, 무엇을 넣었는지 알 수 없었다.
        "결제했는데 리포트가 안 열려요" 문의에 손도 못 대던 이유가 이것이다.
 
-       이제 주문번호만 있으면 언제든 다시 만들 수 있다. (90일 보관)
+       이제 주문번호만 있으면 언제든 다시 만들 수 있다. (365일 보관)
        ──────────────────────────────────────────────────────────────── */
     if (orderId) {
       try {
@@ -580,7 +592,7 @@ const handler = async (req, res) => {
           city: city || 'Seoul', myGender, targetGender,
           timeUnknown: !!body0.timeUnknown,
           at: Date.now()
-        }, { ex: 60 * 60 * 24 * 90 });
+        }, { ex: 60 * 60 * 24 * 365 });   // v2: 90일 → 365일. 리포트 보관기간과 반드시 같아야 재생성이 가능하다.
       } catch (e) { console.log('⚠️ intake 저장 실패(생성은 계속):', e.message); }
 
       /* 이미 완성된 리포트가 있으면 다시 만들지 않는다.
@@ -955,7 +967,9 @@ ${astrologyDataText}
       try {
         /* 30일 → 180일. 카페24 주문내역은 훨씬 오래 남는데 리포트만 30일 뒤
            사라지면, 그때부터 "다시보기가 안 돼요" 문의가 시작된다. */
-        await kv.set(`report:${orderId}`, parsedData, { ex: 60 * 60 * 24 * 180 });
+        /* v2: 180일 → 365일. VVIP(365일)와 통일.
+           "오랜만에 들어갔더니 리포트가 사라졌다"는 문의를 막는다. */
+        await kv.set(`report:${orderId}`, parsedData, { ex: 60 * 60 * 24 * 365 });
         await kv.set(`status:${orderId}`, { state: 'completed', at: Date.now() }, { ex: 60 * 60 * 24 * 180 });
         console.log("💾 KV 저장 완료: report:" + orderId);
       } catch (e) {
