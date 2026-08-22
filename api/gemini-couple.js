@@ -51,7 +51,7 @@ const { buildBirthIso, dayRangeIso } = require('../lib/time.js');
 
 const KEY_PREFIX = 'couple-report:';
 const LOCK_PREFIX = 'couple-lock:';
-const TTL_DAYS = 60;
+const TTL_DAYS = 365;   // v2: 60일 → 365일. 재방문 손님이 리포트를 잃지 않도록 전 상품 통일.
 
 /* -------------------------------------------------------------------------
    CORS
