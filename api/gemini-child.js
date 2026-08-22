@@ -51,7 +51,7 @@ const RETRY_WAIT_MS = [20000, 45000, 0];
 
 const KEY_PREFIX = 'child-report:';
 const LOCK_PREFIX = 'child-lock:';
-const TTL_DAYS = 60;
+const TTL_DAYS = 365;   // v2: 60일 → 365일. 재방문 손님이 리포트를 잃지 않도록 전 상품 통일.
 
 /* -------------------------------------------------------------------------
    CORS
