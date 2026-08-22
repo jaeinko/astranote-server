@@ -28,6 +28,8 @@ const RETRY_WAIT_MS = [20000, 45000, 0];   // 1·2차 실패 후 대기. 3차는
 /* 🚨 CORS 는 lib/cors.js 화이트리스트 정본 하나만 씁니다.
    예전의 '*' 는 아무 사이트나 우리 Gemini 크레딧을 태울 수 있게 했습니다. */
 const { allowCors } = require('../lib/cors.js');
+const { normalizeDate, normalizeTime, cleanName } = require('../lib/validate.js');
+const { enforceRateLimit } = require('../lib/security.js');
 
 // ── 공용 모듈 ──────────────────────────────────────────────────────────
 //  도시 좌표와 시간대 변환은 lib/ 아래 정본 하나만 씁니다.
@@ -512,6 +514,11 @@ const handler = async (req, res) => {
   if (req.method === 'GET') {
     const orderId = req.query && req.query.orderId;
     if (!orderId) return res.status(400).json({ error: 'orderId 필요' });
+
+    /* 🚨 주문번호는 날짜+연번이라 순서대로 훑을 수 있다.
+       손님 한 명은 폴링을 포함해도 분당 수십 번을 넘지 않는다.
+       그 위를 잘라 "남의 주문번호를 훑는 행위"만 막는다. */
+    if (await enforceRateLimit(req, res, { bucket: 'report-get', limit: 120, windowSec: 60 })) return;
     try {
       const saved = await kv.get(`report:${orderId}`);
       res.setHeader('Cache-Control', 'no-store');
@@ -527,13 +534,21 @@ const handler = async (req, res) => {
          기기를 바꾸거나 브라우저 저장소가 비워진 손님은 전부 재입력 화면으로 튕겼다.
          리포트가 없을 땐 intake 를 함께 내려보내 프론트가 말없이 재생성하게 한다.
          (비밀번호 같은 민감정보가 아니고, 주문번호를 아는 본인만 조회 가능하다) */
-      let intake = null;
-      try { intake = await kv.get(`intake:${orderId}`); } catch (e) {}
+      /* ⚠️ 출생정보(이름·생년월일·태어난 시각)를 응답에 실어 보내면 안 된다.
+         주문번호가 20260802-0000059 처럼 날짜+연번이라 순서대로 찍어보면
+         남의 개인정보를 그대로 긁어갈 수 있다.
+         그래서 "다시 만들 수 있다"는 사실만 boolean 으로 알리고,
+         실제 출생정보는 서버 밖으로 절대 내보내지 않는다.
+         프론트는 주문번호만 POST 하고, 재생성은 서버가 제 KV 를 읽어서 한다. */
+      let hasIntake = false;
+      try {
+        const k = await kv.get(`intake:${orderId}`);
+        hasIntake = !!(k && k.name && k.date && k.time);
+      } catch (e) {}
       return res.status(404).json({
         error: '저장된 리포트 없음',
         state: st ? st.state : 'none',
-        intake: intake || null,
-        canRegenerate: !!(intake && intake.name && intake.date && intake.time)
+        canRegenerate: hasIntake
       });
     } catch (e) {
       return res.status(500).json({ error: 'KV 조회 실패: ' + e.message });
@@ -565,11 +580,44 @@ const handler = async (req, res) => {
   }
 
   try {
-    const { name, date, time, city, myGender, targetGender } = body0;
+    let { name, date, time, city, myGender, targetGender } = body0;
+
+    /* 🚨 주문번호만 들어온 경우 = 손님이 기기를 바꿨거나 저장소가 비워진 경우.
+       출생정보는 결제 직후 서버에 넣어뒀으니 여기서 꺼내 쓴다.
+       손님에게 다시 입력하라고 하지 않고, 개인정보를 브라우저로 내보내지도 않는다. */
+    if ((!name || !date || !time) && orderId) {
+      try {
+        const k = await kv.get(`intake:${orderId}`);
+        if (k && k.name && k.date && k.time) {
+          name = k.name; date = k.date; time = k.time;
+          city = city || k.city;
+          myGender = myGender || k.myGender;
+          targetGender = targetGender || k.targetGender;
+          if (body0.timeUnknown === undefined) body0.timeUnknown = !!k.timeUnknown;
+          console.log('♻️ 서버 보관 출생정보로 재생성:', orderId);
+        }
+      } catch (e) { console.log('⚠️ intake 조회 실패:', e.message); }
+    }
 
     if (!name || !date || !time) {
       return res.status(400).json({ error: '필수 입력값 누락' });
     }
+
+    /* 🚨 2026-08-21 — 달력에 없는 날짜가 그대로 통과하던 구멍.
+       JS 의 Date 는 1990-02-31 을 거부하지 않고 3월 3일로 조용히 넘긴다.
+       그러면 손님은 자기 생일이 아닌 차트를 받고, 그 사실을 아무도 모른다.
+       lib/validate.js 는 이미 있었는데 이 파일만 연결되어 있지 않았다. */
+    const vDate = normalizeDate(date);
+    if (!vDate) return res.status(400).json({ error: '생년월일을 다시 확인해 주세요. 달력에 없는 날짜입니다.' });
+    date = vDate;
+
+    if (!body0.timeUnknown) {
+      const vTime = normalizeTime(time);
+      if (!vTime) return res.status(400).json({ error: '태어난 시각을 다시 확인해 주세요. (예: 14:30)' });
+      time = vTime;
+    }
+    name = cleanName(name, 20);
+    if (!name) return res.status(400).json({ error: '이름을 다시 입력해 주세요.' });
     if (!process.env.GEMINI_API_KEY) {
       return await finishFail(500, '서버 설정 오류(GEMINI)', 'GEMINI_API_KEY 없음');
     }
