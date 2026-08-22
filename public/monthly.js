@@ -709,10 +709,17 @@
 
     if (!DATA) {
       showRetry('입력하신 정보를 불러오지 못했습니다.<br><strong>결제는 정상 완료되었습니다.</strong><br>' +
-                '아래 버튼을 눌러 정보를 다시 입력해 주세요.');
+                '<strong>추가 결제는 없습니다.</strong><br>아래 버튼을 눌러 다시 시도해 주세요.');
       var b = $('mtg-retry-btn');
       if (b) { b.textContent = '정보 다시 입력하기';
-        b.onclick = function () { location.href = '/product/detail.html?product_no=' + NO; }; }
+        /* 🚨 2026-08-21 — 상품 상세페이지는 곧 결제 페이지다.
+             이미 결제한 손님을 그리로 보내면 재결제로 오해하고 그 자리에서 나간다.
+             주문번호를 붙여 결과 페이지를 다시 열어 재시도시킨다. */
+          b.onclick = function () {
+            var oid = (typeof ORDER_ID !== 'undefined' && ORDER_ID) ? ORDER_ID : '';
+            location.href = location.pathname + '?product_no=' + NO +
+              (oid ? '&order_id=' + encodeURIComponent(oid) : '') + '&retry=' + Date.now();
+          }; }
       return;
     }
 
