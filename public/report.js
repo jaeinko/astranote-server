@@ -158,6 +158,26 @@ document.addEventListener('DOMContentLoaded', async function () {
             if (res.ok) {
                 const data = await res.json();
                 if (data && !data.error && bindDataToUI(data)) return;
+            } else {
+                /* 🚨 2026-08-21 — 리포트는 없지만 출생정보(intake)는 서버에 남아 있는 경우.
+                   예전에는 이 경우를 몰라서 손님을 재입력 화면(→ 상품 상세=결제 페이지)으로
+                   튕겼다. 이미 돈을 낸 손님에게 결제창을 다시 보여준 셈이다.
+                   이제는 서버가 보관 중인 출생정보를 그대로 받아 말없이 다시 만든다.
+                   손님은 아무것도 입력할 필요가 없다. */
+                const body = await res.json().catch(function () { return null; });
+                if (body && body.canRegenerate && body.intake) {
+                    const k = body.intake;
+                    ASTRO_USER_DATA = {
+                        name: k.name, date: k.date, time: k.time,
+                        city: k.city || 'Seoul',
+                        myGender: k.myGender || '여성',
+                        targetGender: k.targetGender || '남성',
+                        timeUnknown: !!k.timeUnknown,
+                        orderId: orderId
+                    };
+                    try { localStorage.setItem(USER_KEY, JSON.stringify(ASTRO_USER_DATA)); } catch (e) {}
+                    console.log('♻️ 서버에 보관된 출생정보로 자동 복구');
+                }
             }
         } catch (e) {
             console.warn('KV 조회 실패 → 신규 생성으로 진행:', e);
@@ -185,12 +205,104 @@ function showNoDataScreen() {
     const t = rs.querySelector('.retry-title');
     const d = rs.querySelector('.retry-desc');
     const b = rs.querySelector('.btn-retry');
-    if (t) t.innerText = '리포트 정보를 불러오지 못했어요';
-    if (d) d.innerHTML = '결제는 정상 완료되었으니 안심하세요.<br>보안을 위해 정보가 저장되지 않은 경우가 있어,<br>아래 버튼을 눌러 <strong>정보를 다시 입력</strong>하시면<br>리포트를 바로 받아보실 수 있습니다.';
+    if (t) t.innerText = '출생정보만 다시 확인할게요';
+    if (d) d.innerHTML = '<strong>결제는 정상 완료되었습니다. 추가 결제는 없습니다.</strong><br>' +
+        '보안을 위해 이 기기에 정보가 남지 않은 경우가 있어,<br>아래에 출생정보만 다시 넣어주시면 바로 만들어 드립니다.';
     if (b) {
-        b.innerText = '정보 다시 입력하기';
-        b.onclick = function () { location.href = '/product/detail.html?product_no=9'; };
+        b.innerText = '출생정보 입력하기';
+        b.onclick = showInlineForm;
     }
+}
+
+/* ---------------------------------------------------------------------------
+   🚨 2026-08-21 신설 — 페이지 안에서 끝내는 재입력 폼
+
+   예전 버튼은 '/product/detail.html?product_no=9' 로 보냈다. 그 페이지는
+   입력폼이자 곧 결제 페이지다. 결제를 이미 마친 손님이 결제 화면을 다시 보면
+   "돈을 또 내라는 건가" 하고 그 자리에서 나간다. 실제로 그렇게 나갔다.
+
+   그래서 이 화면에서 출생정보만 받아 바로 생성으로 넘긴다.
+   주문번호는 이미 URL 에 있으므로 결제 과정을 다시 거칠 이유가 없다.
+--------------------------------------------------------------------------- */
+function showInlineForm() {
+    const rs = document.getElementById('retry-screen');
+    if (!rs) return;
+    if (document.getElementById('astro-inline-form')) return;   // 중복 생성 방지
+
+    const b = rs.querySelector('.btn-retry');
+    if (b) b.style.display = 'none';
+
+    const F = 'width:100%;box-sizing:border-box;margin:7px 0;padding:13px 14px;' +
+              'background:#151827;color:#fff;font-size:15px;' +
+              'border:1px solid rgba(201,162,75,.34);border-radius:11px;outline:none;';
+    const L = 'display:block;text-align:left;color:#C9A24B;font-size:12.5px;' +
+              'font-weight:700;margin:13px 0 1px;letter-spacing:-.02em;';
+
+    const box = document.createElement('div');
+    box.id = 'astro-inline-form';
+    box.style.cssText = 'width:100%;max-width:340px;margin:6px auto 0;text-align:left;';
+    box.innerHTML =
+        '<label style="' + L + '">이름</label>' +
+        '<input id="af-name" type="text" placeholder="홍길동" style="' + F + '">' +
+        '<label style="' + L + '">생년월일</label>' +
+        '<input id="af-date" type="date" style="' + F + '">' +
+        '<label style="' + L + '">태어난 시각</label>' +
+        '<input id="af-time" type="time" style="' + F + '">' +
+        '<label style="display:flex;align-items:center;gap:7px;margin:9px 1px 0;' +
+        'color:#8b829e;font-size:13px;cursor:pointer;">' +
+        '<input id="af-unknown" type="checkbox" style="width:16px;height:16px;accent-color:#C9A24B;">' +
+        '태어난 시각을 모릅니다</label>' +
+        '<label style="' + L + '">출생 도시</label>' +
+        '<input id="af-city" type="text" value="Seoul" style="' + F + '">' +
+        '<label style="' + L + '">내 성별</label>' +
+        '<select id="af-mine" style="' + F + '"><option>여성</option><option>남성</option></select>' +
+        '<label style="' + L + '">알고 싶은 배우자 성별</label>' +
+        '<select id="af-target" style="' + F + '"><option>남성</option><option>여성</option></select>' +
+        '<div id="af-msg" style="color:#E8654F;font-size:13px;min-height:18px;' +
+        'margin:9px 2px 0;text-align:center;"></div>' +
+        '<button id="af-go" style="width:100%;margin-top:8px;padding:15px;border:none;' +
+        'border-radius:12px;font-size:16px;font-weight:800;color:#0A0C16;cursor:pointer;' +
+        'background:linear-gradient(90deg,#E7CE8E,#C9A24B);">리포트 만들기</button>' +
+        '<div style="color:#6f6880;font-size:11.5px;text-align:center;margin-top:11px;' +
+        'line-height:1.6;">이미 결제가 끝난 주문입니다. 추가 비용은 청구되지 않습니다.</div>';
+    rs.appendChild(box);
+
+    /* 시각 모름을 체크하면 시각 칸을 잠근다.
+       "출생시간 미확인 시 기본값을 넣지 않는다"는 약속을 화면에서도 지킨다. */
+    const unk = document.getElementById('af-unknown');
+    const tEl = document.getElementById('af-time');
+    unk.onchange = function () {
+        tEl.disabled = unk.checked;
+        tEl.style.opacity = unk.checked ? '.4' : '1';
+    };
+
+    document.getElementById('af-go').onclick = function () {
+        const msg = document.getElementById('af-msg');
+        const name = (document.getElementById('af-name').value || '').trim();
+        const date = document.getElementById('af-date').value;
+        const unknown = unk.checked;
+        const time = unknown ? '12:00' : tEl.value;
+
+        if (!name)            { msg.innerText = '이름을 입력해 주세요.'; return; }
+        if (!date)            { msg.innerText = '생년월일을 입력해 주세요.'; return; }
+        if (!unknown && !time) { msg.innerText = '태어난 시각을 입력하거나 "모릅니다"를 선택해 주세요.'; return; }
+
+        ASTRO_USER_DATA = {
+            name: name, date: date, time: time,
+            city: (document.getElementById('af-city').value || 'Seoul').trim(),
+            myGender: document.getElementById('af-mine').value,
+            targetGender: document.getElementById('af-target').value,
+            timeUnknown: unknown,
+            orderId: getOrderId() || undefined
+        };
+        try { localStorage.setItem(USER_KEY, JSON.stringify(ASTRO_USER_DATA)); } catch (e) {}
+
+        rs.style.display = 'none';
+        const loader = document.getElementById('data-loading');
+        if (loader) { loader.style.display = 'flex'; loader.style.opacity = '1'; }
+        startLoadingMessages();
+        runAnalysis();
+    };
 }
 
 /* ---------------------------------------------------------------------------
