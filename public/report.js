@@ -468,6 +468,27 @@ function bindDataToUI(data) {
 
     stopTimers();
 
+    /* ══════════════════════════════════════════════════════════════
+       🚨 2026-08-26 — 빈 리포트를 화면에 그리지 않는다
+
+       서버가 빈 원고를 내보낸 사고가 있었다. 서버는 고쳤지만,
+       그 사고로 이미 KV 에 저장된 빈 리포트가 남아 있다.
+       그걸 그대로 그리면 손님은 "데이터가 부족합니다"만 계속 보게 된다.
+
+       여기서 걸러내면 아래 신규 생성 흐름으로 넘어가 다시 만들어진다.
+       손님 입장에서는 잠깐 더 기다리는 것뿐이고, 결과물이 나온다. */
+    try {
+        const MUST = ['card2_analysis','card3_appearance','card4_career',
+                      'card5_timing','card6_chemistry','card7_destiny_guide'];
+        const textLen = function (v) { return String(v || '').replace(/<[^>]+>/g, '').trim().length; };
+        const emptyCards = MUST.filter(function (k) { return textLen(data[k]) < 150; });
+        if (emptyCards.length > 0) {
+            console.warn('⚠️ 빈 리포트 감지 → 렌더 거부, 재생성으로 넘김:', emptyCards.join(', '));
+            try { localStorage.removeItem(REPORT_KEY); } catch (e) {}   // 빈 저장본도 지운다
+            return false;
+        }
+    } catch (e) { /* 검사 자체가 실패하면 원래대로 진행 */ }
+
     try {
         const userName = resolveUserName(data);
 
