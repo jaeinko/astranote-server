@@ -707,7 +707,38 @@
     rendered = false; polls = 0;
     startLoading();
 
-    if (!DATA) {
+    /* ══════════════════════════════════════════════════════════════
+       🚨 2026-08-26 — 실제 고객 문의로 잡은 버그
+
+       "배우자리포트는 뜨는데 이번달 운세가 안떠요 계속"
+
+       원인: 이 기기에 출생정보(DATA)가 없으면 여기서 곧바로 재입력 화면을
+       띄우고 끝냈다. 서버에 리포트가 멀쩡히 저장돼 있어도 물어보지 않았다.
+       배우자·양육·궁합은 저장본을 먼저 확인하는데 30일 운세만 빠져 있었다.
+       그래서 같은 손님이 배우자는 보고 이번달 운세만 못 보는 상황이 났다.
+
+       손님은 결제 후 기기를 바꾸거나, 쿠키(24시간)가 만료되거나,
+       다른 상품을 사면서 저장값이 덮이면 언제든 이 상태가 된다.
+       이제 재입력을 요구하기 전에 서버 저장본부터 확인한다.
+       ══════════════════════════════════════════════════════════════ */
+    if (!DATA && ORDER_ID && !isRetry) {
+      fetch(API + '?orderId=' + encodeURIComponent(ORDER_ID), { cache: 'no-store' })
+        .then(function (r) { return r.json().catch(function () { return null; }); })
+        .then(function (d) {
+          if (d && !d.error && render(d)) return;   // 저장본으로 복구 성공
+          noDataScreen();                            // 정말 없을 때만 재입력 요청
+        })
+        .catch(function () { noDataScreen(); });
+      return;
+    }
+
+    if (!DATA) { noDataScreen(); return; }
+
+    startBody(isRetry);
+  }
+
+  /* 출생정보도 없고 서버 저장본도 없을 때만 뜨는 화면 */
+  function noDataScreen() {
       showRetry('입력하신 정보를 불러오지 못했습니다.<br><strong>결제는 정상 완료되었습니다.</strong><br>' +
                 '<strong>추가 결제는 없습니다.</strong><br>아래 버튼을 눌러 다시 시도해 주세요.');
       var b = $('mtg-retry-btn');
@@ -720,9 +751,10 @@
             location.href = location.pathname + '?product_no=' + NO +
               (oid ? '&order_id=' + encodeURIComponent(oid) : '') + '&retry=' + Date.now();
           }; }
-      return;
-    }
+  }
 
+  /* 출생정보가 있을 때의 원래 흐름 */
+  function startBody(isRetry) {
     /* 저장본 먼저 확인. 기간이 지났으면 서버가 stale 로 알려주고 다시 만듭니다. */
     var pre = (!isRetry && ORDER_ID)
       ? fetch(API + '?orderId=' + encodeURIComponent(ORDER_ID), { cache: 'no-store' })
