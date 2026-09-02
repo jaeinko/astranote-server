@@ -520,12 +520,26 @@ const handler = async (req, res) => {
        그 위를 잘라 "남의 주문번호를 훑는 행위"만 막는다. */
     if (await enforceRateLimit(req, res, { bucket: 'report-get', limit: 120, windowSec: 60 })) return;
     try {
-      const saved = await kv.get(`report:${orderId}`);
+      /* ══════════════════════════════════════════════════════════════
+         ⚡ 2026-09-02 — 응답 992ms 문제
+
+         KV 를 하나씩 순서대로 물어보고 있었다. 조회 한 번에
+             report → status → intake
+         세 번을 줄줄이 기다렸고, 여기에 레이트리밋 2회가 더해져
+         왕복 5번이 순차로 쌓였다(실측 각 150~330ms).
+
+         셋은 서로 결과를 참조하지 않는다. 한꺼번에 물어보면 된다.
+         왕복 3번이 1번으로 줄어 300ms 이상 빨라진다.
+         폴링은 손님 한 명당 수십 번 반복되므로 체감 차이가 크다. */
+      const [saved, st, intakeRec] = await Promise.all([
+        kv.get(`report:${orderId}`),
+        kv.get(`status:${orderId}`).catch(function () { return null; }),
+        kv.get(`intake:${orderId}`).catch(function () { return null; })
+      ]);
       res.setHeader('Cache-Control', 'no-store');
       if (saved) return res.status(200).json(saved);
       /* 프론트가 폴링할 때 "아직 만드는 중"과 "정말 없음"을 구분해야
          손님에게 실패 화면을 성급하게 띄우지 않는다. */
-      const st = await kv.get(`status:${orderId}`);
       if (st && st.state === 'pending') {
         return res.status(202).json({ status: 'pending' });
       }
@@ -540,11 +554,7 @@ const handler = async (req, res) => {
          그래서 "다시 만들 수 있다"는 사실만 boolean 으로 알리고,
          실제 출생정보는 서버 밖으로 절대 내보내지 않는다.
          프론트는 주문번호만 POST 하고, 재생성은 서버가 제 KV 를 읽어서 한다. */
-      let hasIntake = false;
-      try {
-        const k = await kv.get(`intake:${orderId}`);
-        hasIntake = !!(k && k.name && k.date && k.time);
-      } catch (e) {}
+      const hasIntake = !!(intakeRec && intakeRec.name && intakeRec.date && intakeRec.time);
       return res.status(404).json({
         error: '저장된 리포트 없음',
         state: st ? st.state : 'none',
@@ -571,7 +581,7 @@ const handler = async (req, res) => {
       try {
         await kv.set(`status:${orderId}`,
           { state: 'failed', error: String(detail || message).slice(0, 400), at: Date.now() },
-          { ex: 60 * 60 * 24 * 30 });
+          { ex: 60 * 60 * 24 * 365 });   // v2: 30일 → 365일. 리포트·출생정보와 보관기간을 맞춘다.
       } catch (e) {}
       if (lockKey) { try { await kv.del(lockKey); } catch (e) {} }
     }
@@ -997,6 +1007,37 @@ ${astrologyDataText}
       return await finishFail(500, '리포트 생성이 지연되고 있습니다. 잠시 후 다시 열어주세요.', lastErr);
     }
 
+    /* ══════════════════════════════════════════════════════════════════
+       🚨 2026-08-26 최후 방어선 — 실제 사고로 추가
+
+       손님이 "데이터가 부족합니다"만 가득한 리포트를 받았다.
+       원인은 위 재시도 루프의 이 줄이다.
+
+           if (bad) console.warn('마지막 시도라 그대로 채택');
+
+       분량이 조금 모자란 원고를 살리려고 만든 관용 규칙인데,
+       내용이 아예 빈 원고까지 통과시켰다.
+       그리고 아래 if (!parsedData) 는 빈 객체({})도 truthy 라 못 잡는다.
+       결과: 빈 리포트가 KV 에 저장되고 손님 화면에 그대로 떴다.
+
+       분량이 조금 모자란 것과 내용이 없는 것은 완전히 다른 문제다.
+       "조금 모자람"은 관용하되, "사실상 비어 있음"은 절대 내보내지 않는다.
+       손님에게는 빈 리포트보다 "잠시 후 다시 열어주세요"가 훨씬 낫다.
+       (finishFail 이 status 를 남기므로 다시 열면 재생성된다)
+       ══════════════════════════════════════════════════════════════════ */
+    const MUST_FIELDS = ['card2_analysis','card3_appearance','card4_career',
+                         'card5_timing','card6_chemistry','card7_destiny_guide'];
+    const HARD_MIN = 150;   // 이 밑이면 문단 하나도 안 되는 분량이다
+    const emptyFields = MUST_FIELDS.filter(function (k) {
+      return strip(parsedData[k]).length < HARD_MIN;
+    });
+    if (emptyFields.length > 0) {
+      console.error('🚨 빈 리포트 방출 차단 —', emptyFields.join(', '));
+      return await finishFail(500,
+        '리포트 생성이 지연되고 있습니다. 잠시 후 다시 열어주세요.',
+        '빈 카드: ' + emptyFields.join(', '));
+    }
+
     /* ── 서버가 만든 사실 자료를 응답에 붙인다 ──
        AI 가 손대지 않으므로 지어낼 수 없다. VVIP 와 같은 장치다. */
     try {
@@ -1018,7 +1059,7 @@ ${astrologyDataText}
         /* v2: 180일 → 365일. VVIP(365일)와 통일.
            "오랜만에 들어갔더니 리포트가 사라졌다"는 문의를 막는다. */
         await kv.set(`report:${orderId}`, parsedData, { ex: 60 * 60 * 24 * 365 });
-        await kv.set(`status:${orderId}`, { state: 'completed', at: Date.now() }, { ex: 60 * 60 * 24 * 180 });
+        await kv.set(`status:${orderId}`, { state: 'completed', at: Date.now() }, { ex: 60 * 60 * 24 * 365 });
         console.log("💾 KV 저장 완료: report:" + orderId);
       } catch (e) {
         console.log("⚠️ KV 저장 실패(리포트 전송은 정상 진행):", e.message);
