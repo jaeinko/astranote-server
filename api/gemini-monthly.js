@@ -62,7 +62,8 @@ const { allowCors } = require('../lib/cors.js');
 const { normalizeDate, normalizeTime, cleanName } = require('../lib/validate.js');
 
 const KEY = oid => 'monthly:' + oid;
-const TTL = 60 * 60 * 24 * 60;      // 60일
+const TTL = 60 * 60 * 24 * 365;     // v2: 60일 → 365일. 전 상품 통일.
+                                    // 운세 내용은 그 달 것이지만, 손님이 나중에 다시 꺼내 보는 것은 막을 이유가 없다.
 
 /* ── 출생차트 요약 (AI 가 읽을 재료) ───────────────────────── */
 function natalDigest(natal, ascLon) {
