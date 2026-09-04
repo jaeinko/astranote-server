@@ -435,6 +435,95 @@
     var sb = $('mtg-save-btn');  if (sb) sb.onclick = save;
   }
 
+  /* ═══════════════════════════════════════════════════════════════════
+     🚨 2026-09-03 신설 — 페이지 안에서 끝내는 출생정보 입력
+
+     [무엇이 문제였나]
+     버튼에 "정보 다시 입력하기"라고 적어 놓고, 정작 정보를 넣을 칸을
+     어디에도 만들어 주지 않았다. 눌러도 같은 화면이 다시 뜰 뿐이었다.
+
+         결과화면 → 정보 없음 → "다시 입력하기" → 같은 화면 → 무한 반복
+
+     배우자 리포트에는 이 폼을 만들어 줬는데 30일 운세에는 빠뜨렸다.
+     실제로 손님 한 분이 여기 갇혀 있었다.
+
+     [주의]
+     · 이미 결제가 끝난 주문이다. 결제 페이지로 절대 보내지 않는다.
+     · 시각을 모르면 비워 보낸다. 여기서 12:00 같은 값을 넣으면
+       서버가 그걸 진짜 출생시각으로 믿는다. 절대 금지.
+     ═══════════════════════════════════════════════════════════════════ */
+  function showInlineForm() {
+    var host = $('mtg-retry');
+    if (!host || document.getElementById('mtg-form')) return;
+
+    var rb = $('mtg-retry-btn'); if (rb) rb.style.display = 'none';
+
+    var F = 'width:100%;box-sizing:border-box;margin:7px 0;padding:13px 14px;' +
+            'background:#151827;color:#fff;font-size:15px;' +
+            'border:1px solid rgba(201,162,75,.34);border-radius:11px;outline:none;';
+    var L = 'display:block;text-align:left;color:#C9A24B;font-size:12.5px;' +
+            'font-weight:700;margin:13px 0 1px;letter-spacing:-.02em;';
+
+    var box = document.createElement('div');
+    box.id = 'mtg-form';
+    box.style.cssText = 'width:100%;max-width:340px;margin:6px auto 0;text-align:left;';
+    box.innerHTML =
+      '<label style="' + L + '">이름</label>' +
+      '<input id="mf-name" type="text" placeholder="홍길동" style="' + F + '">' +
+      '<label style="' + L + '">생년월일 (양력)</label>' +
+      '<input id="mf-date" type="date" style="' + F + '">' +
+      '<label style="' + L + '">태어난 시각</label>' +
+      '<input id="mf-time" type="time" style="' + F + '">' +
+      '<label style="display:flex;align-items:center;gap:7px;margin:9px 1px 0;' +
+      'color:#8b829e;font-size:13px;cursor:pointer;">' +
+      '<input id="mf-unknown" type="checkbox" style="width:16px;height:16px;accent-color:#C9A24B;">' +
+      '태어난 시각을 모릅니다</label>' +
+      '<label style="' + L + '">태어난 도시</label>' +
+      '<input id="mf-city" type="text" value="Seoul" style="' + F + '">' +
+      '<label style="' + L + '">성별</label>' +
+      '<select id="mf-gender" style="' + F + '"><option>여성</option><option>남성</option></select>' +
+      '<div id="mf-msg" style="color:#E8654F;font-size:13px;min-height:18px;' +
+      'margin:9px 2px 0;text-align:center;"></div>' +
+      '<button id="mf-go" style="width:100%;margin-top:8px;padding:15px;border:none;' +
+      'border-radius:12px;font-size:16px;font-weight:800;color:#0A0C16;cursor:pointer;' +
+      'background:linear-gradient(90deg,#E7CE8E,#C9A24B);">이번 달 운세 만들기</button>' +
+      '<div style="color:#6f6880;font-size:11.5px;text-align:center;margin-top:11px;' +
+      'line-height:1.6;">이미 결제가 끝난 주문입니다. 추가 비용은 청구되지 않습니다.</div>';
+    host.appendChild(box);
+
+    /* 시각 모름을 체크하면 시각 칸을 잠근다.
+       "모르는 건 추측해서 채우지 않는다"는 약속을 화면에서도 지킨다. */
+    var unk = document.getElementById('mf-unknown');
+    var tEl = document.getElementById('mf-time');
+    unk.onchange = function () {
+      tEl.disabled = unk.checked;
+      tEl.style.opacity = unk.checked ? '.4' : '1';
+    };
+
+    document.getElementById('mf-go').onclick = function () {
+      var msg = document.getElementById('mf-msg');
+      var name = (document.getElementById('mf-name').value || '').trim();
+      var date = document.getElementById('mf-date').value;
+      var unknown = unk.checked;
+      var time = unknown ? '' : tEl.value;
+
+      if (!name) { msg.innerText = '이름을 입력해 주세요.'; return; }
+      if (!date) { msg.innerText = '생년월일을 입력해 주세요.'; return; }
+      if (!unknown && !time) { msg.innerText = '태어난 시각을 넣거나 "모릅니다"를 선택해 주세요.'; return; }
+
+      DATA = {
+        name: name, date: date, time: time, timeUnknown: unknown,
+        city: (document.getElementById('mf-city').value || 'Seoul').trim(),
+        myGender: document.getElementById('mf-gender').value,
+        productNo: NO, savedAt: Date.now()
+      };
+      try { localStorage.setItem(DATA_KEY, JSON.stringify(DATA)); } catch (e) {}
+
+      hideRetry();
+      startBody(true);
+    };
+  }
+
   var stepT = null, progT = null, t0 = 0;
 
   function startLoading() {
@@ -742,6 +831,10 @@
       showRetry('입력하신 정보를 불러오지 못했습니다.<br><strong>결제는 정상 완료되었습니다.</strong><br>' +
                 '<strong>추가 결제는 없습니다.</strong><br>아래 버튼을 눌러 다시 시도해 주세요.');
       var b = $('mtg-retry-btn');
+      if (b) { b.textContent = '출생정보 입력하기';
+        b.onclick = showInlineForm;
+        return;
+      }
       if (b) { b.textContent = '정보 다시 입력하기';
         /* 🚨 2026-08-21 — 상품 상세페이지는 곧 결제 페이지다.
              이미 결제한 손님을 그리로 보내면 재결제로 오해하고 그 자리에서 나간다.
