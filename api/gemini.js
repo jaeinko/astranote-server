@@ -1,4 +1,27 @@
 // ✅ @google/generative-ai SDK 완전 제거 → fetch 직접 호출로 패키지 버전 문제 원천 차단
+//
+// ════════════════════════════════════════════════════════════════════════════
+//  v3 (2026-09-14) 변경 요약 — 왜 고쳤는지 기록
+// ────────────────────────────────────────────────────────────────────────────
+//  [치명] card3 이 존재하지 않는 [👤 배우자 외모] 블록을 참조하고 있었다.
+//         lib/appearance.js 를 연결하지 않은 채 프롬프트만 바뀌어 있어서,
+//         모델은 없는 블록을 찾다가 외모를 전부 지어냈다. → 실제 연결.
+//  [치명] 프롬프트 본문 ■3("외모 지어내지 마라, 인상과 태도로")과
+//         출력 JSON card3("사진 보듯 단정하라")이 정면으로 충돌했다.
+//         모델은 그 사이에서 어중간한 글을 썼다. → 한쪽으로 통일.
+//  [치명] timeUnknown 손님이 400 으로 튕겼다. 빈 시각을 필수값 검사가 막는데
+//         정오를 넣어주는 코드가 없었다. → 정오 기본값.
+//  [치명] PAIR_MEANING 의 명왕성·천왕성·해왕성 항목은 PLANET_KR 에 없어
+//         영원히 안 잡히는 죽은 코드였다. 그런데 프롬프트 팩폭 예시에는
+//         그 배치가 들어 있었다 = 모델에게 없는 걸 지어내라고 시킨 셈. → 제거.
+//  [버그] 프롬프트 JSON 의 card3 뒤 쉼표 누락. 깨진 형식을 모델이 따라 한다.
+//  [버그] 목성 테이블이 2026-08 부터라 이미 지난 달이 미래 시기로 나갔다. → 클리핑.
+//  [개선] 재생성 시 실패 사유를 모델에게 돌려준다(couple.js 의 correction 장치).
+//         없으면 같은 프롬프트로 같은 실패를 세 번 반복한다.
+//  [개선] POST 레이트리밋 추가. 돈이 나가는 쪽은 GET 이 아니라 POST 다.
+//  [개선] 과거 목성 트랜짓 스캔 추가 — 지난 일을 먼저 맞혀야 미래가 믿긴다.
+//  [개선] 강조 남용 게이트 기준을 프롬프트 지시(2~3개)와 일치시킴.
+// ════════════════════════════════════════════════════════════════════════════
 
 const { kv } = require('@vercel/kv');
 
@@ -24,7 +47,6 @@ const { kv } = require('@vercel/kv');
    함수 제한 300초 안에 들어온다. */
 const RETRY_WAIT_MS = [20000, 45000, 0];   // 1·2차 실패 후 대기. 3차는 마지막이라 0.
 
-
 /* 🚨 CORS 는 lib/cors.js 화이트리스트 정본 하나만 씁니다.
    예전의 '*' 는 아무 사이트나 우리 Gemini 크레딧을 태울 수 있게 했습니다. */
 const { allowCors } = require('../lib/cors.js');
@@ -47,16 +69,27 @@ const CH = require('../lib/chart.js');
 //    자체 계산(Swiss Ephemeris 대비 오차 1.7분 검증)을 대체 경로로 둡니다.
 const EPH = require('../lib/ephemeris.js');
 
-
-
-
-
+/* 🚨 외모 재료 생성기.
+   이 파일이 없어도 리포트 자체는 나가야 하므로 실패를 삼킨다.
+   (배포 순서가 어긋나 lib 가 아직 안 올라간 상황에서 전체가 500 나면 안 된다) */
+let buildAppearanceSignature = null;
+try {
+  buildAppearanceSignature = require('../lib/appearance.js').buildAppearanceSignature;
+} catch (e) {
+  console.warn('⚠️ lib/appearance.js 없음 → card3 은 인상·태도 위주로만 생성됩니다');
+}
 
 // ===== 🔬 차트 정밀 다이제스트 =====
 // Prokerala의 베딕(사이더리얼) 좌표를 서양 점성술(트로피컬)로 보정하고,
 // AI가 바로 이해할 수 있는 한국어 요약으로 변환합니다. 이게 리포트 품질의 핵심입니다.
 const SIGNS_KR = ['양자리','황소자리','쌍둥이자리','게자리','사자자리','처녀자리','천칭자리','전갈자리','사수자리','염소자리','물병자리','물고기자리'];
 const PLANET_KR = { Sun:'태양', Moon:'달', Mercury:'수성', Venus:'금성', Mars:'화성', Jupiter:'목성', Saturn:'토성', Ascendant:'상승점' };
+
+/* 🚨 이 목록 밖의 행성은 차트에 존재하지 않는다.
+   천왕성·해왕성·명왕성을 해석 재료나 프롬프트 예시에 넣으면,
+   계산은 절대 안 잡히는데 모델은 그 배치가 있는 줄 알고 지어낸다.
+   v2 까지 PAIR_MEANING 13개 중 4개가 이 죽은 항목이었다. */
+const AVAILABLE_BODIES = ['태양','달','수성','금성','화성','목성','토성','상승점','천정'];
 
 function lahiriAyanamsa(dateTimeIso) {
   const d = new Date(dateTimeIso);
@@ -67,6 +100,7 @@ function signDeg(lon) {
   const l = ((lon % 360) + 360) % 360;
   return { sign: SIGNS_KR[Math.floor(l / 30)], deg: (l % 30).toFixed(1), abs: l };
 }
+
 /* 🚨 v2.1 (2026-08-04) — 전역변수 → 요청별 컨텍스트
    ------------------------------------------------------------------
    원래 CHART_SNAPSHOT · STRONGEST_MARRIAGE_YEAR 가 모듈 전역이었다.
@@ -82,13 +116,16 @@ function signDeg(lon) {
 
 /* ── 각도(어스펙트) 계산 ────────────────────────────────────────
    "오차 0.3도로 맺혀 있습니다" 같은 근거를 쓰려면 이게 있어야 한다.
-   이게 없으면 AI 는 별자리 일반론밖에 못 쓴다. */
+   이게 없으면 AI 는 별자리 일반론밖에 못 쓴다.
+   🚨 v3: 예전엔 이 상수가 모듈과 buildChartDigest 안에 두 벌 있었다.
+      오브가 서로 달라서 같은 차트에서 다른 각도 목록 두 개가 프롬프트에 들어갔다.
+      한 벌로 합친다. */
 const ASPECTS = [
-  { ang: 0,   name: '합',   orb: 7 },
-  { ang: 60,  name: '육각', orb: 4 },
-  { ang: 90,  name: '사각', orb: 6 },
-  { ang: 120, name: '삼각', orb: 6 },
-  { ang: 180, name: '대립', orb: 7 }
+  { ang: 0,   name: '합',   orb: 7, tone: '융합' },
+  { ang: 60,  name: '육각', orb: 4, tone: '조화' },
+  { ang: 90,  name: '사각', orb: 6, tone: '긴장' },
+  { ang: 120, name: '삼각', orb: 6, tone: '조화' },
+  { ang: 180, name: '대립', orb: 7, tone: '긴장' }
 ];
 const ASPECT_TONE = { '합': '겹침', '육각': '순풍', '삼각': '순풍', '사각': '마찰', '대립': '팽팽함' };
 
@@ -98,17 +135,16 @@ function sep360(a, b) {
 }
 
 function buildAspects(planets) {
-  const keys = ['태양','달','수성','금성','화성','목성','토성','상승점','천정'];
   const out = [];
-  for (let i = 0; i < keys.length; i++) {
-    for (let j = i + 1; j < keys.length; j++) {
-      const a = keys[i], b = keys[j];
+  for (let i = 0; i < AVAILABLE_BODIES.length; i++) {
+    for (let j = i + 1; j < AVAILABLE_BODIES.length; j++) {
+      const a = AVAILABLE_BODIES[i], b = AVAILABLE_BODIES[j];
       if (!planets[a] || !planets[b]) continue;
       const d = sep360(planets[a].abs, planets[b].abs);
       for (const A of ASPECTS) {
         const err = Math.abs(d - A.ang);
         if (err > A.orb) continue;
-        out.push({ a: a, b: b, name: A.name, err: err, tone: ASPECT_TONE[A.name] });
+        out.push({ a: a, b: b, name: A.name, err: err, tone: ASPECT_TONE[A.name], mood: A.tone });
         break;
       }
     }
@@ -210,6 +246,165 @@ function localPlanetList(dateTimeIso) {
   return out;
 }
 
+/* ── 실제로 계산 가능한 조합만 남긴 각도 의미표 ───────────────────────
+   🚨 천왕성·해왕성·명왕성 항목을 전부 들어냈다.
+      PLANET_KR 에 없으므로 영원히 안 잡히는데, 표에 남겨두면
+      "이런 팩폭을 써라"는 예시로 프롬프트에 흘러들어가 모델이 지어낸다. */
+const PAIR_MEANING = {
+  '태양-달':    { 조화:'겉과 속이 일치해 자기 자신과 사이가 좋다', 긴장:'하고 싶은 것과 마음이 원하는 것이 자주 어긋나 스스로 갈등한다', 융합:'자기 감정과 의지가 한 덩어리라 몰입이 강하다' },
+  '태양-토성':  { 조화:'어릴 때부터 책임감이 몸에 배어 신뢰를 얻는다', 긴장:'늘 부족하다고 느끼며 스스로를 몰아붙인다. 인정받는 데 목마르다', 융합:'일찍 어른이 된 사람. 무겁지만 단단하다' },
+  '달-토성':    { 조화:'감정을 절제할 줄 아는 어른스러움', 긴장:'감정을 드러내면 안 된다고 배워 혼자 삼킨다. 외로움의 뿌리', 융합:'정서적으로 일찍 독립했지만 그만큼 결핍이 있다' },
+  '금성-토성':  { 조화:'오래가는 진중한 사랑을 만든다', 긴장:'사랑에 조건을 붙이거나 마음을 늦게 연다. 애정 결핍의 흔적', 융합:'가볍게 사랑하지 못하는 사람. 늦지만 깊다' },
+  '화성-토성':  { 조화:'끈질기게 밀어붙여 결과를 낸다', 긴장:'하고 싶은데 브레이크가 걸린다. 참다가 한 번에 터진다', 융합:'욕망을 억누르며 사는 사람' },
+  '수성-토성':  { 조화:'깊이 있게 사고하고 신중하게 말한다', 긴장:'말하기 전에 재고 또 재느라 표현이 늦다', 융합:'생각이 무겁고 진지하다' },
+  '태양-목성':  { 조화:'운이 따르고 사람이 모인다', 긴장:'자신감이 과해 일을 크게 벌인다', 융합:'스케일이 큰 사람' },
+  '달-금성':    { 조화:'정서적으로 따뜻하고 사랑스러운 기질', 긴장:'애정 욕구와 감정 사이에서 흔들린다', 융합:'사랑받고 싶은 마음이 크다' },
+  '금성-화성':  { 조화:'좋아하는 마음과 다가가는 행동이 어긋나지 않는다', 긴장:'끌리는 사람과 편한 사람이 따로 논다. 그래서 늘 둘 중 하나를 포기해왔다', 융합:'좋아하면 바로 움직인다. 밀어붙이다 놓친 적도 있다' },
+  '달-화성':    { 조화:'감정이 곧 행동이라 솔직하다', 긴장:'서운하면 말 대신 날이 먼저 선다. 싸우고 나서 후회하는 쪽', 융합:'감정의 온도가 높고 반응이 빠르다' },
+  '금성-목성':  { 조화:'사람 복이 있고 애정에 여유가 있다', 긴장:'상대에게 기대를 크게 걸었다가 실망한다', 융합:'사랑에 후하다. 주는 걸 아끼지 않는다' },
+  '수성-화성':  { 조화:'말이 빠르고 정확해 설득력이 있다', 긴장:'말이 먼저 나가 상처를 준다. 이기고 나서 관계를 잃는다', 융합:'논쟁을 즐기는 편이다' },
+  '달-상승점':  { 조화:'느끼는 그대로가 겉으로 드러나 편안하다', 긴장:'속마음과 보이는 태도가 달라 오해를 산다', 융합:'감정이 얼굴에 다 뜬다' },
+  '금성-상승점':{ 조화:'첫인상에서 호감을 얻는다', 긴장:'꾸미는 것과 편한 것 사이에서 늘 갈등한다', 융합:'외모와 분위기에 신경 쓰는 사람' },
+  '토성-상승점':{ 조화:'믿음직해 보이는 인상', 긴장:'실제보다 차갑고 어렵게 보여 다가오는 사람을 놓친다', 융합:'나이보다 성숙해 보인다' }
+};
+
+/* ── 🪐 목성 트랜짓 표 (2026.08 ~ 2034.12, 매달) ───────────────────────
+   사람마다 배우자궁을 지나는 진짜 시기가 다르도록 실제 천문 계산값을 저장해두고 조회한다.
+   이렇게 해야 모든 손님의 만남 시기가 2026~2028로 획일화되는 문제가 사라진다. */
+const JUPITER_TABLE_START = { year: 2026, month: 8 };
+const JUPITER_LON_TABLE = [126.96,133.7,139.59,144.32,146.79,146.44,143.35,139.75,137.23,137.49,140.41,145.13,151.2,157.84,164.27,170.28,174.81,177.31,176.9,174.08,170.18,167.79,168.03,170.79,175.57,181.59,187.99,194.6,200.38,204.96,207.28,206.89,203.95,200.22,197.76,197.94,200.73,205.53,211.39,218.07,224.54,230.57,235.17,237.39,237.11,234.33,230.5,228.06,228.19,231.01,235.72,241.9,248.52,255.37,261.56,265.92,268.66,268.61,265.9,262.17,259.5,259.53,262.23,267.17,273.31,280.36,287.44,293.49,298.64,301.6,301.9,299.51,295.63,292.76,292.59,295.31,300.16,306.66,313.91,320.52,327.3,332.71,336.34,337.28,335.32,331.47,328.28,327.59,329.89,334.74,341.23,347.82,355.28,2.1,8.1,12.22,13.94,12.61,9.06,5.35,4.03];
+
+function angleDiff(a, b) {
+  let d = Math.abs(a - b) % 360;
+  return d > 180 ? 360 - d : d;
+}
+
+/* 표의 인덱스 → '2029년 3월' */
+function tableYM(i) {
+  const y = JUPITER_TABLE_START.year + Math.floor((JUPITER_TABLE_START.month - 1 + i) / 12);
+  const m = ((JUPITER_TABLE_START.month - 1 + i) % 12) + 1;
+  return { y: y, m: m };
+}
+
+/* 🚨 v3: 오늘이 표 시작(2026-08)보다 뒤라면 이미 지난 칸이 생긴다.
+   그대로 두면 "2026년 8월~10월에 만납니다" 같은 과거 시기가 나간다.
+   오늘 이후만 보도록 시작 인덱스를 잘라낸다. */
+function currentTableIndex() {
+  const n = new Date();
+  const i = (n.getFullYear() - JUPITER_TABLE_START.year) * 12 +
+            (n.getMonth() + 1 - JUPITER_TABLE_START.month);
+  return Math.max(0, i);
+}
+
+function findJupiterTransitWindows(targetDeg, ctx) {
+  const aspects = [
+    { name: '합 · 강력', angle: 0, orb: 6, weight: 3 },
+    { name: '삼각 · 우호적', angle: 120, orb: 5, weight: 2 },
+    { name: '삼각 · 우호적', angle: 240, orb: 5, weight: 2 },
+    { name: '육각 · 기회', angle: 60, orb: 4, weight: 1 },
+    { name: '육각 · 기회', angle: 300, orb: 4, weight: 1 }
+  ];
+
+  const FROM = currentTableIndex();
+  const all = [];
+  for (const asp of aspects) {
+    let inWindow = false;
+    let windowStart = null;
+    for (let i = FROM; i < JUPITER_LON_TABLE.length; i++) {
+      const diff = angleDiff(JUPITER_LON_TABLE[i], (targetDeg + asp.angle) % 360);
+      const within = diff <= asp.orb;
+      if (within && !inWindow) { inWindow = true; windowStart = i; }
+      if (!within && inWindow) {
+        inWindow = false;
+        all.push({ start: windowStart, end: i - 1, name: asp.name, weight: asp.weight });
+      }
+    }
+    if (inWindow) {
+      all.push({ start: windowStart, end: JUPITER_LON_TABLE.length - 1, name: asp.name, weight: asp.weight });
+    }
+  }
+
+  if (all.length === 0) return null;
+
+  all.sort(function (a, b) { return a.start - b.start; });
+
+  /* 🚨 v2 (2026-08-04) — '가장 강력한 결혼 적기' 산출
+     기존에는 weight(합3·삼각2·육각1)를 계산해놓고 버렸다.
+     전체 창 중 최강(합>삼각>육각, 동률이면 더 가까운 미래)을 먼저 확정하고,
+     시간순 상위 3개에 없으면 마지막 자리를 밀어내고 강제 포함한다.
+     (예: 삼각 2028·2028, 육각 2030, 합 2032 → 합이 잘려나가 차상위에 ★가 붙던 결함 수정) */
+  let strongest = all[0];
+  for (let i = 1; i < all.length; i++) {
+    if (all[i].weight > strongest.weight) strongest = all[i];
+  }
+  let top = all.slice(0, 3);
+  if (top.indexOf(strongest) === -1) {
+    top[top.length - 1] = strongest;
+    top.sort(function (a, b) { return a.start - b.start; });
+  }
+  const strongestIdx = top.indexOf(strongest);
+
+  return top.map(function (w, idx) {
+    const s = tableYM(w.start), e = tableYM(w.end);
+    const period = (s.y === e.y)
+      ? s.y + '년 ' + s.m + '월~' + e.m + '월'
+      : s.y + '년 ' + s.m + '월 ~ ' + e.y + '년 ' + e.m + '월';
+    let out = period + ' (목성 ' + w.name + ')';
+    if (idx === strongestIdx) {
+      out += ' ★★각도상 가장 강력한 결혼·만남의 창★★';
+      if (ctx) {
+        /* 게이트가 연도 인용을 검사한다. 해를 걸치는 구간이면 둘 다 허용해야
+           멀쩡한 원고가 반려되지 않는다. */
+        ctx.strongestYear = String(s.y);
+        ctx.strongestYears = (s.y === e.y) ? [String(s.y)] : [String(s.y), String(e.y)];
+      }
+    }
+    return out;
+  });
+}
+
+/* ── 🕰 지난 목성 트랜짓 — 과거 검증용 ────────────────────────────────
+   미래만 말하는 리포트는 손님이 확인할 방법이 없다. 재밌지만 안 믿긴다.
+   양육설명서 브리프에 적어두신 원리 그대로다:
+   "이미 지난 7세를 맞히면 14세 예고가 믿음이 된다."
+
+   과거 구간은 표에 없으므로 lib/ephemeris.js 로 직접 계산한다.
+   🚨 단, 계산이 틀리면 손님에게 "그때 헤어지셨죠"를 엉뚱한 해에 던지게 된다.
+      그래서 표의 첫 칸(2026-08 = 126.96도)을 EPH 로 재계산해 대조하고,
+      3도 이상 벌어지면 이 기능을 통째로 끈다. 없는 것보다 틀린 게 훨씬 나쁘다. */
+function jupiterLonAt(year, month) {
+  const iso = year + '-' + String(month).padStart(2, '0') + '-15T12:00:00+09:00';
+  const p = EPH.positions(iso, ['목성']);
+  return (p && typeof p['목성'] === 'number') ? ((p['목성'] % 360) + 360) % 360 : null;
+}
+
+function findJupiterPastHits(targetDeg) {
+  try {
+    const check = jupiterLonAt(JUPITER_TABLE_START.year, JUPITER_TABLE_START.month);
+    if (check === null || angleDiff(check, JUPITER_LON_TABLE[0]) > 3) {
+      console.warn('⚠️ 과거 트랜짓 자체검증 실패 → 과거 검증 재료 생략');
+      return [];
+    }
+  } catch (e) { return []; }
+
+  const now = new Date();
+  const hits = [];
+  /* 지난 8년(96개월)을 훑는다. 그 이상은 손님 기억이 흐릿해 검증 효과가 없다. */
+  for (let back = 96; back >= 1; back--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - back, 1);
+    const lon = jupiterLonAt(d.getFullYear(), d.getMonth() + 1);
+    if (lon === null) continue;
+    if (angleDiff(lon, targetDeg) <= 5) {
+      const prev = hits[hits.length - 1];
+      /* 같은 통과의 연속된 달은 하나로 묶는다 */
+      if (prev && back >= prev.back - 3) { prev.back = back; continue; }
+      hits.push({ y: d.getFullYear(), m: d.getMonth() + 1, back: back });
+    }
+  }
+  /* 가장 최근 2건만. 너무 오래된 건 맞혀도 감흥이 없다. */
+  return hits.slice(-2).map(function (h) { return h.y + '년 ' + h.m + '월 무렵'; });
+}
+
 function buildChartDigest(data, dateTimeIso, location, ctx) {
   try {
     const list = data.planet_position || data.planet_positions || [];
@@ -236,28 +431,40 @@ function buildChartDigest(data, dateTimeIso, location, ctx) {
       return null;   // 지어내느니 실패시킨다
     }
     if (ctx) ctx.snapshot = { planets: planets, ascAbs: asc.abs };
-    const lines = [];
-    if (asc) {
-      const dsc = signDeg(asc.abs + 180);
-      lines.push(`상승점(ASC): ${asc.sign} ${asc.deg}도`);
-      lines.push(`7하우스(배우자궁) 시작점: ${dsc.sign} ${dsc.deg}도 ← 배우자 해석의 최우선 근거`);
-      if (planets['천정']) lines.push(`천정(MC): ${planets['천정'].sign} ${planets['천정'].deg}도`);
 
-      // 🪐 실제 계산된 목성 트랜짓 (사람마다 달라야 하는 만남 시기의 유일한 근거)
-      const jupiterWindows = findJupiterTransitWindows(dsc.abs, ctx);
-      // 🚨 안전장치: 결과가 비었거나 undefined가 섞이면 '없음'으로 처리 (리포트에 undefined 노출 방지)
-      const validWindows = (jupiterWindows || []).filter(function(w) {
-        return typeof w === 'string' && w.length > 0 && w.indexOf('undefined') === -1;
-      });
-      if (validWindows.length > 0) {
-        lines.push(`\n[실제 계산된 목성 트랜짓 - 이 시기만 만남 시기로 사용하라]`);
-        validWindows.forEach((w, i) => lines.push((i+1) + '순위 시기: ' + w));
-        const strongest = validWindows.find(function(w){ return w.indexOf('★★') >= 0; });
-        if (strongest) lines.push('→ 위 목록에서 ★★ 표시된 구간이 각도상 가장 강력한 결혼·만남의 창이다. card5에서 이 구간만 빨간 강조로 못 박아라. 다른 시기를 최강으로 바꿔치기하면 치명적 실패다.');
-      } else {
-        lines.push(`\n[실제 계산 결과] 향후 8년간(~2034년) 목성이 배우자궁과 뚜렷한 각을 맺는 시기가 없다. 이 경우 만남 시기를 단정하지 말고, "현재는 특별히 두드러진 트랜짓이 없어 시기보다 태도와 만남의 자리를 넓히는 데 집중할 시점"이라고 정직하게 안내하라. 없는 시기를 지어내지 마라.`);
-      }
+    const lines = [];
+    const dsc = signDeg(asc.abs + 180);
+    lines.push(`상승점(ASC): ${asc.sign} ${asc.deg}도`);
+    lines.push(`7하우스(배우자궁) 시작점: ${dsc.sign} ${dsc.deg}도 ← 배우자 해석의 최우선 근거`);
+    if (planets['천정']) lines.push(`천정(MC): ${planets['천정'].sign} ${planets['천정'].deg}도`);
+
+    // 🪐 실제 계산된 목성 트랜짓 (사람마다 달라야 하는 만남 시기의 유일한 근거)
+    const jupiterWindows = findJupiterTransitWindows(dsc.abs, ctx);
+    // 🚨 안전장치: 결과가 비었거나 undefined가 섞이면 '없음'으로 처리 (리포트에 undefined 노출 방지)
+    const validWindows = (jupiterWindows || []).filter(function (w) {
+      return typeof w === 'string' && w.length > 0 && w.indexOf('undefined') === -1;
+    });
+    if (validWindows.length > 0) {
+      lines.push(`\n[실제 계산된 목성 트랜짓 - 이 시기만 만남 시기로 사용하라]`);
+      validWindows.forEach((w, i) => lines.push((i + 1) + '순위 시기: ' + w));
+      const strongest = validWindows.find(function (w) { return w.indexOf('★★') >= 0; });
+      if (strongest) lines.push('→ 위 목록에서 ★★ 표시된 구간이 각도상 가장 강력한 결혼·만남의 창이다. card5에서 이 구간만 빨간 강조로 못 박아라. 다른 시기를 최강으로 바꿔치기하면 치명적 실패다.');
+    } else {
+      lines.push(`\n[실제 계산 결과] 향후 8년간(~2034년) 목성이 배우자궁과 뚜렷한 각을 맺는 시기가 없다. 이 경우 만남 시기를 단정하지 말고, "현재는 특별히 두드러진 트랜짓이 없어 시기보다 태도와 만남의 자리를 넓히는 데 집중할 시점"이라고 정직하게 안내하라. 없는 시기를 지어내지 마라.`);
     }
+
+    /* 🕰 지난 목성 통과 — card2 의 과거 검증에 쓴다 */
+    const pastHits = findJupiterPastHits(dsc.abs);
+    if (pastHits.length) {
+      lines.push('\n[🕰 지난 목성 통과 — card2 과거 검증에 반드시 쓸 것]');
+      pastHits.forEach(function (t) {
+        lines.push('· ' + t + ' 목성이 배우자궁을 지났다.');
+      });
+      lines.push('→ 이 시기에 관계가 시작됐거나, 정리됐거나, 한 번 크게 흔들렸다. 둘 중 하나로 단정하라.');
+      lines.push('  맞히면 뒤의 미래 예측이 전부 믿음이 된다. 이게 이 리포트에서 가장 값싼 신뢰 획득 수단이다.');
+      if (ctx) ctx.pastYears = pastHits.map(function (t) { return t.slice(0, 4); });
+    }
+
     // 하우스별 인생 영역 의미 (리포트 깊이의 핵심 재료)
     const HOUSE_MEANING = {
       1: '자아·타고난 기질·첫인상',
@@ -274,38 +481,60 @@ function buildChartDigest(data, dateTimeIso, location, ctx) {
       12: '무의식·숨겨진 상처·혼자만의 세계'
     };
 
+    const ascSign = Math.floor((((asc.abs % 360) + 360) % 360) / 30);
+    const houseOf = function (abs) {
+      const ps = Math.floor((((abs % 360) + 360) % 360) / 30);
+      return (((ps - ascSign) % 12) + 12) % 12 + 1;
+    };
+
     const houseMap = {};  // 하우스별 행성 모음 (스텔리움 탐지용)
     for (const n of ['태양','달','수성','금성','화성','목성','토성']) {
       if (!planets[n]) continue;
-      let houseTxt = '';
-      if (asc) {
-        // 🔧 홀사인(Whole Sign) 방식: 상승점이 '속한 별자리' 기준으로 하우스 배정.
-        // (상승점의 도수가 아니라 별자리로 나눠야 astro-seek/mizar 등 표준 사이트와 일치함)
-        const ascSign = Math.floor((((asc.abs % 360) + 360) % 360) / 30);
-        const planetSign = Math.floor((((planets[n].abs % 360) + 360) % 360) / 30);
-        const h = (((planetSign - ascSign) % 12) + 12) % 12 + 1;
-        houseMap[h] = houseMap[h] || [];
-        houseMap[h].push(n);
-        houseTxt = ` (${h}하우스 = ${HOUSE_MEANING[h]}${h === 7 ? ' ★배우자궁 안! 최우선 근거' : ''})`;
-      }
-      lines.push(`${n}: ${planets[n].sign} ${planets[n].deg}도${houseTxt}`);
+      // 🔧 홀사인(Whole Sign) 방식: 상승점이 '속한 별자리' 기준으로 하우스 배정.
+      // (상승점의 도수가 아니라 별자리로 나눠야 astro-seek/mizar 등 표준 사이트와 일치함)
+      const h = houseOf(planets[n].abs);
+      houseMap[h] = houseMap[h] || [];
+      houseMap[h].push(n);
+      lines.push(`${n}: ${planets[n].sign} ${planets[n].deg}도 (${h}하우스 = ${HOUSE_MEANING[h]}${h === 7 ? ' ★배우자궁 안! 최우선 근거' : ''})`);
     }
 
     /* ── 7하우스 지배성 : 배우자를 어디서 만나는지의 핵심 단서 ── */
-    if (asc) {
-      const dscSign = SIGNS_KR[Math.floor(((((asc.abs + 180) % 360) + 360) % 360) / 30)];
-      const ruler = SIGN_RULER[dscSign];
-      if (ruler && planets[ruler]) {
-        const as2 = Math.floor((((asc.abs % 360) + 360) % 360) / 30);
-        const rs = Math.floor((((planets[ruler].abs % 360) + 360) % 360) / 30);
-        const rh = (((rs - as2) % 12) + 12) % 12 + 1;
-        lines.push('\n[7하우스 지배성 — 배우자를 만나는 자리]');
-        lines.push('7하우스가 ' + dscSign + '이므로 지배성은 ' + ruler + '이다.');
-        lines.push('그 ' + ruler + '이 ' + planets[ruler].sign + ' ' + planets[ruler].deg +
-                   '도, ' + rh + '하우스(' + HOUSE_MEANING[rh] + ')에 있다.');
-        lines.push('→ 배우자는 이 영역과 얽힌 자리에서 나타난다. 만남의 장소·경로를 여기서 끌어내라.');
-      }
+    const dscSignName = dsc.sign;
+    const ruler = SIGN_RULER[dscSignName];
+    if (ruler && planets[ruler]) {
+      const rh = houseOf(planets[ruler].abs);
+      lines.push('\n[7하우스 지배성 — 배우자를 만나는 자리]');
+      lines.push('7하우스가 ' + dscSignName + '이므로 지배성은 ' + ruler + '이다.');
+      lines.push('그 ' + ruler + '이 ' + planets[ruler].sign + ' ' + planets[ruler].deg +
+                 '도, ' + rh + '하우스(' + HOUSE_MEANING[rh] + ')에 있다.' +
+                 (dignityOf(ruler, planets[ruler].sign) ? ' 품위: ' + dignityOf(ruler, planets[ruler].sign) : ''));
+      lines.push('→ 배우자는 이 영역과 얽힌 자리에서 나타난다. 만남의 장소·경로를 여기서 끌어내라.');
     }
+
+    /* ── 8하우스 : 배우자의 지갑 (card4 전용 재료) ────────────────────
+       🚨 v3: 예전엔 card4 가 "8하우스를 근거로 부자인지 단정하라"고만 시키고
+          정작 8하우스 내용을 따로 정리해주지 않았다. 모델이 직접 세야 했다. */
+    (function () {
+      const eighthSignIdx = (ascSign + 7) % 12;
+      const eighthSign = SIGNS_KR[eighthSignIdx];
+      lines.push('\n[8하우스 — 배우자의 수입 구조 (card4 근거)]');
+      lines.push('8하우스 별자리: ' + eighthSign);
+      if (houseMap[8] && houseMap[8].length) {
+        lines.push('8하우스 안의 행성: ' + houseMap[8].join('·'));
+        houseMap[8].forEach(function (n) {
+          const dg = dignityOf(n, planets[n].sign);
+          lines.push('  · ' + n + ' ' + planets[n].sign + (dg ? ' / ' + dg : ''));
+        });
+      } else {
+        const r8 = SIGN_RULER[eighthSign];
+        if (r8 && planets[r8]) {
+          lines.push('8하우스는 비어 있다. 지배성 ' + r8 + '이 ' + planets[r8].sign +
+                     ' ' + houseOf(planets[r8].abs) + '하우스에 있다' +
+                     (dignityOf(r8, planets[r8].sign) ? ' / ' + dignityOf(r8, planets[r8].sign) : '') + '.');
+          lines.push('→ 비었다고 없는 게 아니다. 지배성이 앉은 방이 배우자 수입의 출처다.');
+        }
+      }
+    })();
 
     /* ── 지난 연애 패턴의 근거 : 금성과 화성 ── */
     if (planets['금성'] || planets['화성']) {
@@ -373,45 +602,15 @@ function buildChartDigest(data, dateTimeIso, location, ctx) {
     if (houseMap[11]) highlights.push(`【인간관계】 11하우스에 ${houseMap[11].join('·')}이 있다 → 인맥·모임·친구 관계가 인생에서 큰 비중을 차지한다.`);
     if (houseMap[8]) highlights.push(`【깊은 상처와 변형】 8하우스에 ${houseMap[8].join('·')}이 있다 → 얕은 관계로는 만족 못 하는 사람. 깊은 결속을 갈망한다.`);
 
-    // 🔭 행성 간 각도(애스펙트) 자동 탐지 → 해석 깊이의 핵심
-    const ASPECTS = [
-      { ang: 0,   name: '합',    orb: 7, tone: '융합' },
-      { ang: 180, name: '대립',  orb: 6, tone: '긴장' },
-      { ang: 120, name: '삼각',  orb: 6, tone: '조화' },
-      { ang: 90,  name: '사각',  orb: 6, tone: '긴장' },
-      { ang: 60,  name: '육각',  orb: 4, tone: '조화' }
-    ];
-    const PAIR_MEANING = {
-      '태양-달': { 조화: '겉과 속이 일치해 자기 자신과 사이가 좋다', 긴장: '하고 싶은 것과 마음이 원하는 것이 자주 어긋나 스스로 갈등한다', 융합: '자기 감정과 의지가 한 덩어리라 몰입이 강하다' },
-      '태양-토성': { 조화: '어릴 때부터 책임감이 몸에 배어 신뢰를 얻는다', 긴장: '늘 부족하다고 느끼며 스스로를 몰아붙인다. 인정받는 데 목마르다', 융합: '일찍 어른이 된 사람. 무겁지만 단단하다' },
-      '달-토성': { 조화: '감정을 절제할 줄 아는 어른스러움', 긴장: '감정을 드러내면 안 된다고 배워 혼자 삼킨다. 외로움의 뿌리', 융합: '정서적으로 일찍 독립했지만 그만큼 결핍이 있다' },
-      '달-명왕성': { 조화: '사람 속을 꿰뚫는 깊은 감정 통찰', 긴장: '애착이 강해 집착·통제를 사랑으로 착각하기 쉽다', 융합: '감정의 밀도가 극단적으로 깊다' },
-      '금성-토성': { 조화: '오래가는 진중한 사랑을 만든다', 긴장: '사랑에 조건을 붙이거나 마음을 늦게 연다. 애정 결핍의 흔적', 융합: '가볍게 사랑하지 못하는 사람. 늦지만 깊다' },
-      '금성-천왕성': { 조화: '연애에서 자유롭고 독특한 매력', 긴장: '설렘에 훅 빠졌다 훅 식는다. 구속을 못 견딘다', 융합: '평범한 관계로는 만족 못 한다' },
-      '금성-해왕성': { 조화: '낭만적이고 예술적인 사랑의 감각', 긴장: '콩깍지가 두꺼워 상대를 이상화하다 상처받는다', 융합: '사랑을 환상으로 그리는 사람' },
-      '화성-토성': { 조화: '끈질기게 밀어붙여 결과를 낸다', 긴장: '하고 싶은데 브레이크가 걸린다. 참다가 한 번에 터진다', 융합: '욕망을 억누르며 사는 사람' },
-      '화성-명왕성': { 조화: '한번 정하면 끝을 보는 폭발적 추진력', 긴장: '관계의 온도가 극단적이다. 격렬하게 타오르다 파괴적으로 끝난다', 융합: '집념이 무섭게 강하다' },
-      '수성-토성': { 조화: '깊이 있게 사고하고 신중하게 말한다', 긴장: '말하기 전에 재고 또 재느라 표현이 늦다', 융합: '생각이 무겁고 진지하다' },
-      '태양-목성': { 조화: '운이 따르고 사람이 모인다', 긴장: '자신감이 과해 일을 크게 벌인다', 융합: '스케일이 큰 사람' },
-      '달-금성': { 조화: '정서적으로 따뜻하고 사랑스러운 기질', 긴장: '애정 욕구와 감정 사이에서 흔들린다', 융합: '사랑받고 싶은 마음이 크다' }
-    };
+    /* 각도 의미 — buildAspects 결과를 재사용한다 (예전엔 여기서 또 한 번 계산했다) */
     const aspectLines = [];
-    const pnames = Object.keys(planets).filter(n => planets[n]);
-    for (let i = 0; i < pnames.length; i++) {
-      for (let j = i + 1; j < pnames.length; j++) {
-        const a = pnames[i], b = pnames[j];
-        let diff = Math.abs(planets[a].abs - planets[b].abs) % 360;
-        if (diff > 180) diff = 360 - diff;
-        for (const asp of ASPECTS) {
-          if (Math.abs(diff - asp.ang) <= asp.orb) {
-            const key = PAIR_MEANING[`${a}-${b}`] ? `${a}-${b}` : (PAIR_MEANING[`${b}-${a}`] ? `${b}-${a}` : null);
-            if (key) {
-              const meaning = PAIR_MEANING[key][asp.tone];
-              if (meaning) aspectLines.push(`【각도】 ${a}-${b} ${asp.name}(${asp.tone}, 오차 ${Math.abs(diff - asp.ang).toFixed(1)}도) → ${meaning}`);
-            }
-            break;
-          }
-        }
+    for (const x of asps) {
+      const key = PAIR_MEANING[x.a + '-' + x.b] ? x.a + '-' + x.b
+                : (PAIR_MEANING[x.b + '-' + x.a] ? x.b + '-' + x.a : null);
+      if (!key) continue;
+      const meaning = PAIR_MEANING[key][x.mood];
+      if (meaning) {
+        aspectLines.push(`【각도】 ${x.a}-${x.b} ${x.name}(${x.mood}, 오차 ${x.err.toFixed(1)}도) → ${meaning}`);
       }
     }
     if (aspectLines.length) {
@@ -423,90 +622,65 @@ function buildChartDigest(data, dateTimeIso, location, ctx) {
       lines.push('\n[🔬 이 사람만의 특이 배치 - 중심 스토리로 반드시 활용하라]');
       highlights.forEach(h => lines.push(h));
     }
+
+    /* ── 👤 외모 재료 ────────────────────────────────────────────────
+       🚨 v3 핵심 수정. 이 블록이 없는 상태로 card3 프롬프트만 먼저 바뀌어 있었다.
+          "위 [👤 배우자 외모] 블록이 유일한 재료다"라고 시켜놓고 블록을 안 줬으니
+          모델은 전부 지어냈다. */
+    if (buildAppearanceSignature) {
+      try {
+        const ap = buildAppearanceSignature(planets, asc);
+        if (ap) { lines.push('\n' + ap); if (ctx) ctx.hasAppearance = true; }
+      } catch (e) { console.warn('⚠️ 외모 재료 생성 실패:', e.message); }
+    }
+
     return lines.join('\n');
-  } catch (e) { return null; }
+  } catch (e) {
+    console.error('🔥 buildChartDigest 실패:', e.message);
+    return null;
+  }
 }
 
+/* ── 강조 남용 검사 ──────────────────────────────────────────
+   "강조하지 마라"는 지시만으로는 안 지킨다. 실제로 세어봐야 한다.
+   행성·별자리 이름에 <b>를 씌우면 정작 중요한 문장이 묻힌다.
+   🚨 v3: 기준이 6개인데 메시지는 "3개 이하로"였다. 프롬프트 지시(2~3개)에 맞춰 4로. */
+const NOUN_ONLY = ['태양','달','수성','금성','화성','목성','토성',
+  '상승점','천정','노스노드','사우스노드',
+  '양자리','황소자리','쌍둥이자리','게자리','사자자리','처녀자리',
+  '천칭자리','전갈자리','사수자리','염소자리','물병자리','물고기자리'];
+const BOLD_LIMIT = 4;
 
-// ===== 🪐 실제 목성 트랜짓 계산 (2026.08 ~ 2034.12, 매달) =====
-// 사람마다 배우자궁을 지나는 진짜 시기가 다르도록, 실제 천문 계산값을 표로 저장해두고 조회한다.
-// 이렇게 해야 모든 손님의 만남 시기가 2026~2028로 획일화되는 문제가 사라진다.
-const JUPITER_TABLE_START = { year: 2026, month: 8 };
-const JUPITER_LON_TABLE = [126.96,133.7,139.59,144.32,146.79,146.44,143.35,139.75,137.23,137.49,140.41,145.13,151.2,157.84,164.27,170.28,174.81,177.31,176.9,174.08,170.18,167.79,168.03,170.79,175.57,181.59,187.99,194.6,200.38,204.96,207.28,206.89,203.95,200.22,197.76,197.94,200.73,205.53,211.39,218.07,224.54,230.57,235.17,237.39,237.11,234.33,230.5,228.06,228.19,231.01,235.72,241.9,248.52,255.37,261.56,265.92,268.66,268.61,265.9,262.17,259.5,259.53,262.23,267.17,273.31,280.36,287.44,293.49,298.64,301.6,301.9,299.51,295.63,292.76,292.59,295.31,300.16,306.66,313.91,320.52,327.3,332.71,336.34,337.28,335.32,331.47,328.28,327.59,329.89,334.74,341.23,347.82,355.28,2.1,8.1,12.22,13.94,12.61,9.06,5.35,4.03];
-
-function angleDiff(a, b) {
-  let d = Math.abs(a - b) % 360;
-  return d > 180 ? 360 - d : d;
+function emphasisIssue(text) {
+  const t = String(text || '');
+  const bolds = (t.match(/<b>([\s\S]*?)<\/b>/g) || [])
+    .map(function (x) { return x.replace(/<\/?b>/g, '').trim(); });
+  if (bolds.length > BOLD_LIMIT) return '한 카드에 금색 강조가 ' + bolds.length + '개 (' + BOLD_LIMIT + '개 이하로)';
+  /* 명사 하나만 통째로 감싼 경우 */
+  for (const b of bolds) {
+    if (b.length <= 6 && NOUN_ONLY.indexOf(b.replace(/[·\s]/g, '')) >= 0) {
+      return '행성·별자리 이름에 강조: "' + b + '" (판정 문장에만 쳐라)';
+    }
+  }
+  const reds = (t.match(/color:\s*#ff3b30/g) || []).length;
+  if (reds > 2) return '빨간 경고가 ' + reds + '개 (1개만)';
+  return null;
 }
 
-function findJupiterTransitWindows(targetDeg, ctx) {
-  // 여러 각도를 모두 수집한 뒤 시간순 정렬 → 가까운 미래부터 제시
-  const aspects = [
-    { name: '합 · 강력', angle: 0, orb: 6, weight: 3 },
-    { name: '삼각 · 우호적', angle: 120, orb: 5, weight: 2 },
-    { name: '삼각 · 우호적', angle: 240, orb: 5, weight: 2 },
-    { name: '육각 · 기회', angle: 60, orb: 4, weight: 1 },
-    { name: '육각 · 기회', angle: 300, orb: 4, weight: 1 }
-  ];
-
-  const all = [];
-  for (const asp of aspects) {
-    let inWindow = false;
-    let windowStart = null;
-    for (let i = 0; i < JUPITER_LON_TABLE.length; i++) {
-      const diff = angleDiff(JUPITER_LON_TABLE[i], (targetDeg + asp.angle) % 360);
-      const within = diff <= asp.orb;
-      if (within && !inWindow) { inWindow = true; windowStart = i; }
-      if (!within && inWindow) {
-        inWindow = false;
-        all.push({ start: windowStart, end: i - 1, name: asp.name, weight: asp.weight });
-      }
-    }
-    if (inWindow) {
-      all.push({ start: windowStart, end: JUPITER_LON_TABLE.length - 1, name: asp.name, weight: asp.weight });
-    }
-  }
-
-  if (all.length === 0) return null;
-
-  // 시간순 정렬 (가까운 미래부터)
-  all.sort(function(a, b) { return a.start - b.start; });
-
-  /* 🚨 v2 (2026-08-04) — '가장 강력한 결혼 적기' 산출
-     기존에는 weight(합3·삼각2·육각1)를 계산해놓고 버렸다.
-     상위 3개 중 weight 최고(동률이면 더 가까운 미래)를 ★로 표시해
-     card5가 '가장 강력한 시기'를 빨간 강조로 못 박을 수 있게 한다.
-     연도는 ctx.strongestYear 에 저장해 gateCheck 가 인용 여부를 검사한다. */
-  /* 전체 창 중 최강(합>삼각>육각, 동률이면 더 가까운 미래)을 먼저 확정하고,
-     시간순 상위 3개에 없으면 마지막 자리를 밀어내고 강제 포함한다.
-     (예: 삼각 2028·2028, 육각 2030, 합 2032 → 합이 잘려나가 차상위에 ★가 붙던 결함 수정) */
-  let strongest = all[0];
-  for (let i = 1; i < all.length; i++) {
-    if (all[i].weight > strongest.weight) strongest = all[i];
-  }
-  let top = all.slice(0, 3);
-  if (top.indexOf(strongest) === -1) {
-    top[top.length - 1] = strongest;
-    top.sort(function(a, b) { return a.start - b.start; });
-  }
-  const strongestIdx = top.indexOf(strongest);
-
-  return top.map(function(w, idx) {
-    const sy = JUPITER_TABLE_START.year + Math.floor((JUPITER_TABLE_START.month - 1 + w.start) / 12);
-    const sm = ((JUPITER_TABLE_START.month - 1 + w.start) % 12) + 1;
-    const ey = JUPITER_TABLE_START.year + Math.floor((JUPITER_TABLE_START.month - 1 + w.end) / 12);
-    const em = ((JUPITER_TABLE_START.month - 1 + w.end) % 12) + 1;
-    const period = (sy === ey)
-      ? sy + '년 ' + sm + '월~' + em + '월'
-      : sy + '년 ' + sm + '월 ~ ' + ey + '년 ' + em + '월';
-    let out = period + ' (목성 ' + w.name + ')';
-    if (idx === strongestIdx) {
-      out += ' ★★각도상 가장 강력한 결혼·만남의 창★★';
-      if (ctx) ctx.strongestYear = String(sy);
-    }
-    return out;
-  });
-}
+/* ── 품질 게이트 기준 ────────────────────────────────────────────
+   VVIP 에는 있는데 배우자에는 없었다. 그래서 발뺌 화법과 별자리 일반론이 그대로 나갔다.
+   🚨 기준을 너무 높이면 매번 3회 재생성이 걸려 비용만 3배가 되고,
+      마지막 시도는 어차피 통과시키므로 아무것도 못 거른다(couple.js v3~v4 실패 사례).
+      목표 분량의 약 75% 선으로 잡는다. */
+const BANNED = ['undefined', 'NaN', '트랜짓 항목', '데이터에 없음',
+  '우주가 당신', '에너지가', '파동', '기운이 흐르', '다시 말해', '살펴보겠습니다',
+  '일 수 있습니다', '느낌도 있습니다', '경우에 따라', '아마도',
+  '긍정적으로 생각', '시간이 해결'];
+const NEED_LEN = {
+  card2_analysis: 560, card3_appearance: 650, card4_career: 580,
+  card5_timing: 660, card6_chemistry: 400, card7_destiny_guide: 470
+};
+const strip = function (v) { return String(v || '').replace(/<[^>]+>/g, ''); };
 
 const handler = async (req, res) => {
   // 🚨 [다시보기 기능] GET + orderId → 이미 저장된 리포트를 KV에서 즉시 조회
@@ -543,11 +717,6 @@ const handler = async (req, res) => {
       if (st && st.state === 'pending') {
         return res.status(202).json({ status: 'pending' });
       }
-      /* 🚨 2026-08-21 — "정보를 다시 입력하세요 → 결제페이지" 사고의 근본 원인.
-         출생정보(intake)는 서버에 멀쩡히 있는데 프론트가 조회조차 하지 않아,
-         기기를 바꾸거나 브라우저 저장소가 비워진 손님은 전부 재입력 화면으로 튕겼다.
-         리포트가 없을 땐 intake 를 함께 내려보내 프론트가 말없이 재생성하게 한다.
-         (비밀번호 같은 민감정보가 아니고, 주문번호를 아는 본인만 조회 가능하다) */
       /* ⚠️ 출생정보(이름·생년월일·태어난 시각)를 응답에 실어 보내면 안 된다.
          주문번호가 20260802-0000059 처럼 날짜+연번이라 순서대로 찍어보면
          남의 개인정보를 그대로 긁어갈 수 있다.
@@ -566,6 +735,10 @@ const handler = async (req, res) => {
   }
 
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST 요청만 받습니다.' });
+
+  /* 🚨 v3: POST 에 레이트리밋이 없었다. 돈이 나가는 쪽은 GET 이 아니라 POST 다.
+     한 번 호출에 Gemini 토큰이 수만 개 나간다. 정상 손님은 분당 2~3번을 넘지 않는다. */
+  if (await enforceRateLimit(req, res, { bucket: 'report-post', limit: 10, windowSec: 60 })) return;
 
   console.log("✅ [1] gemini.js 진입 성공");
 
@@ -609,6 +782,20 @@ const handler = async (req, res) => {
       } catch (e) { console.log('⚠️ intake 조회 실패:', e.message); }
     }
 
+    /* ══════════════════════════════════════════════════════════════════
+       🚨 v3 치명 버그 수정 — 태어난 시각을 모르는 손님이 400 으로 튕겼다.
+
+       아래 필수값 검사가 빈 time 을 거부하는데, timeUnknown 손님은
+       time 이 빈 채로 온다. buildMethodNote 에는 "정오 기준으로 잡았습니다"
+       안내문까지 준비돼 있었는데, 정작 정오를 넣어주는 코드가 없었다.
+       설령 통과했더라도 buildBirthIso(date, '', city) 는 'T:00+09:00' 같은
+       깨진 문자열을 만들고, 그게 NaN 율리우스일 → 엉뚱한 상승점으로 이어진다.
+       ══════════════════════════════════════════════════════════════════ */
+    const isTimeUnknown = !!body0.timeUnknown;
+    if (isTimeUnknown && (!time || String(time).trim() === '')) {
+      time = '12:00';
+    }
+
     if (!name || !date || !time) {
       return res.status(400).json({ error: '필수 입력값 누락' });
     }
@@ -621,11 +808,14 @@ const handler = async (req, res) => {
     if (!vDate) return res.status(400).json({ error: '생년월일을 다시 확인해 주세요. 달력에 없는 날짜입니다.' });
     date = vDate;
 
-    if (!body0.timeUnknown) {
-      const vTime = normalizeTime(time);
-      if (!vTime) return res.status(400).json({ error: '태어난 시각을 다시 확인해 주세요. (예: 14:30)' });
+    const vTime = normalizeTime(time);
+    if (!vTime) {
+      if (isTimeUnknown) { time = '12:00'; }
+      else return res.status(400).json({ error: '태어난 시각을 다시 확인해 주세요. (예: 14:30)' });
+    } else {
       time = vTime;
     }
+
     name = cleanName(name, 20);
     if (!name) return res.status(400).json({ error: '이름을 다시 입력해 주세요.' });
     if (!process.env.GEMINI_API_KEY) {
@@ -648,7 +838,7 @@ const handler = async (req, res) => {
         await kv.set(`intake:${orderId}`, {
           product: '9', name, date, time,
           city: city || 'Seoul', myGender, targetGender,
-          timeUnknown: !!body0.timeUnknown,
+          timeUnknown: isTimeUnknown,
           at: Date.now()
         }, { ex: 60 * 60 * 24 * 365 });   // v2: 90일 → 365일. 리포트 보관기간과 반드시 같아야 재생성이 가능하다.
       } catch (e) { console.log('⚠️ intake 저장 실패(생성은 계속):', e.message); }
@@ -680,14 +870,14 @@ const handler = async (req, res) => {
 
     let location = cityCoordinates[city];
     if (!location) {
-        console.error(`⚠️ 출생지 좌표 없음: "${city}" → 서울로 임시 처리됨. 도시 목록 확인 필요!`);
-        location = cityCoordinates["Seoul"];
+      console.error(`⚠️ 출생지 좌표 없음: "${city}" → 서울로 임시 처리됨. 도시 목록 확인 필요!`);
+      location = cityCoordinates["Seoul"];
     }
     const dateTimeIso = buildBirthIso(date, time, city);
 
     let astrologyDataText = null;   // 🚨 기본값을 문장으로 두면 데이터 없이도 리포트가 나간다
     /* 이 요청 전용 차트 컨텍스트 — 동시 주문끼리 절대 섞이지 않는다 */
-    const chartCtx = { snapshot: null, strongestYear: null };
+    const chartCtx = { snapshot: null, strongestYear: null, strongestYears: [], pastYears: [], hasAppearance: false };
     try {
       if (process.env.PROKERALA_CLIENT_ID && process.env.PROKERALA_CLIENT_SECRET) {
         const tokenResponse = await fetch('https://api.prokerala.com/token', {
@@ -747,48 +937,9 @@ const handler = async (req, res) => {
     /* 프롬프트에서 쓸 손님 정보 */
     const customerName = String(name || '고객').trim();
     const cityResolved = !!(cityCoordinates && cityCoordinates[city]);
-    const isTimeUnknown = !!(req.body && (req.body.timeUnknown || !time || String(time).trim() === ''));
     const genderLine = (myGender && targetGender)
       ? `손님은 ${myGender}이고, 찾는 상대는 ${targetGender}이다. 배우자 묘사는 ${targetGender} 기준으로 써라.`
       : '손님의 성별 정보가 없으니 배우자 묘사에서 성별을 단정하지 말고 중립적으로 써라.';
-
-
-/* ── 강조 남용 검사 ──────────────────────────────────────────
-   "강조하지 마라"는 지시만으로는 안 지킨다. 실제로 세어봐야 한다.
-   행성·별자리 이름에 <b>를 씌우면 정작 중요한 문장이 묻힌다. */
-const NOUN_ONLY = ['태양','달','수성','금성','화성','목성','토성','천왕성','해왕성','명왕성',
-  '상승점','천정','노스노드','사우스노드',
-  '양자리','황소자리','쌍둥이자리','게자리','사자자리','처녀자리',
-  '천칭자리','전갈자리','사수자리','염소자리','물병자리','물고기자리'];
-
-function emphasisIssue(text) {
-  const t = String(text || '');
-  const bolds = (t.match(/<b>([\s\S]*?)<\/b>/g) || [])
-    .map(function (x) { return x.replace(/<\/?b>/g, '').trim(); });
-  if (bolds.length > 6) return '한 카드에 금색 강조가 ' + bolds.length + '개 (3개 이하로)';
-  /* 명사 하나만 통째로 감싼 경우 */
-  for (const b of bolds) {
-    if (b.length <= 6 && NOUN_ONLY.indexOf(b.replace(/[·\s]/g, '')) >= 0) {
-      return '행성·별자리 이름에 강조: "' + b + '" (판정 문장에만 쳐라)';
-    }
-  }
-  const reds = (t.match(/color:\s*#ff3b30/g) || []).length;
-  if (reds > 2) return '빨간 경고가 ' + reds + '개 (1개만)';
-  return null;
-}
-
-    /* ── 품질 게이트 ─────────────────────────────────────────────
-       VVIP 에는 있는데 배우자에는 없었다. 그래서 발뺌 화법과 별자리 일반론이
-       그대로 나갔다. 걸리면 다시 쓰게 한다. */
-    const BANNED = ['undefined', 'null', 'NaN', '트랜짓 항목', '데이터에 없음',
-      '우주가 당신', '에너지가', '파동', '기운이 흐르', '다시 말해', '살펴보겠습니다',
-      '일 수 있습니다', '느낌도 있습니다', '경우에 따라', '아마도',
-      '긍정적으로 생각', '시간이 해결'];
-    const NEED_LEN = {
-      card2_analysis: 550, card3_appearance: 380, card4_career: 580,
-      card5_timing: 660, card6_chemistry: 380, card7_destiny_guide: 450
-    };   // v2: card4(돈 스타일 추가)·card5(최강 시기 추가) 목표 상향에 맞춰 게이트도 상향
-    const strip = function (v) { return String(v || '').replace(/<[^>]+>/g, ''); };
 
     function gateCheck(d) {
       if (!d || typeof d !== 'object') return '파싱 결과 없음';
@@ -801,9 +952,20 @@ function emphasisIssue(text) {
       /* 오차까지 인용했는지 — 계산했다는 유일한 증거다 */
       if (!/오차\s*[\d.]+\s*도/.test(all)) return '각도 오차 인용 없음';
       /* v2: 가장 강력한 결혼 적기가 계산됐는데 card5가 그 연도를 인용하지 않으면 실패.
-         모델이 ★★ 구간을 무시하고 딴 연도를 최강으로 쓰는 사고를 서버가 막는다. */
-      if (chartCtx.strongestYear && strip(d.card5_timing).indexOf(chartCtx.strongestYear) === -1)
-        return 'card5 가장 강력한 시기(' + chartCtx.strongestYear + '년) 미인용';
+         v3: 해를 걸치는 구간이면 시작·종료 연도 어느 쪽이든 인정한다.
+             (예전엔 시작연도만 봐서 멀쩡한 원고가 반려됐다) */
+      if (chartCtx.strongestYears && chartCtx.strongestYears.length) {
+        const t5 = strip(d.card5_timing);
+        const ok = chartCtx.strongestYears.some(function (y) { return t5.indexOf(y) >= 0; });
+        if (!ok) return 'card5 가장 강력한 시기(' + chartCtx.strongestYears.join('/') + '년) 미인용';
+      }
+      /* v3: 과거 검증 재료를 줬는데 card2 가 안 썼으면 반려.
+         이 리포트에서 신뢰를 가장 싸게 얻는 장치인데 모델이 자주 건너뛴다. */
+      if (chartCtx.pastYears && chartCtx.pastYears.length) {
+        const t2 = strip(d.card2_analysis);
+        const ok2 = chartCtx.pastYears.some(function (y) { return t2.indexOf(y) >= 0; });
+        if (!ok2) return 'card2 과거 검증 연도(' + chartCtx.pastYears.join('/') + ') 미인용';
+      }
       /* 강조 남용 */
       for (const k in NEED_LEN) {
         const em = emphasisIssue(d[k]);
@@ -812,10 +974,22 @@ function emphasisIssue(text) {
       return null;
     }
 
-    const prompt = `
-[🚨 절대 금지]
+    /* ══════════════════════════════════════════════════════════════════
+       프롬프트 — correction 을 받는 함수로 바꿨다.
+
+       예전에는 상수 문자열이라, 게이트에 걸려 재생성할 때도 똑같은 글을
+       똑같이 물어봤다. 온도만 높은 같은 질문이니 같은 실패가 반복됐다.
+       gemini-couple.js 에는 이 장치가 있는데 여기만 빠져 있었다.
+       ══════════════════════════════════════════════════════════════════ */
+    function buildPrompt(correction) {
+      return `${correction ? `[🚨🚨🚨 직전 원고 반려 — 아래를 반드시 고쳐서 다시 써라]
+${correction}
+이 지적을 무시하면 또 반려된다. 나머지 규칙은 그대로 지키면서 이 부분을 확실히 고쳐라.
+
+` : ''}[🚨 절대 금지]
 'undefined', 'null', 'NaN', '트랜짓 항목', '데이터에 없음' 같은 시스템 용어를 본문에 쓰지 마라. 손님은 일반인이다.
 아래 [실제 계산] 항목에 없는 각도·날짜·배치를 지어내면 치명적 실패다.
+🚨 이 차트에는 천왕성·해왕성·명왕성이 계산되어 있지 않다. 그 세 행성은 한 번도 언급하지 마라.
 
 [🚨 시간 기준]
 오늘은 ${todayStr}이다. 모든 미래 시기는 오늘 이후의 연·월로만 써라. 지난 연도를 미래로 쓰면 실패다.
@@ -835,9 +1009,10 @@ ${astrologyDataText}
 ■ 1. 과거를 먼저 맞혀라
    미래 이야기만 하면 손님은 확인할 방법이 없다. 읽는 순간엔 재밌지만 남는 게 없고,
    "이거 맞는 말인지 내가 어떻게 아나" 하고 덮는다.
-   그래서 card2에서 <b>지금까지의 연애 패턴</b>을 먼저 짚는다.
-   금성과 화성 배치를 근거로, 이 사람이 어떤 상대에게 반복해서 끌렸고
-   왜 같은 지점에서 어긋났는지를 장면으로 그려라.
+   그래서 card2 의 <b>첫 단락</b>은 반드시 과거다.
+   위 [🕰 지난 목성 통과] 항목이 있으면 그 연·월을 그대로 인용해
+   "그 무렵 관계가 시작됐거나, 정리됐거나, 한 번 크게 흔들렸습니다"라고 단정하라.
+   그다음 금성·화성 배치로 <b>지금까지의 연애 패턴</b>을 장면으로 그려라.
    여기서 "어떻게 알았지" 소리가 나와야 뒤의 미래 이야기가 전부 믿음이 된다.
 
 ■ 2. 각도를 오차까지 인용하라
@@ -845,11 +1020,12 @@ ${astrologyDataText}
    예: "당신의 금성과 토성이 <b>오차 0.8도</b>로 맞물려 있습니다."
    이 한 줄이 "계산했다"는 유일한 증거다. 없으면 별자리 운세와 구분이 안 된다.
 
-■ 3. 외모를 지어내지 마라
-   차트로 키·이목구비를 특정할 근거는 약하다. 그런 문장은 뻔한 별자리 일반론으로 읽힌다.
-   card3은 <b>인상과 태도</b>로 써라.
-   "처음엔 차갑다고 느끼실 겁니다. 세 번째 만남쯤 그게 신중함이었다는 걸 아시게 됩니다."
-   이런 문장이 근거도 있고 나중에 검증도 된다.
+■ 3. 외모는 [👤 배우자 외모] 블록 안에서만 써라
+   그 블록에 계산된 재료가 다 들어 있다. 거기 있는 것은 <b>단정해서 쓰고</b>,
+   거기 없는 것은 한 글자도 쓰지 마라. 특히 키·몸무게·나이 숫자, 피부색, 실존 연예인 이름,
+   쌍꺼풀 유무나 점의 위치처럼 반증되는 이분법적 사실은 금지다.
+   틀리는 순간 리포트 전체의 신뢰가 무너진다.
+   인상·비율·움직임·목소리·습관으로 승부하라. 훨씬 구체적으로 읽히면서 반증되지 않는다.
 
 ■ 4. 시기는 준 것만 써라
    [실제 계산된 목성 트랜짓]에 있는 시기만 인용하라.
@@ -857,9 +1033,11 @@ ${astrologyDataText}
    지어낸 연월은 손님이 몇 달 뒤에 알아차린다.
 
 ■ 5. 틀릴 수 있는 조건을 밝혀라
-   card7 끝에 한 문단을 넣어라.
-   "이 해석이 어긋난다면 그건 ○○ 때문입니다" 형태로, 어떤 조건에서 다르게 흐르는지를 써라.
-   전부 맞다고 하는 글보다 이게 훨씬 믿음직하다.
+   card2 의 <b>마지막 문단</b>에 한 줄 넣어라.
+   "이 해석이 어긋난다면 그건 ○○ 때문입니다" 형태로, 어떤 조건에서 다르게 흐르는지를.
+   🚨 리포트 맨 끝(card7)이 아니라 앞쪽이어야 한다.
+   끝에 두면 글 전체가 변명으로 닫히고 손님은 그 문단만 기억한다.
+   앞에서 한 번 밝히고 나면 뒤의 단정들이 오히려 더 단단하게 읽힌다.
 
 [문장 규칙]
 · 발뺌 금지: '~일 수 있습니다', '~한 느낌도 있습니다', '아마', '경우에 따라' 금지.
@@ -869,13 +1047,16 @@ ${astrologyDataText}
 · 각 단락에 15자 이내의 짧은 단정문을 하나씩 넣어라. 문장 길이가 균일하면 기계가 쓴 것처럼 읽힌다.
 · 별자리 일반론 금지. "사자자리는 열정적" 같은 문장은 한 줄도 쓰지 마라.
   이 사람의 이 배치에만 해당하는 이야기를 써라.
+· 🚨 분량은 지정된 범위 안에서 끝내라. 하한만 보고 늘리면 앞 문장을 말만 바꿔 반복하게 된다.
+  재료가 떨어졌는데 분량이 남으면, 그건 늘릴 게 아니라 이미 충분히 쓴 것이다.
 · 마크다운(*) 금지. 단락 구분은 <br><br>.
+
 [강조 표시 — 여기가 리포트의 인상을 결정한다]
 강조는 두 가지만 쓴다.
   금색 형광펜 : <b>...</b>
   빨간 경고   : <span style="color:#ff3b30;font-weight:900;">...</span>
 
-■ 금색은 <b>손님에 대한 판정</b>에만 친다. 한 카드에 2~3개.
+■ 금색은 <b>손님에 대한 판정</b>에만 친다. 한 카드에 2~3개, 최대 4개.
    손님이 캡처해서 친구에게 보낼 만한 문장, 다시 읽고 싶은 문장에만 친다.
    예) 금성이 전갈자리에 있습니다. <b>좋아하면 다 주는 사람입니다.</b>
 
@@ -888,19 +1069,19 @@ ${astrologyDataText}
    ❌ <b>금성</b>이 <b>전갈자리</b>에 있어서
    ✅ 금성이 전갈자리에 있습니다. <b>좋아하면 다 주는 사람입니다.</b>
 
-■ 개수를 넘기지 마라. 많이 칠수록 아무것도 안 보인다.
-   한 문단에 두 개 이상 치지 마라.
+■ 개수를 넘기지 마라. 많이 칠수록 아무것도 안 보인다. 한 문단에 두 개 이상 치지 마라.
 
 [💥 팩트폭력 규격 — 이 리포트가 캡처되어 퍼지게 만드는 장치]
 카드마다 최소 하나(card1·티저 제외), 읽는 순간 "어떻게 알았지" 소리가 나오는 뼈 때리는 단정을 넣어라. 단:
-① 반드시 위 차트에 실제로 있는 배치에서만 도출하라. 근거 없는 팩폭은 치명적 실패다. 예시 매핑 —
+① 🚨 반드시 위 차트에 실제로 있는 배치에서만 도출하라. 근거 없는 팩폭은 치명적 실패다.
+   아래는 형식 예시일 뿐이다. 해당 각도가 위 목록에 없으면 그 문장을 쓰지 마라.
    · 금성-토성 긴장 → "사랑에 조건을 붙여왔습니다. 이 사람이면 안전한가부터 계산하죠. 그래서 마음이 늦게 열립니다."
-   · 금성-명왕성 긴장 → "사랑과 소유를 구분 못 해서 관계를 통째로 태워먹은 적이 있으실 겁니다."
-   · 달-천왕성 긴장 → "안정을 원한다고 말하면서, 막상 편안한 사람이 오면 제일 먼저 지루해하는 건 본인입니다."
+   · 금성-화성 긴장 → "끌리는 사람과 편한 사람이 늘 따로였습니다. 그래서 매번 둘 중 하나를 포기해오셨죠."
    · 달-토성 긴장 / 토성 4하우스 → "집에 사랑이 없던 게 아닙니다. 사랑에 조건이 붙어 있었죠. 그래서 받는 게 어색한 겁니다."
-   · 달·금성이 목성과 조화인데 명왕성·천왕성 긴장 동반 → "부족한 것 없이 사랑받았는데도 늘 허기가 졌을 겁니다. 자극 없이는 못 견디는 배치라 그렇습니다."
+   · 달-화성 긴장 → "서운하면 말보다 날이 먼저 섭니다. 싸우고 나서 후회하는 쪽은 늘 본인이었습니다."
+   · 토성-상승점 긴장 → "실제보다 차갑게 보입니다. 먼저 다가오려던 사람을 그렇게 여럿 놓치셨습니다."
    · 8하우스 토성 → "배우자 돈으로 편하게 살 팔자는 아닙니다. 같이 벌어야 합니다."
-② 팩폭과 근거(도·분 또는 각도)는 반드시 같은 단락 안에 붙여 써라. 근거 없이 던지는 순간 점쟁이 사기가 된다.
+② 팩폭과 근거(도·분 또는 각도 오차)는 반드시 같은 단락 안에 붙여 써라. 근거 없이 던지면 점쟁이 사기가 된다.
 ③ 팩폭으로 끝내지 마라. 반드시 '그래서 그 기질을 어떻게 쓰면 무기가 되는지'로 닫아라.
 ④ '~하면 안 됩니다' 류 금지 팩폭은 리포트 전체에서 최대 두 개. 해당 배치가 없으면 아예 쓰지 마라.
 ⑤ 팩폭 문장이야말로 금색 <b> 1순위 후보다. 명사가 아니라 판정 문장에 쳐라.
@@ -912,35 +1093,38 @@ ${astrologyDataText}
   "core_sentence": "(45자 이내) 이 사람의 인연을 관통하는 한 문장. 차트 근거에서 나온 것이어야 한다. 예: '먼저 다가가지 않아서 놓친 사람이 많았습니다'",
   "card1_title": "(20자 이내) 배우자를 한 마디로. 예: '말수 적고 뒤가 단단한 사람'",
   "guardian_symbol_1": "(이모지 1개)",
-  "guardian_name_1": "(2~4자 키워드)",
+  "guardian_name_1": "(2~4자) 배우자의 강점 키워드",
   "guardian_symbol_2": "(이모지 1개)",
-  "guardian_name_2": "(2~4자)",
+  "guardian_name_2": "(2~4자) 이 관계의 성격 키워드",
   "guardian_symbol_3": "(이모지 1개)",
-  "guardian_name_3": "(2~4자)",
+  "guardian_name_3": "(2~4자) 🚨 셋 중 이것만은 반드시 '불편한 진실'이어야 한다. 예: '늦은인연', '무뚝뚝', '속앓이'. 셋 다 좋은 말이면 손님은 셋 다 안 믿는다.",
 
-  "card2_analysis": "(700자 이상) ★가장 중요한 카드★ 지금까지의 연애 패턴을 먼저 맞힌다. 금성·화성 배치와 각도를 근거로, 어떤 사람에게 반복해서 끌렸는지, 관계가 어느 지점에서 늘 같은 방식으로 어긋났는지를 장면으로 써라. 대사가 들릴 만큼 구체적으로. 그다음 그 패턴이 어디서 왔는지(달·토성·12하우스 등)를 짚어라. 마지막에 '이걸 알고 나면 다음 사람은 달라집니다' 방향으로 닫아라.",
+  "card2_analysis": "(700~900자) ★가장 중요한 카드★ 네 단락으로 써라.\\n① 과거 검증 — [🕰 지난 목성 통과]의 연·월을 그대로 인용해 그때 무슨 일이 있었는지 단정한다. 그 항목이 없으면 이 단락은 건너뛰고 ②로 시작한다.\\n② 연애 패턴 — 금성·화성 배치와 각도를 근거로, 어떤 사람에게 반복해서 끌렸는지, 관계가 어느 지점에서 늘 같은 방식으로 어긋났는지를 대사가 들릴 만큼 구체적인 장면으로.\\n③ 그 패턴의 뿌리 — 달·토성·12하우스 등에서 끌어와 '왜 그렇게 됐는지'를 짚는다.\\n④ 반증 조건 한 줄 — '이 해석이 어긋난다면 그건 ○○ 때문입니다'. 그리고 '이걸 알고 나면 다음 사람은 달라집니다' 방향으로 닫아라.",
 
-  "card3_appearance": "(500자 이상) 배우자의 인상과 태도. 키·이목구비 같은 외모 특정은 금지. 처음 만났을 때의 느낌, 말투, 사람을 대하는 방식, 몇 번 만나야 진짜 모습이 보이는지를 써라. 7하우스 별자리와 그 안의 행성이 근거다.",
+  "card3_appearance": "(900~1100자) 배우자의 외모. 🚨 위 [👤 배우자 외모] 블록이 이 카드의 유일한 재료다. 거기 없는 특징은 한 글자도 쓰지 마라. '~일 수 있습니다', '~가능성이 높습니다' 발뺌 화법 절대 금지. 재료에 있는 것은 사진을 보고 받아쓰듯 단정하라. 🚨 재료를 항목별로 나열하면 실패다. 한 사람의 모습으로 녹여서, 그 사람이 카페 문을 열고 들어와 앞에 앉는 장면처럼 써라. 순서: ① 문을 열고 들어올 때 가장 먼저 눈에 들어오는 것 ② 마주 앉았을 때 얼굴에서 오래 머무는 지점 ③ 몸을 쓰는 방식 — 앉는 자세, 걷는 속도, 손이 어디로 가는지 ④ 첫마디를 뗄 때의 목소리와 말의 속도 ⑤ 그날 입고 온 옷에서 읽히는 것 ⑥ 동물상 한 줄 ⑦ 헤어지고 돌아오는 길에 당신 머릿속에 남아 있을 한 가지. 🚨 '7하우스가 ○○자리라'는 근거는 첫 문장에 딱 한 번만 쓰고, 그 뒤로는 근거 없이 묘사만 하라. 용어를 반복하면 상담이 아니라 해설서가 된다.",
 
-  "card4_career": "(750자 이상) 그 사람의 사회적 위치와 돈. 두 부분으로 써라.\\n\\n① 직업의 결: 7하우스 지배성이 있는 하우스를 근거로. 두루뭉술한 '전문직' 금지, 어떤 방식으로 일하는 사람인지.\\n\\n② 돈 버는 스타일 — 이 카드의 승부처다. 사주 용어와 대비해 단정하라: 다달이 꼬박꼬박 쌓는 사람(사주로 치면 정관·정재 스타일)인가, 한 번에 크게 당기는 사람(편재 스타일)인가. 근거는 8하우스다 — 8하우스는 7하우스에서 두 번째 방, 즉 <b>배우자의 지갑</b>이다. 8하우스의 별자리·행성과 7하우스 지배성의 품위를 근거로 반드시 다음 중 하나로 단정하라. 부자 배치면 부자라고 그대로 말하라. 8하우스에 목성·금성이 있거나 지배성 품위가 좋으면 → <b>결혼이 곧 재테크가 되는 배치입니다</b> 수준으로 화끈하게. 8하우스에 토성이 있거나 비어 있고 지배성이 약하면 → '배우자 돈으로 편하게 살 팔자는 아닙니다. 같이 벌어야 합니다'라고 정직하게 팩폭하라. 애매하게 '둘 다 가능' 금지. 위 하우스 배치에 실제로 있는 것만 근거로 쓰고, 8하우스가 비었으면 8하우스 별자리의 지배성이 어느 방에 있는지로 판단하라.",
+  "card4_career": "(750~950자) 그 사람의 사회적 위치와 돈. 두 부분으로 써라.\\n\\n① 직업의 결: [7하우스 지배성] 항목의 하우스를 근거로. 두루뭉술한 묘사 금지, 어떤 방식으로 일하는 사람인지.\\n\\n② 돈을 다루는 방식 — 이 카드의 승부처다. 근거는 위 [8하우스] 항목이다. 8하우스는 7하우스에서 두 번째 방, 즉 배우자의 지갑이다. 사주 용어와 대비해 단정하라: 다달이 꼬박꼬박 쌓는 사람(정관·정재 스타일)인가, 한 번에 크게 당기는 사람(편재 스타일)인가. 애매하게 '둘 다 가능' 금지.\\n🚨 단, 재산의 '규모'를 단정하지 마라('부자입니다', '결혼이 곧 재테크입니다' 금지). 결혼 뒤에 반증되는 종류의 약속이고, 그때 손님은 자기 결혼 결정에 이 리포트가 끼어들었다고 생각한다. 규모 대신 <b>돈이 들어오고 나가는 방식</b>을 단정하라. 그게 더 구체적으로 읽히고 반증되지 않는다.\\n   8하우스에 목성·금성이 있거나 지배성 품위가 좋으면 → '월급 하나로 끝내지 않는 사람입니다. 돈이 들어올 구멍을 스스로 만듭니다' 방향으로 화끈하게.\\n   8하우스에 토성이 있거나 비어 있고 지배성이 약하면 → '배우자 돈으로 편하게 살 팔자는 아닙니다. 같이 벌어야 합니다'라고 정직하게 팩폭하라.",
 
-  "card5_timing": "(850자 이상) ★두 번째로 중요★ 만남의 시기와 자리. [실제 계산된 목성 트랜짓]의 연·월을 그대로 인용하고, 왜 그 시기인지 근거를 밝혀라. 그리고 🚨핵심: 목록에서 ★★ 표시된 구간을 <span style='color:#ff3b30;font-weight:900;'>가장 강력한 결혼의 창</span>으로 빨간 강조 한 곳에 못 박아라 — 시기 문장 통째로. 왜 그 구간이 최강인지(합은 목성이 배우자궁 문 앞에 정확히 서는 각이라 가장 세다는 식으로, 쉬운 말로) 근거를 붙여라. 다른 구간을 최강으로 바꾸거나 임의 연도를 만들면 치명적 실패다. 그다음 7하우스 지배성이 있는 하우스를 근거로 '어디서 만나는지'를 구체적으로 짚어라. ★★ 구간이 없거나 시기가 계산되지 않았으면 정직하게 말하고 자리 쪽에 집중하라.",
+  "card5_timing": "(850~1050자) ★두 번째로 중요★ 만남의 시기와 자리. [실제 계산된 목성 트랜짓]의 연·월을 그대로 인용하고, 왜 그 시기인지 근거를 밝혀라. 🚨핵심: 목록에서 ★★ 표시된 구간을 <span style='color:#ff3b30;font-weight:900;'>가장 강력한 결혼의 창</span>으로 빨간 강조 한 곳에 못 박아라 — 시기 문장 통째로. 왜 그 구간이 최강인지(합은 목성이 배우자궁 문 앞에 정확히 서는 각이라 가장 세다는 식으로, 쉬운 말로) 근거를 붙여라. 다른 구간을 최강으로 바꾸거나 임의 연도를 만들면 치명적 실패다. 그다음 [7하우스 지배성]이 있는 하우스를 근거로 '어디서 만나는지'를 구체적으로 짚어라. ★★ 구간이 없거나 시기가 계산되지 않았으면 정직하게 말하고 자리 쪽에 집중하라.",
 
-  "card6_chemistry": "(500자 이상) 두 사람이 만나면 생기는 일. 잘 맞는 지점과 <span style='color:#ff3b30;font-weight:900;'>반드시 부딪히는 지점</span>을 함께 써라. 좋은 말만 있으면 안 믿는다. 각도를 최소 1개 인용하라.",
+  "card6_chemistry": "(500~650자) 두 사람이 만나면 생기는 일. 잘 맞는 지점과 <span style='color:#ff3b30;font-weight:900;'>반드시 부딪히는 지점</span>을 함께 써라. 좋은 말만 있으면 안 믿는다. 각도를 최소 1개 오차까지 인용하라.",
 
-  "card7_destiny_guide": "(600자 이상) 이 인연을 잡기 위해 오늘부터 할 일 3가지. 다짐이 아니라 행동으로. 그리고 <span style='color:#ff3b30;font-weight:900;'>피해야 할 상대의 특징</span>을 빨간 글씨로 경고하라. 마지막 문단은 반증 조건 — '이 해석이 어긋난다면 그건 ○○ 때문입니다'.",
+  "card7_destiny_guide": "(600~750자) 이 인연을 잡기 위해 오늘부터 할 일 3가지. 다짐이 아니라 행동으로 — '연락을 먼저 한다' 같은 동사로 끝나야 한다. 그리고 <span style='color:#ff3b30;font-weight:900;'>피해야 할 상대의 특징</span>을 빨간 글씨로 경고하라. 🚨 반증 조건은 card2 에 이미 썼으니 여기서 반복하지 마라. 이 카드는 손님이 내일 뭘 할지 알고 덮게 만드는 게 목적이다. 힘이 나게 끝내라.",
 
-  "card8_teaser": "(150자 내외) 배우자 이야기는 여기까지. 그런데 왜 이 패턴이 반복됐는지, 그 뿌리는 본인 차트에 있다는 방향으로 자연스럽게 이어라. 강매하지 마라."
+  "card8_teaser": "(150자 내외) 배우자 이야기는 여기까지. 그런데 왜 이 패턴이 반복됐는지, 그 뿌리는 본인 차트에 있다는 방향으로 자연스럽게 이어라. 강매하지 마라. 마지막은 질문으로 끝내 궁금증을 남겨라."
 }
 `;
+    }
 
     // ✅ Gemini v1beta 직접 호출
     // - thinkingBudget 4096: '생각' 기능 ON → 차트를 깊이 분석해 리포트 품질 대폭 상승
     //   (vercel.json에서 실행시간 300초 확보했으므로 타임아웃 걱정 없음)
     // - responseMimeType JSON: 순수 JSON만 답하도록 강제 (500 파싱에러 해결)
-    // - 실패 시 자동 1회 재시도 + 깨진 JSON 복구 파싱
+    // - 🚨 v3: temperature 0.9 → 0.8. 형식 제약이 이렇게 많은 프롬프트에서 0.9는
+    //   창의성보다 형식 위반(강조 남용·분량 초과·발뺌)을 더 많이 만든다.
     let parsedData = null;
     let lastErr = "";
+    let correction = "";
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         const geminiRes = await fetch(
@@ -949,10 +1133,10 @@ ${astrologyDataText}
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
+              contents: [{ parts: [{ text: buildPrompt(correction) }] }],
               generationConfig: {
                 maxOutputTokens: 32768,
-                temperature: 0.9,
+                temperature: 0.8,
                 responseMimeType: "application/json",
                 thinkingConfig: { thinkingBudget: 4096 }
               }
@@ -984,6 +1168,7 @@ ${astrologyDataText}
         const e = responseText.lastIndexOf("}");
         if (s === -1 || e === -1) {
           lastErr = "응답에 JSON 없음: " + responseText.slice(0, 200);
+          correction = "순수 JSON 객체만 출력하라. 앞뒤에 설명이나 코드블록을 붙이지 마라.";
           console.error(`🔥 [시도 ${attempt}]`, lastErr);
           continue;
         }
@@ -991,6 +1176,7 @@ ${astrologyDataText}
         const bad = gateCheck(cand);
         if (bad && attempt < 3) {
           lastErr = bad;
+          correction = bad;   // 🚨 v3: 실패 사유를 모델에게 돌려준다
           console.warn(`⚠️ [시도 ${attempt}] 재생성 — ${bad}`);
           continue;
         }
@@ -999,6 +1185,7 @@ ${astrologyDataText}
         break;
       } catch (err) {
         lastErr = err.message;
+        correction = "직전 응답이 올바른 JSON 이 아니었다. 따옴표와 중괄호를 정확히 닫아라.";
         console.error(`🔥 [시도 ${attempt}] 실패:`, err.message);
       }
     }
@@ -1038,26 +1225,41 @@ ${astrologyDataText}
         '빈 카드: ' + emptyFields.join(', '));
     }
 
+    /* 🚨 v3: 마크다운이 새어나오면 손님 화면에 별표가 그대로 보인다.
+       프롬프트로 여러 번 막았는데도 뚫린다. 결정론적으로 고치면 비용이 안 든다.
+       (couple.js 의 sanitize 와 같은 장치) */
+    for (const k of Object.keys(parsedData)) {
+      if (typeof parsedData[k] !== 'string') continue;
+      parsedData[k] = parsedData[k]
+        .replace(/\*\*\*(.+?)\*\*\*/g, '<b>$1</b>')
+        .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+        .replace(/(^|[^*])\*([^*\n]+?)\*(?!\*)/g, '$1<b>$2</b>')
+        .replace(/^#{1,6}\s+/gm, '')
+        /* 브랜드 밖 색상 → 금색. 경고용 빨강(#ff3b30)만 남긴다 */
+        .replace(/color:\s*#(?!ff3b30\b)[0-9a-fA-F]{3,8}/gi, 'color:#d4af37')
+        .replace(/\u00a0/g, ' ')
+        .trim();
+    }
+
     /* ── 서버가 만든 사실 자료를 응답에 붙인다 ──
        AI 가 손대지 않으므로 지어낼 수 없다. VVIP 와 같은 장치다. */
     try {
       if (chartCtx.snapshot && chartCtx.snapshot.planets) {
         parsedData.chart_table = buildChartTable(chartCtx.snapshot.planets, chartCtx.snapshot.ascAbs);
-        parsedData.method_note = buildMethodNote(dateTimeIso, cityResolved, !!isTimeUnknown);
-        parsedData.time_unknown = !!isTimeUnknown;
+        parsedData.method_note = buildMethodNote(dateTimeIso, cityResolved, isTimeUnknown);
+        parsedData.time_unknown = isTimeUnknown;
       }
     } catch (e) { console.warn('⚠️ 명세표 생성 실패:', e.message); }
 
     console.log("✅ [4] JSON 파싱 성공, 응답 전송");
 
-    // 🚨 [다시보기 기능] 주문번호가 함께 왔으면 KV에 30일간 저장
+    // 🚨 [다시보기 기능] 주문번호가 함께 왔으면 KV에 저장
     // → 이후 GET ?orderId=... 로 언제 어디서든 재조회 가능
     if (orderId) {
       try {
-        /* 30일 → 180일. 카페24 주문내역은 훨씬 오래 남는데 리포트만 30일 뒤
-           사라지면, 그때부터 "다시보기가 안 돼요" 문의가 시작된다. */
-        /* v2: 180일 → 365일. VVIP(365일)와 통일.
-           "오랜만에 들어갔더니 리포트가 사라졌다"는 문의를 막는다. */
+        /* 30일 → 180일 → 365일(VVIP 와 통일).
+           카페24 주문내역은 훨씬 오래 남는데 리포트만 먼저 사라지면
+           그때부터 "다시보기가 안 돼요" 문의가 시작된다. */
         await kv.set(`report:${orderId}`, parsedData, { ex: 60 * 60 * 24 * 365 });
         await kv.set(`status:${orderId}`, { state: 'completed', at: Date.now() }, { ex: 60 * 60 * 24 * 365 });
         console.log("💾 KV 저장 완료: report:" + orderId);
