@@ -257,10 +257,38 @@ const handler = async (req, res) => {
       const saved = await kv.get(KEY(orderId));
       res.setHeader('Cache-Control', 'no-store');
       if (!saved) return res.status(404).json({ error: '저장된 리포트 없음' });
-      /* 기간이 지난 저장본은 다시 만들게 합니다. "오늘부터 30일"이니까요. */
+      /* ══════════════════════════════════════════════════════════════
+         🚨 2026-09-06 수정 — 손님이 직접 알려준 문제
+
+         "조회 누를 때마다 그 날부터 30일로 새롭게 나오더라구요.
+          그래서 오류가 나나 싶기도 하구요"
+
+         정확한 지적이었다. 예전 조건은 이랬다.
+
+             if (saved.baseDate < today)  →  다시 만든다
+
+         구매 다음 날부터는 열 때마다 매번 걸린다.
+         9월 6일에 산 손님이 7일에 열면 재생성, 8일에 열어도 재생성.
+         30일 동안 매일 열면 서른 번을 새로 만든다.
+
+         문제가 셋이다.
+           1) 손님이 산 리포트가 열 때마다 딴 내용이 된다. 뭘 산 건지 모른다.
+           2) 1,900원 받고 Gemini 를 무제한으로 호출한다.
+           3) 생성을 반복하니 실패할 기회도 그만큼 늘어난다.
+              이 손님이 겪은 오류의 상당수가 여기서 나왔을 것이다.
+
+         "오늘부터 30일"의 오늘은 '구매한 날'이다. 열어본 날이 아니다.
+         그래서 구매 시점의 30일 구간이 실제로 끝났을 때만 다시 만든다.
+         구간 안에서는 산 그대로를 계속 보여준다.
+         ══════════════════════════════════════════════════════════════ */
       const today = new Date(); today.setHours(0, 0, 0, 0);
-      if (saved.baseDate && new Date(saved.baseDate) < today) {
-        return res.status(404).json({ error: '기간이 지나 다시 계산해야 합니다', stale: true });
+      if (saved.baseDate) {
+        const end = new Date(saved.baseDate);
+        end.setHours(0, 0, 0, 0);
+        end.setDate(end.getDate() + 30);        // 구매일 + 30일 = 이 리포트가 다루는 마지막 날
+        if (end < today) {
+          return res.status(404).json({ error: '기간이 지나 다시 계산해야 합니다', stale: true });
+        }
       }
       return res.status(200).json(saved);
     } catch (e) {
