@@ -1265,8 +1265,9 @@ const handler = async (req, res) => {
 
     if (b.orderId) {
       try {
-        await kv.set('vip-report:' + b.orderId, out, { ex: 60 * 60 * 24 * 365 });
-        console.log('💾 KV 저장(1년): vip-report:' + b.orderId);
+        /* 2026-10-02 봉인 — 만료 없이 영구 보관. 사라지면 재생성돼 내용이 바뀐다. */
+        await kv.set('vip-report:' + b.orderId, out);
+        console.log('💾 KV 저장(영구): vip-report:' + b.orderId);
       } catch (e) { console.log('⚠️ KV 저장 실패(전송은 진행):', e.message); }
     }
     res.setHeader('Cache-Control', 'no-store');
