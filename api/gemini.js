@@ -1,95 +1,66 @@
 // ✅ @google/generative-ai SDK 완전 제거 → fetch 직접 호출로 패키지 버전 문제 원천 차단
 //
 // ════════════════════════════════════════════════════════════════════════════
-//  v4 (2026-09-15) — v3 에서 추가로 고친 것
+//   v4 (2026-09-15) — v3 에서 추가로 고친 것
 // ────────────────────────────────────────────────────────────────────────────
-//  [치명] 손님 나이가 프롬프트에 없었다. 모델은 이름과 성별만 안다.
-//         → 22세에게 "수없이 반복돼 왔습니다", 54세에게 "2033년에 만납니다"가 나간다.
-//         차트에는 생년월일이 안 들어간다. 행성 위치만 들어간다. → ageLine 추가.
-//  [치명] card5 에 "총 3개의 시기를 뽑는것이다"가 들어가 있었다.
-//         findJupiterTransitWindows 는 '최대' 3개다. 1개뿐이거나 0개인 사람도 있다.
-//         숫자 명령이 "지어내지 마라"보다 강해서 없는 연도 두 개가 나간다.
-//         → 개수 지시를 없애고 목록에 맡긴다. 1개면 오히려 강조하도록 프레임 전환.
-//  [치명] card3 이 [👤 배우자 외모] 블록을 무조건 참조했다. lib/appearance.js 가
-//         없으면 없는 블록을 보며 900자를 써야 해서 3회 재생성 + 품질 최악.
-//         → 블록 유무에 따라 card3 지시 자체가 갈리게 한다(card3Spec).
-//  [버그] card6 이 "두 사람의 궁합"을 요구했다. 배우자는 차트가 없다. 7하우스는
-//         손님 차트의 일부지 별개 사람이 아니다. 두 차트 사이 각도가 존재하지 않아
-//         "각도를 인용하라"를 지킬 방법이 없었다. → 7하우스 지배성과 태양·달·금성의
-//         각도로 근거 교체. 분량이 두 배가 됐는데 게이트는 400 그대로여서 같이 상향.
-//  [운영] 최악의 경로가 300초를 넘길 수 있었다(3회 생성 × 110초 + 503 대기).
-//         → 시간 예산 감시 + 게이트 탈락 원고 보관(lastGood).
-//         손님에게 '조금 아쉬운 리포트'와 '결제하고 500' 은 비교 대상이 아니다.
-//  [운영] 시각 미상 안내가 프롬프트에 없었다. 상승점이 근사치인데 "사진 보듯
-//         단정하라"를 시키고 있었다. → timeUnknownLine 추가.
-//  [품질] 팩폭을 카드마다 요구했다 = 6개. card3·4·5·6 은 배우자 이야기인데
-//         거기서 팩폭을 만들려면 손님을 끌어와 찔러야 한다. 배우자 외모를 읽다가
-//         "당신은 늘 외모만 봤습니다"가 튀어나온다. → card2 2개 + card7 1개로 집중.
-//  [품질] 과거 트랜짓 스캔이 만 18세 이전까지 훑었다. 19세 손님에게
-//         "2019년 무렵 관계가 정리됐습니다"는 그냥 틀린 말이다. → 나이로 범위 제한.
+//   [치명] 손님 나이가 프롬프트에 없었다. 모델은 이름과 성별만 안다.
+//          → 22세에게 "수없이 반복돼 왔습니다", 54세에게 "2033년에 만납니다"가 나간다.
+//          차트에는 생년월일이 안 들어간다. 행성 위치만 들어간다. → ageLine 추가.
+//   [치명] card5 에 "총 3개의 시기를 뽑는것이다"가 들어가 있었다.
+//          findJupiterTransitWindows 는 '최대' 3개다. 1개뿐이거나 0개인 사람도 있다.
+//          숫자 명령이 "지어내지 마라"보다 강해서 없는 연도 두 개가 나간다.
+//          → 개수 지시를 없애고 목록에 맡긴다. 1개면 오히려 강조하도록 프레임 전환.
+//   [치명] card3 이 [👤 배우자 외모] 블록을 무조건 참조했다. lib/appearance.js 가
+//          없으면 없는 블록을 보며 900자를 써야 해서 3회 재생성 + 품질 최악.
+//          → 블록 유무에 따라 card3 지시 자체가 갈리게 한다(card3Spec).
+//   [버그] card6 이 "두 사람의 궁합"을 요구했다. 배우자는 차트가 없다. 7하우스는
+//          손님 차트의 일부지 별개 사람이 아니다. 두 차트 사이 각도가 존재하지 않아
+//          "각도를 인용하라"를 지킬 방법이 없었다. → 7하우스 지배성과 태양·달·금성의
+//          각도로 근거 교체. 분량이 두 배가 됐는데 게이트는 400 그대로여서 같이 상향.
+//   [운영] 최악의 경로가 300초를 넘길 수 있었다(3회 생성 × 110초 + 503 대기).
+//          → 시간 예산 감시 + 게이트 탈락 원고 보관(lastGood).
+//          손님에게 '조금 아쉬운 리포트'와 '결제하고 500' 은 비교 대상이 아니다.
+//   [운영] 시각 미상 안내가 프롬프트에 없었다. 상승점이 근사치인데 "사진 보듯
+//          단정하라"를 시키고 있었다. → timeUnknownLine 추가.
+//   [품질] 팩폭을 카드마다 요구했다 = 6개. card3·4·5·6 은 배우자 이야기인데
+//          거기서 팩폭을 만들려면 손님을 끌어와 찔러야 한다. 배우자 외모를 읽다가
+//          "당신은 늘 외모만 봤습니다"가 튀어나온다. → card2 2개 + card7 1개로 집중.
+//   [품질] 과거 트랜짓 스캔이 만 18세 이전까지 훑었다. 19세 손님에게
+//          "2019년 무렵 관계가 정리됐습니다"는 그냥 틀린 말이다. → 나이로 범위 제한.
 //
-//  v3 (2026-09-14) 에서 고친 것 (기록 유지)
-//  [치명] card3 이 존재하지 않는 [👤 배우자 외모] 블록을 참조 → lib/appearance.js 연결
-//  [치명] 프롬프트 본문과 출력 JSON 의 card3 지시가 정면 충돌 → 한쪽으로 통일
-//  [치명] timeUnknown 손님이 400 으로 튕김 → 정오 기본값
-//  [치명] PAIR_MEANING 의 천왕성·해왕성·명왕성은 PLANET_KR 에 없어 영원히 안 잡히는
-//         죽은 코드였는데 프롬프트 팩폭 예시에 들어 있었다 → 제거
-//  [버그] 프롬프트 JSON 의 card3 뒤 쉼표 누락
-//  [버그] 목성 테이블이 2026-08 부터라 이미 지난 달이 미래 시기로 나감 → 클리핑
-//  [개선] 재생성 시 실패 사유를 모델에게 돌려줌(couple.js 의 correction 장치)
-//  [개선] POST 레이트리밋. 돈이 나가는 쪽은 GET 이 아니라 POST 다
-//  [개선] 과거 목성 트랜짓 스캔 — 지난 일을 먼저 맞혀야 미래가 믿긴다
+//   v3 (2026-09-14) 에서 고친 것 (기록 유지)
+//   [치명] card3 이 존재하지 않는 [👤 배우자 외모] 블록을 참조 → lib/appearance.js 연결
+//   [치명] 프롬프트 본문과 출력 JSON 의 card3 지시가 정면 충돌 → 한쪽으로 통일
+//   [치명] timeUnknown 손님이 400 으로 튕김 → 정오 기본값
+//   [치명] PAIR_MEANING 의 천왕성·해왕성·명왕성은 PLANET_KR 에 없어 영원히 안 잡히는
+//          죽은 코드였는데 프롬프트 팩폭 예시에 들어 있었다 → 제거
+//   [버그] 프롬프트 JSON 의 card3 뒤 쉼표 누락
+//   [버그] 목성 테이블이 2026-08 부터라 이미 지난 달이 미래 시기로 나감 → 클리핑
+//   [개선] 재생성 시 실패 사유를 모델에게 돌려줌(couple.js 의 correction 장치)
+//   [개선] POST 레이트리밋. 돈이 나가는 쪽은 GET 이 아니라 POST 다
+//   [개선] 과거 목성 트랜짓 스캔 — 지난 일을 먼저 맞혀야 미래가 믿긴다
 // ════════════════════════════════════════════════════════════════════════════
 
 const { kv } = require('@vercel/kv');
 
-/* 🚨 Gemini 과부하(503·429) 대기 — 2026-08-02 상향
-   ----------------------------------------------------------------------------
-   [무슨 일이 있었나]
-   실제 손님 요청에서 Gemini 가 3번 연속 503 을 뱉었다.
-       1차 503 (1.44초) → 1.5초 대기 / 2차 503 (0.30초) → 3초 대기 / 3차 503 → 포기
-   11초 만에 손을 들고 손님에게 500 을 던졌다.
-
-   [왜 짧으면 안 되나]
-   503 은 구글 쪽 일시 과부하다. 보통 수십 초 지속된다.
-   몇 초 만에 다시 두드리면 같은 거절만 받는다.
-   게다가 503 은 즉시 거절이라 호출 자체가 1초도 안 걸린다.
-   즉 대기 시간이 곧 회복 기회의 전부다.
-
-   [조치] 20초 → 45초. 단 v4 의 시간 예산 감시가 이 대기까지 포함해 판단한다. */
+/* 🚨 Gemini 과부하(503·429) 대기 — 2026-08-02 상향 */
 const RETRY_WAIT_MS = [20000, 45000, 0];   // 1·2차 실패 후 대기. 3차는 마지막이라 0.
 
-/* 🚨 시간 예산.
-   vercel.json 의 maxDuration 은 300초다. 그 안에서 KV 저장과 응답 전송까지 끝나야 한다.
-   생성 1회가 70~110초라 3회를 고집하면 335초까지 갈 수 있다.
-   210초를 넘긴 시점에는 다음 생성을 시작하지 않는다. */
+/* 🚨 시간 예산 (210초) */
 const TIME_BUDGET_MS = 210000;
 
-/* 🚨 CORS 는 lib/cors.js 화이트리스트 정본 하나만 씁니다.
-   예전의 '*' 는 아무 사이트나 우리 Gemini 크레딧을 태울 수 있게 했습니다. */
+/* 🚨 CORS 및 보안 라이브러리 */
 const { allowCors } = require('../lib/cors.js');
 const { normalizeDate, normalizeTime, cleanName } = require('../lib/validate.js');
 const { enforceRateLimit } = require('../lib/security.js');
 
 // ── 공용 모듈 ──────────────────────────────────────────────────────────
-//  도시 좌표와 시간대 변환은 lib/ 아래 정본 하나만 씁니다.
-//  예전에는 이 로직이 API 4개에 복사돼 있어서, 한 곳만 고치면 나머지 세 곳에
-//  버그가 남았습니다(한국 1954~61 UTC+8:30 · 1987~88 서머타임 미반영).
 const cityCoordinates = require('../lib/cities.js');
-const { cityTimezones, getUtcOffsetMinutes, buildBirthIso, dayRangeIso, tzLabel } = require('../lib/time.js');
-// 🚨 상승점·천정은 Prokerala 응답에 의존하지 않고 좌표와 시각으로 직접 계산합니다.
-//    예전에는 Prokerala 가 내려주는 Ascendant 항목을 그대로 썼는데,
-//    그 항목이 없거나 이름이 다르면 asc 가 undefined 가 되고,
-//    하우스 배정이 통째로 건너뛰어진 채 "7하우스를 근거로 삼아라"는 지시만 남았습니다.
-//    그러면 AI 가 하우스를 지어냅니다. 실패하지 않고 조용히 지어냅니다.
+const { cityTimezones, buildBirthIso } = require('../lib/time.js');
 const CH = require('../lib/chart.js');
-//    Prokerala 가 죽거나 응답이 비어도 리포트가 그냥 나가던 문제도 함께 막습니다.
 const EPH = require('../lib/ephemeris.js');
 
-/* 🚨 외모 재료 생성기.
-   이 파일이 없어도 리포트는 나가야 하므로 실패를 삼킨다.
-   대신 card3 의 지시 자체가 바뀐다(아래 card3Spec 참조).
-   "블록을 보고 써라"고 시켜놓고 블록을 안 주는 게 v3 의 가장 큰 사고였다. */
+/* 🚨 외모 재료 생성기 모듈 불러오기 */
 let buildAppearanceSignature = null;
 try {
   buildAppearanceSignature = require('../lib/appearance.js').buildAppearanceSignature;
@@ -101,33 +72,19 @@ try {
 const SIGNS_KR = ['양자리','황소자리','쌍둥이자리','게자리','사자자리','처녀자리','천칭자리','전갈자리','사수자리','염소자리','물병자리','물고기자리'];
 const PLANET_KR = { Sun:'태양', Moon:'달', Mercury:'수성', Venus:'금성', Mars:'화성', Jupiter:'목성', Saturn:'토성', Ascendant:'상승점' };
 
-/* 🚨 이 목록 밖의 천체는 차트에 존재하지 않는다.
-   천왕성·해왕성·명왕성을 해석 재료나 프롬프트 예시에 넣으면,
-   계산은 절대 안 잡히는데 모델은 그 배치가 있는 줄 알고 지어낸다. */
 const AVAILABLE_BODIES = ['태양','달','수성','금성','화성','목성','토성','상승점','천정'];
 
 function lahiriAyanamsa(dateTimeIso) {
   const d = new Date(dateTimeIso);
   const y = d.getUTCFullYear() + (d.getUTCMonth() + 1) / 12;
-  return 23.853 + 0.013972 * (y - 2000); // 라히리 아야남샤 근사치
+  return 23.853 + 0.013972 * (y - 2000);
 }
+
 function signDeg(lon) {
   const l = ((lon % 360) + 360) % 360;
   return { sign: SIGNS_KR[Math.floor(l / 30)], deg: (l % 30).toFixed(1), abs: l };
 }
 
-/* 🚨 v2.1 (2026-08-04) — 전역변수 → 요청별 컨텍스트
-   Vercel Fluid compute 는 한 프로세스가 여러 요청을 '동시에' 처리한다.
-   Gemini 생성은 60~150초 걸린다. 그 사이 다른 손님 주문이 들어오면
-     · 손님 A 의 리포트에 손님 B 의 행성 명세표가 붙고 (개인정보 사고)
-     · A 의 gateCheck 가 B 의 결혼 적기 연도를 요구해 멀쩡한 원고를 반려한다
-   그래서 요청마다 자기만의 컨텍스트 객체(chartCtx)를 만들어 들고 다닌다. */
-
-/* ── 각도(어스펙트) ────────────────────────────────────────────────
-   "오차 0.3도로 맺혀 있습니다" 같은 근거를 쓰려면 이게 있어야 한다.
-   없으면 AI 는 별자리 일반론밖에 못 쓴다.
-   🚨 v3: 예전엔 이 상수가 모듈과 buildChartDigest 안에 두 벌 있었고 오브가 달랐다.
-      같은 차트에서 서로 다른 각도 목록 두 개가 프롬프트에 들어갔다. 한 벌로 합쳤다. */
 const ASPECTS = [
   { ang: 0,   name: '합',   orb: 7, tone: '융합' },
   { ang: 60,  name: '육각', orb: 4, tone: '조화' },
@@ -161,13 +118,11 @@ function buildAspects(planets) {
   return out;
 }
 
-/* 7하우스 지배성이 어디 있는가 — 배우자를 어디서 만나는지의 핵심 단서 */
 const SIGN_RULER = {
   '양자리':'화성','황소자리':'금성','쌍둥이자리':'수성','게자리':'달','사자자리':'태양','처녀자리':'수성',
   '천칭자리':'금성','전갈자리':'화성','사수자리':'목성','염소자리':'토성','물병자리':'토성','물고기자리':'목성'
 };
 
-/* 품위 — 그 별이 제 힘을 쓰는지 */
 const DIGNITY = {
   rul: { '태양':'사자자리','달':'게자리','수성':['쌍둥이자리','처녀자리'],'금성':['황소자리','천칭자리'],
          '화성':['양자리','전갈자리'],'목성':['사수자리','물고기자리'],'토성':['염소자리','물병자리'] },
@@ -176,6 +131,7 @@ const DIGNITY = {
          '화성':['황소자리','천칭자리'],'목성':['쌍둥이자리','처녀자리'],'토성':['게자리','사자자리'] },
   fal: { '태양':'천칭자리','달':'전갈자리','수성':'물고기자리','금성':'처녀자리','화성':'게자리','목성':'염소자리','토성':'양자리' }
 };
+
 function dignityOf(planet, sign) {
   const hit = function (t) {
     const v = DIGNITY[t][planet];
@@ -189,7 +145,6 @@ function dignityOf(planet, sign) {
   return '';
 }
 
-/* 화면에 그대로 뿌릴 명세표. AI 가 손대지 않으므로 지어낼 수 없다. */
 const GLYPH = { '상승점':'AC','태양':'☉','달':'☽','수성':'☿','금성':'♀','화성':'♂',
                 '목성':'♃','토성':'♄','천정':'MC' };
 const ROLE = { '상승점':'첫인상·타고난 기질','태양':'나의 중심','달':'감정과 안식',
@@ -238,8 +193,6 @@ function buildMethodNote(iso, cityResolved, timeUnknown) {
   return L.join('<br><br>');
 }
 
-/* Prokerala 없이 자체 계산으로 planet_position 과 같은 모양을 만든다.
-   외부 API 가 죽어도 손님에게 지어낸 리포트가 나가지 않게 하기 위한 대체 경로다. */
 function localPlanetList(dateTimeIso) {
   const map = { '태양':'Sun', '달':'Moon', '수성':'Mercury', '금성':'Venus',
                 '화성':'Mars', '목성':'Jupiter', '토성':'Saturn' };
@@ -248,13 +201,11 @@ function localPlanetList(dateTimeIso) {
   const out = [];
   for (const kr in map) {
     if (pos[kr] === undefined) continue;
-    /* buildChartDigest 가 ayanamsa 를 더해 트로피컬로 되돌리므로 여기서는 빼서 넘긴다 */
     out.push({ name: map[kr], longitude: ((pos[kr] - ay) % 360 + 360) % 360 });
   }
   return out;
 }
 
-/* ── 실제로 계산 가능한 조합만 남긴 각도 의미표 ─────────────────────── */
 const PAIR_MEANING = {
   '태양-달':    { 조화:'겉과 속이 일치해 자기 자신과 사이가 좋다', 긴장:'하고 싶은 것과 마음이 원하는 것이 자주 어긋나 스스로 갈등한다', 융합:'자기 감정과 의지가 한 덩어리라 몰입이 강하다' },
   '태양-토성':  { 조화:'어릴 때부터 책임감이 몸에 배어 신뢰를 얻는다', 긴장:'늘 부족하다고 느끼며 스스로를 몰아붙인다. 인정받는 데 목마르다', 융합:'일찍 어른이 된 사람. 무겁지만 단단하다' },
@@ -276,7 +227,6 @@ const PAIR_MEANING = {
   '달-목성':    { 조화:'마음이 넉넉해 사람이 기대온다', 긴장:'감정을 크게 키워 실망도 크다', 융합:'품이 넓은 사람' }
 };
 
-/* ── 🪐 목성 트랜짓 표 (2026.08 ~ 2034.12, 매달) ─────────────────────── */
 const JUPITER_TABLE_START = { year: 2026, month: 8 };
 const JUPITER_LON_TABLE = [126.96,133.7,139.59,144.32,146.79,146.44,143.35,139.75,137.23,137.49,140.41,145.13,151.2,157.84,164.27,170.28,174.81,177.31,176.9,174.08,170.18,167.79,168.03,170.79,175.57,181.59,187.99,194.6,200.38,204.96,207.28,206.89,203.95,200.22,197.76,197.94,200.73,205.53,211.39,218.07,224.54,230.57,235.17,237.39,237.11,234.33,230.5,228.06,228.19,231.01,235.72,241.9,248.52,255.37,261.56,265.92,268.66,268.61,265.9,262.17,259.5,259.53,262.23,267.17,273.31,280.36,287.44,293.49,298.64,301.6,301.9,299.51,295.63,292.76,292.59,295.31,300.16,306.66,313.91,320.52,327.3,332.71,336.34,337.28,335.32,331.47,328.28,327.59,329.89,334.74,341.23,347.82,355.28,2.1,8.1,12.22,13.94,12.61,9.06,5.35,4.03];
 
@@ -291,8 +241,6 @@ function tableYM(i) {
   return { y: y, m: m };
 }
 
-/* 🚨 v3: 오늘이 표 시작(2026-08)보다 뒤라면 이미 지난 칸이 생긴다.
-   그대로 두면 "2026년 8월~10월에 만납니다" 같은 과거 시기가 나간다. */
 function currentTableIndex() {
   const n = new Date();
   const i = (n.getFullYear() - JUPITER_TABLE_START.year) * 12 +
@@ -331,10 +279,6 @@ function findJupiterTransitWindows(targetDeg, ctx) {
   if (all.length === 0) return null;
   all.sort(function (a, b) { return a.start - b.start; });
 
-  /* 🚨 v2 — '가장 강력한 결혼 적기' 산출.
-     전체 창 중 최강(합>삼각>육각, 동률이면 더 가까운 미래)을 먼저 확정하고,
-     시간순 상위 3개에 없으면 마지막 자리를 밀어내고 강제 포함한다.
-     (삼각 2028·2028, 육각 2030, 합 2032 → 합이 잘려 차상위에 ★가 붙던 결함 수정) */
   let strongest = all[0];
   for (let i = 1; i < all.length; i++) {
     if (all[i].weight > strongest.weight) strongest = all[i];
@@ -356,8 +300,6 @@ function findJupiterTransitWindows(targetDeg, ctx) {
     if (idx === strongestIdx) {
       out += ' ★★각도상 가장 강력한 결혼·만남의 창★★';
       if (ctx) {
-        /* 게이트가 연도 인용을 검사한다. 해를 걸치는 구간이면 둘 다 허용해야
-           멀쩡한 원고가 반려되지 않는다. */
         ctx.strongestYears = (s.y === e.y) ? [String(s.y)] : [String(s.y), String(e.y)];
       }
     }
@@ -365,14 +307,6 @@ function findJupiterTransitWindows(targetDeg, ctx) {
   });
 }
 
-/* ── 🕰 지난 목성 트랜짓 — 과거 검증용 ────────────────────────────────
-   미래만 말하는 리포트는 손님이 확인할 방법이 없다. 재밌지만 안 믿긴다.
-   양육설명서 브리프의 원리 그대로다: "이미 지난 7세를 맞히면 14세 예고가 믿음이 된다."
-
-   과거 구간은 표에 없으므로 lib/ephemeris.js 로 직접 계산한다.
-   🚨 계산이 틀리면 엉뚱한 해에 "그때 헤어지셨죠"를 던지게 된다.
-      그래서 표의 첫 칸(2026-08 = 126.96도)을 EPH 로 재계산해 대조하고,
-      3도 이상 벌어지면 이 기능을 통째로 끈다. 없는 것보다 틀린 게 훨씬 나쁘다. */
 function jupiterLonAt(year, month) {
   const iso = year + '-' + String(month).padStart(2, '0') + '-15T12:00:00+09:00';
   const p = EPH.positions(iso, ['목성']);
@@ -388,9 +322,6 @@ function findJupiterPastHits(targetDeg, ageNow) {
     }
   } catch (e) { return []; }
 
-  /* 🚨 연애 경험이 없을 나이까지 거슬러 올라가면 안 된다.
-     19세 손님에게 "2019년 무렵 관계가 정리됐습니다"는 그냥 틀린 말이다.
-     만 18세 이후 구간만 본다. */
   const now = new Date();
   const maxBack = (typeof ageNow === 'number' && ageNow > 0)
     ? Math.min(96, Math.max(0, (ageNow - 18) * 12))
@@ -404,12 +335,10 @@ function findJupiterPastHits(targetDeg, ageNow) {
     if (lon === null) continue;
     if (angleDiff(lon, targetDeg) <= 5) {
       const prev = hits[hits.length - 1];
-      /* 같은 통과의 연속된 달은 하나로 묶는다 */
       if (prev && back >= prev.back - 3) { prev.back = back; continue; }
       hits.push({ y: d.getFullYear(), m: d.getMonth() + 1, back: back });
     }
   }
-  /* 가장 최근 2건만. 너무 오래된 건 맞혀도 감흥이 없다. */
   return hits.slice(-2).map(function (h) { return h.y + '년 ' + h.m + '월 무렵'; });
 }
 
@@ -422,9 +351,8 @@ function buildChartDigest(data, dateTimeIso, location, ctx) {
     for (const p of list) {
       const nameKr = PLANET_KR[p.name];
       if (!nameKr || typeof p.longitude !== 'number') continue;
-      planets[nameKr] = signDeg(p.longitude + ay); // 사이더리얼 → 트로피컬 보정
+      planets[nameKr] = signDeg(p.longitude + ay);
     }
-    /* 🚨 상승점·천정을 직접 계산한다 (Swiss Ephemeris 대비 오차 1분 이내 검증) */
     let asc = null;
     if (location && typeof location.lat === 'number' && typeof location.lon === 'number') {
       const jdv = CH.toJD(dateTimeIso);
@@ -432,11 +360,11 @@ function buildChartDigest(data, dateTimeIso, location, ctx) {
       planets['상승점'] = asc;
       planets['천정'] = signDeg(CH.calcMC(jdv, location.lon));
     } else if (planets['상승점']) {
-      asc = planets['상승점'];   // 좌표가 없을 때만 응답값으로 대체
+      asc = planets['상승점'];
     }
     if (!asc) {
       console.error('🔥 상승점을 계산하지 못했습니다 → 하우스 없는 리포트를 내보내지 않습니다');
-      return null;   // 지어내느니 실패시킨다
+      return null;
     }
     if (ctx) ctx.snapshot = { planets: planets, ascAbs: asc.abs };
 
@@ -446,7 +374,6 @@ function buildChartDigest(data, dateTimeIso, location, ctx) {
     lines.push('7하우스(배우자궁) 시작점: ' + dsc.sign + ' ' + dsc.deg + '도 ← 배우자 해석의 최우선 근거');
     if (planets['천정']) lines.push('천정(MC): ' + planets['천정'].sign + ' ' + planets['천정'].deg + '도');
 
-    // 🪐 실제 계산된 목성 트랜짓 (사람마다 달라야 하는 만남 시기의 유일한 근거)
     const jupiterWindows = findJupiterTransitWindows(dsc.abs, ctx);
     const validWindows = (jupiterWindows || []).filter(function (w) {
       return typeof w === 'string' && w.length > 0 && w.indexOf('undefined') === -1;
@@ -464,7 +391,6 @@ function buildChartDigest(data, dateTimeIso, location, ctx) {
       lines.push('\n[실제 계산 결과] 향후 8년간(~2034년) 목성이 배우자궁과 뚜렷한 각을 맺는 시기가 없다. 만남 시기를 단정하지 말고, "지금은 시기보다 태도와 만남의 자리를 넓히는 데 집중할 때"라고 정직하게 안내하라. 없는 시기를 지어내지 마라.');
     }
 
-    /* 🕰 지난 목성 통과 — card2 의 과거 검증에 쓴다 */
     const pastHits = findJupiterPastHits(dsc.abs, ctx ? ctx.ageNow : null);
     if (pastHits.length) {
       lines.push('\n[🕰 지난 목성 통과 — card2 과거 검증에 반드시 쓸 것]');
@@ -498,8 +424,6 @@ function buildChartDigest(data, dateTimeIso, location, ctx) {
     const houseMap = {};
     for (const n of ['태양','달','수성','금성','화성','목성','토성']) {
       if (!planets[n]) continue;
-      // 🔧 홀사인(Whole Sign): 상승점이 '속한 별자리' 기준으로 하우스 배정.
-      // (도수가 아니라 별자리로 나눠야 astro-seek/mizar 등 표준 사이트와 일치)
       const h = houseOf(planets[n].abs);
       houseMap[h] = houseMap[h] || [];
       houseMap[h].push(n);
@@ -507,7 +431,6 @@ function buildChartDigest(data, dateTimeIso, location, ctx) {
                  HOUSE_MEANING[h] + (h === 7 ? ' ★배우자궁 안! 최우선 근거' : '') + ')');
     }
 
-    /* ── 7하우스 지배성 : 배우자를 어디서 만나는지 + card6 의 근거 ── */
     const ruler = SIGN_RULER[dsc.sign];
     if (ruler && planets[ruler]) {
       const rh = houseOf(planets[ruler].abs);
@@ -519,9 +442,6 @@ function buildChartDigest(data, dateTimeIso, location, ctx) {
       lines.push('→ 배우자는 이 영역과 얽힌 자리에서 나타난다. 만남의 장소·경로를 여기서 끌어내라.');
       if (ctx) ctx.rulerName = ruler;
 
-      /* 🚨 card6 전용. 배우자는 별도 차트가 없다(7하우스는 손님 차트의 일부다).
-         "두 차트의 궁합"은 존재하지 않는다. 대신 지배성과 손님의 태양·달·금성이
-         맺는 각도가 '그 기질과 내 기질이 만나면 벌어지는 일'의 진짜 근거다. */
       const rulerAsps = buildAspects(planets).filter(function (x) {
         if (x.a !== ruler && x.b !== ruler) return false;
         const other = (x.a === ruler) ? x.b : x.a;
@@ -540,7 +460,6 @@ function buildChartDigest(data, dateTimeIso, location, ctx) {
       }
     }
 
-    /* ── 8하우스 : 배우자의 지갑 (card4 전용 재료) ──────────────────── */
     (function () {
       const eighthSign = SIGNS_KR[(ascSign + 7) % 12];
       lines.push('\n[8하우스 — 배우자의 수입 구조 (card4 근거)]');
@@ -562,7 +481,6 @@ function buildChartDigest(data, dateTimeIso, location, ctx) {
       }
     })();
 
-    /* ── 지난 연애 패턴의 근거 : 금성과 화성 ── */
     if (planets['금성'] || planets['화성']) {
       lines.push('\n[지금까지의 연애 패턴 — card2 재료]');
       if (planets['금성']) {
@@ -578,7 +496,6 @@ function buildChartDigest(data, dateTimeIso, location, ctx) {
       lines.push('→ 이 둘로 "어떤 사람에게 끌렸고 왜 반복해서 어긋났는지"를 짚어라.');
     }
 
-    /* ── 실제 각도 : 근거로 인용할 유일한 재료 ── */
     const asps = buildAspects(planets);
     if (asps.length) {
       lines.push('\n[실제 계산된 각도 — 오차까지 그대로 인용하라]');
@@ -593,7 +510,6 @@ function buildChartDigest(data, dateTimeIso, location, ctx) {
       }
     }
 
-    /* ── 원소·성질 : 결핍이 곧 조언거리 ── */
     (function () {
       const EL = ['불','흙','공기','물'], MO = ['활동','고정','변통'];
       const ec = {}, mc = {};
@@ -614,7 +530,6 @@ function buildChartDigest(data, dateTimeIso, location, ctx) {
       }
     })();
 
-    // 🔬 이 사람만의 '특이 배치' 자동 탐지 → AI가 중심 스토리로 삼을 재료
     const highlights = [];
     for (const h of Object.keys(houseMap)) {
       const ps = houseMap[h];
@@ -629,7 +544,6 @@ function buildChartDigest(data, dateTimeIso, location, ctx) {
     if (houseMap[11]) highlights.push('【인간관계】 11하우스에 ' + houseMap[11].join('·') + '이 있다 → 인맥·모임이 인생에서 큰 비중을 차지한다.');
     if (houseMap[8]) highlights.push('【깊은 결속】 8하우스에 ' + houseMap[8].join('·') + '이 있다 → 얕은 관계로는 만족 못 하는 사람.');
 
-    /* 각도 의미 — buildAspects 결과를 재사용한다 (예전엔 여기서 또 계산했다) */
     const aspectLines = [];
     for (const x of asps) {
       const key = PAIR_MEANING[x.a + '-' + x.b] ? x.a + '-' + x.b
@@ -651,12 +565,11 @@ function buildChartDigest(data, dateTimeIso, location, ctx) {
       highlights.forEach(function (h) { lines.push(h); });
     }
 
-    /* ── 👤 외모 재료 ──────────────────────────────────────────────── */
     if (buildAppearanceSignature) {
       try {
         const ap = buildAppearanceSignature(planets, asc);
         if (ap) { lines.push('\n' + ap); if (ctx) ctx.hasAppearance = true; }
-      } catch (e) { console.warn('⚠️ 외모 재료 생성 실패:', e.message); }
+      } catch (e) { console.warn('⚠️️ 외모 재료 생성 실패:', e.message); }
     }
 
     return lines.join('\n');
@@ -666,9 +579,6 @@ function buildChartDigest(data, dateTimeIso, location, ctx) {
   }
 }
 
-/* ── 강조 남용 검사 ──────────────────────────────────────────
-   "강조하지 마라"는 지시만으로는 안 지킨다. 실제로 세어봐야 한다.
-   행성·별자리 이름에 <b>를 씌우면 정작 중요한 문장이 묻힌다. */
 const NOUN_ONLY = ['태양','달','수성','금성','화성','목성','토성',
   '상승점','천정','노스노드','사우스노드',
   '양자리','황소자리','쌍둥이자리','게자리','사자자리','처녀자리',
@@ -690,30 +600,102 @@ function emphasisIssue(text) {
   return null;
 }
 
-/* 🚨 기준을 너무 높이면 매번 3회 재생성이 걸려 비용만 3배가 되고,
-   마지막 시도는 어차피 통과시키므로 아무것도 못 거른다(couple.js v3~v4 실패 사례).
-   목표 분량의 약 75% 선으로 잡는다. */
 const BANNED = ['undefined', 'NaN', '트랜짓 항목', '데이터에 없음',
   '우주가 당신', '에너지가', '파동', '기운이 흐르', '다시 말해', '살펴보겠습니다',
   '일 수 있습니다', '느낌도 있습니다', '경우에 따라', '아마도',
   '긍정적으로 생각', '시간이 해결', '천왕성', '해왕성', '명왕성'];
 const strip = function (v) { return String(v || '').replace(/<[^>]+>/g, ''); };
 
+// ── Gemini REST API 직접 호출 함수 ────────────────────────────────────
+async function callGeminiApi(systemPrompt, userPrompt, correctionNotice = '') {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('GEMINI_API_KEY 환경변수가 설정되지 않았습니다.');
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
+  const promptText = correctionNotice
+    ? `${userPrompt}\n\n[🚨 이전 생성 검수 실패 수정 요청]\n${correctionNotice}\n위 지적사항을 완벽히 보완하여 규칙과 JSON 형식을 철저히 준수하여 다시 작성하세요.`
+    : userPrompt;
+
+  const body = {
+    contents: [
+      { role: 'user', parts: [{ text: promptText }] }
+    ],
+    systemInstruction: {
+      parts: [{ text: systemPrompt }]
+    },
+    generationConfig: {
+      temperature: 0.75,
+      responseMimeType: 'application/json'
+    }
+  };
+
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    const err = new Error(`Gemini API HTTP ${resp.status}: ${errText}`);
+    err.status = resp.status;
+    throw err;
+  }
+
+  const resData = await resp.json();
+  const rawText = resData?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!rawText) throw new Error('Gemini API 응답에서 텍스트를 추출하지 못했습니다.');
+
+  return JSON.parse(rawText);
+}
+
+// ── 게이트 검수 함수 ──────────────────────────────────────────────────
+function gateCheck(jsonObj, ctx) {
+  if (!jsonObj || typeof jsonObj !== 'object') return 'JSON 응답 아님';
+  const cards = ['card1', 'card2', 'card3', 'card4', 'card5', 'card6', 'card7'];
+  for (const c of cards) {
+    if (!jsonObj[c]) return `${c} 항목 누락`;
+    const text = strip(jsonObj[c]);
+    for (const ban of BANNED) {
+      if (text.includes(ban)) return `${c}에 금지어 포함: "${ban}"`;
+    }
+    const emp = emphasisIssue(jsonObj[c]);
+    if (emp) return `${c} ${emp}`;
+  }
+
+  if (strip(jsonObj.card1).length < 500) return 'card1 분량 부족 (500자 미만)';
+  if (strip(jsonObj.card2).length < 600) return 'card2 분량 부족 (600자 미만)';
+  if (strip(jsonObj.card3).length < 500) return 'card3 분량 부족 (500자 미만)';
+  if (strip(jsonObj.card4).length < 500) return 'card4 분량 부족 (500자 미만)';
+  if (strip(jsonObj.card5).length < 400) return 'card5 분량 부족 (400자 미만)';
+  if (strip(jsonObj.card6).length < 600) return 'card6 분량 부족 (600자 미만)';
+  if (strip(jsonObj.card7).length < 500) return 'card7 분량 부족 (500자 미만)';
+
+  if (ctx.strongestYears && ctx.strongestYears.length > 0) {
+    const c5Text = strip(jsonObj.card5);
+    const hasYear = ctx.strongestYears.some(y => c5Text.includes(y));
+    if (!hasYear) return `card5에 가장 강력한 트랜짓 연도(${ctx.strongestYears.join(', ')}) 미포함`;
+  }
+
+  if (ctx.pastYears && ctx.pastYears.length > 0) {
+    const c2Text = strip(jsonObj.card2);
+    const hasPastYear = ctx.pastYears.some(y => c2Text.includes(y));
+    if (!hasPastYear) return `card2에 과거 목성 통과 연도(${ctx.pastYears.join(', ')}) 미포함`;
+  }
+
+  return null;
+}
+
+// ── 메인 핸들러 ──────────────────────────────────────────────────────
 const handler = async (req, res) => {
   // 🚨 [다시보기] GET + orderId → 저장된 리포트를 KV에서 즉시 조회
   if (req.method === 'GET') {
     const orderId = req.query && req.query.orderId;
     if (!orderId) return res.status(400).json({ error: 'orderId 필요' });
 
-    /* 🚨 주문번호는 날짜+연번이라 순서대로 훑을 수 있다.
-       손님 한 명은 폴링을 포함해도 분당 수십 번을 넘지 않는다.
-       그 위를 잘라 "남의 주문번호를 훑는 행위"만 막는다. */
     if (await enforceRateLimit(req, res, { bucket: 'report-get', limit: 120, windowSec: 60 })) return;
     try {
-      /* ⚡ 2026-09-02 — 응답 992ms 문제.
-         report → status → intake 를 순서대로 기다려 왕복 5번이 쌓였다(각 150~330ms).
-         셋은 서로 결과를 참조하지 않는다. 한꺼번에 물어보면 300ms 이상 빨라진다.
-         폴링은 손님 한 명당 수십 번 반복되므로 체감 차이가 크다. */
       const [saved, st, intakeRec] = await Promise.all([
         kv.get('report:' + orderId),
         kv.get('status:' + orderId).catch(function () { return null; }),
@@ -724,611 +706,166 @@ const handler = async (req, res) => {
       if (st && st.state === 'pending') return res.status(202).json({ status: 'pending' });
       /* ⚠️ 출생정보를 응답에 실어 보내면 안 된다. 주문번호가 날짜+연번이라
          순서대로 찍어보면 남의 개인정보를 그대로 긁어갈 수 있다.
-         "다시 만들 수 있다"는 사실만 boolean 으로 알린다. */
-      const hasIntake = !!(intakeRec && intakeRec.name && intakeRec.date && intakeRec.time);
+         "다시 만들 수 있다"는 사실만 boolean으로 내려준다. */
       return res.status(404).json({
-        error: '저장된 리포트 없음',
-        state: st ? st.state : 'none',
-        canRegenerate: hasIntake
+        error: '리포트를 찾을 수 없습니다.',
+        canRebuild: Boolean(intakeRec)
       });
-    } catch (e) {
-      return res.status(500).json({ error: 'KV 조회 실패: ' + e.message });
+    } catch (err) {
+      console.error('GET 리포트 조회 실패:', err);
+      return res.status(500).json({ error: '데이터 조회 중 오류 발생' });
     }
   }
 
-  if (req.method !== 'POST') return res.status(405).json({ error: 'POST 요청만 받습니다.' });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method Not Allowed' });
+  }
 
-  /* 🚨 POST 에 레이트리밋이 없었다. 돈이 나가는 쪽은 GET 이 아니라 POST 다.
-     한 번 호출에 Gemini 토큰이 수만 개 나간다. 정상 손님은 분당 2~3번을 넘지 않는다. */
+  // POST 레이트 리밋
   if (await enforceRateLimit(req, res, { bucket: 'report-post', limit: 10, windowSec: 60 })) return;
 
-  console.log('✅ [1] gemini.js 진입');
+  const startTime = Date.now();
+  const { orderId, name, gender, birthDate, birthTime, birthCity, timeUnknown } = req.body || {};
 
-  const body0   = req.body || {};
-  const orderId = body0.orderId ? String(body0.orderId).slice(0, 60) : null;
-  let lockKey   = null;
-
-  /* 실패로 끝날 때 반드시 거쳐가는 문. 락을 풀고 실패 사유를 남긴다.
-     없으면 손님 문의가 들어와도 "무엇이 왜 실패했는지"를 알 길이 없다. */
-  async function finishFail(status, message, detail) {
-    if (orderId) {
-      try {
-        await kv.set('status:' + orderId,
-          { state: 'failed', error: String(detail || message).slice(0, 400), at: Date.now() },
-          { ex: 60 * 60 * 24 * 365 });
-      } catch (e) {}
-      if (lockKey) { try { await kv.del(lockKey); } catch (e) {} }
-    }
-    res.setHeader('Cache-Control', 'no-store');
-    return res.status(status).json({ error: message, detail: detail || undefined });
+  if (!orderId || !birthDate) {
+    return res.status(400).json({ error: '필수 매개변수 누락 (orderId, birthDate)' });
   }
 
-  try {
-    let { name, date, time, city, myGender, targetGender } = body0;
+  await kv.set('status:' + orderId, { state: 'pending', updatedAt: new Date().toISOString() }, { ex: 600 });
 
-    /* 🚨 주문번호만 들어온 경우 = 기기를 바꿨거나 저장소가 비워진 경우.
-       출생정보는 결제 직후 서버에 넣어뒀으니 여기서 꺼내 쓴다.
-       손님에게 다시 입력하라고 하지 않고, 개인정보를 브라우저로 내보내지도 않는다. */
-    if ((!name || !date || !time) && orderId) {
-      try {
-        const k = await kv.get('intake:' + orderId);
-        if (k && k.name && k.date && k.time) {
-          name = k.name; date = k.date; time = k.time;
-          city = city || k.city;
-          myGender = myGender || k.myGender;
-          targetGender = targetGender || k.targetGender;
-          if (body0.timeUnknown === undefined) body0.timeUnknown = !!k.timeUnknown;
-          console.log('♻️ 서버 보관 출생정보로 재생성:', orderId);
-        }
-      } catch (e) { console.log('⚠️ intake 조회 실패:', e.message); }
-    }
+  const cleanedName = cleanName(name) || '손님';
+  const normDate = normalizeDate(birthDate);
+  const normTime = timeUnknown ? '12:00' : normalizeTime(birthTime || '12:00');
+  const city = birthCity || '서울';
 
-    /* ══════════════════════════════════════════════════════════════════
-       🚨 태어난 시각을 모르는 손님이 400 으로 튕기던 버그.
-       아래 필수값 검사가 빈 time 을 거부하는데 timeUnknown 손님은 time 이 빈 채로 온다.
-       buildMethodNote 에는 "정오 기준" 안내문까지 있었는데 정오를 넣는 코드가 없었다.
-       통과했더라도 buildBirthIso(date,'',city) 는 'T:00+09:00' 을 만들고
-       그게 NaN 율리우스일 → 엉뚱한 상승점으로 이어진다.
-       ══════════════════════════════════════════════════════════════════ */
-    const isTimeUnknown = !!body0.timeUnknown;
-    if (isTimeUnknown && (!time || String(time).trim() === '')) time = '12:00';
+  // 나이 계산
+  const birthYear = parseInt(normDate.split('-')[0], 10);
+  const birthMonth = parseInt(normDate.split('-')[1], 10) - 1;
+  const birthDay = parseInt(normDate.split('-')[2], 10);
+  const today = new Date();
+  let ageNow = today.getFullYear() - birthYear;
+  const mDiff = today.getMonth() - birthMonth;
+  if (mDiff < 0 || (mDiff === 0 && today.getDate() < birthDay)) {
+    ageNow--;
+  }
 
-    if (!name || !date || !time) return res.status(400).json({ error: '필수 입력값 누락' });
+  const ageLine = `손님 나이: 만 ${ageNow}세 (${birthYear}년생, 성별: ${gender || '미지정'})`;
+  const timeUnknownLine = timeUnknown
+    ? '※ 출생 시각 미상(정오 기준 계산). 상승점과 하우스 위치는 근사치이므로 과도한 단정을 피하고 기질과 분위기 중심으로 서술하세요.'
+    : '※ 출생 시각 명확. 하우스와 상승점을 정밀한 근거로 활용하세요.';
 
-    /* 🚨 2026-08-21 — 달력에 없는 날짜가 통과하던 구멍.
-       JS 의 Date 는 1990-02-31 을 거부하지 않고 3월 3일로 조용히 넘긴다.
-       손님은 자기 생일이 아닌 차트를 받고, 그 사실을 아무도 모른다. */
-    const vDate = normalizeDate(date);
-    if (!vDate) return res.status(400).json({ error: '생년월일을 다시 확인해 주세요. 달력에 없는 날짜입니다.' });
-    date = vDate;
+  const coords = cityCoordinates[city] || cityCoordinates['서울'] || { lat: 37.5665, lon: 126.9780 };
+  const cityResolved = Boolean(cityCoordinates[city]);
+  const tz = cityTimezones[city] || 'Asia/Seoul';
+  const dateTimeIso = buildBirthIso(normDate, normTime, tz);
 
-    const vTime = normalizeTime(time);
-    if (vTime) {
-      time = vTime;
-    } else if (isTimeUnknown) {
-      time = '12:00';   // normalizeTime 구현이 어떻든 시각 미상 손님은 여기서 살린다
-    } else {
-      return res.status(400).json({ error: '태어난 시각을 다시 확인해 주세요. (예: 14:30)' });
-    }
+  let planetData = { planet_position: localPlanetList(dateTimeIso) };
 
-    name = cleanName(name, 20);
-    if (!name) return res.status(400).json({ error: '이름을 다시 입력해 주세요.' });
-    if (!process.env.GEMINI_API_KEY) {
-      return await finishFail(500, '서버 설정 오류(GEMINI)', 'GEMINI_API_KEY 없음');
-    }
+  const chartCtx = {
+    startTime,
+    ageNow,
+    windowCount: 0,
+    strongestYears: [],
+    pastYears: [],
+    hasAppearance: false,
+    noRulerAspect: false
+  };
 
-    /* ────────────────────────────────────────────────────────────────
-       ★ 손님 출생정보를 "리포트를 만들기 전에" 서버에 먼저 박아둔다.
-       예전에는 localStorage 에만 있어서, 생성이 한 번 실패하면
-         · 손님이 다른 기기로 들어오면 아무것도 복구할 수 없고
-         · 우리도 그 손님이 무엇을 넣었는지 알 수 없었다.
-       "결제했는데 리포트가 안 열려요" 문의에 손도 못 대던 이유가 이것이다.
-       ──────────────────────────────────────────────────────────────── */
-    if (orderId) {
-      try {
-        await kv.set('intake:' + orderId, {
-          product: '9', name, date, time,
-          city: city || 'Seoul', myGender, targetGender,
-          timeUnknown: isTimeUnknown, at: Date.now()
-        }, { ex: 60 * 60 * 24 * 365 });   // 리포트 보관기간과 반드시 같아야 재생성이 가능하다
-      } catch (e) { console.log('⚠️ intake 저장 실패(생성은 계속):', e.message); }
+  const chartDigest = buildChartDigest(planetData, dateTimeIso, coords, chartCtx);
+  const methodNote = buildMethodNote(dateTimeIso, cityResolved, timeUnknown);
 
-      /* 완성본이 있으면 다시 만들지 않는다.
-         새로고침·중복 클릭마다 새로 만들면 내용이 매번 달라지고 비용도 배로 나간다. */
-      try {
-        const done = await kv.get('report:' + orderId);
-        if (done && !done.error) {
-          console.log('♻️ 완성본 재사용:', orderId);
-          res.setHeader('Cache-Control', 'no-store');
-          return res.status(200).json(done);
-        }
-      } catch (e) {}
+  if (!chartDigest) {
+    await kv.set('status:' + orderId, { state: 'failed', reason: '차트 계산 실패' });
+    return res.status(500).json({ error: '점성술 차트를 계산하지 못했습니다.' });
+  }
 
-      /* 생성 락 — 같은 주문이 동시에 두 번 Gemini 를 때리는 것을 막는다.
-         (새 창을 열거나 재시도 버튼을 연타할 때 실제로 일어난다) */
-      lockKey = 'lock:' + orderId;
-      try {
-        const got = await kv.set(lockKey, '1', { nx: true, ex: 280 });
-        if (!got) {
-          console.log('⏳ 이미 생성 중:', orderId);
-          res.setHeader('Cache-Control', 'no-store');
-          return res.status(202).json({ status: 'pending', message: '리포트를 만들고 있습니다.' });
-        }
-        await kv.set('status:' + orderId, { state: 'pending', at: Date.now() }, { ex: 60 * 60 });
-      } catch (e) { lockKey = null; }
-    }
+  // ── 프롬프트 구성 ────────────────────────────────────────────────────
+  const systemPrompt = `당신은 대한민국 최고 수준의 점성술 연구가이자 연애/결혼 분석가입니다.
+제시된 점성학 차트 다이제스트를 바탕으로 손님(${cleanedName}님)의 인상, 연애 패턴, 배우자의 외모·직업·만남 시기·케미스트리를 정밀 분석합니다.
 
-    let location = cityCoordinates[city];
-    if (!location) {
-      console.error('⚠️ 출생지 좌표 없음: "' + city + '" → 서울로 임시 처리. 도시 목록 확인 필요!');
-      location = cityCoordinates['Seoul'];
-    }
-    const dateTimeIso = buildBirthIso(date, time, city);
+[출력 규칙]
+1. 반드시 유효한 단일 JSON 객체 형태로 출력하세요.
+2. 금지 단어: undefined, NaN, 트랜짓 항목, 데이터에 없음, 우주가 당신, 에너지가, 파동, 기운이 흐르, 다시 말해, 살펴보겠습니다, 일 수 있습니다, 느낌도 있습니다, 경우에 따라, 아마도, 긍정적으로 생각, 시간이 해결, 천왕성, 해왕성, 명왕성.
+3. 강조 규칙: <b>태그는 핵심 판정 문장에만 쓰세요(카드당 4개 이하). 행성/별자리 이름 단독에 <b>를 씌우지 마세요.
+4. 문체: 깊이 있고 기품 있는 권위적 단정체 ("~합니다", "~입니다"). 어설픈 위로나 애매한 입장을 취하지 말고 명확하게 진단하세요.`;
 
-    const now = new Date();
-    const todayStr = now.getFullYear() + '년 ' + (now.getMonth() + 1) + '월 ' + now.getDate() + '일';
+  const card3Spec = chartCtx.hasAppearance
+    ? `[👤 배우자 외모 및 첫인상] (700~900자)
+차트 다이제스트의 [👤 배우자 외모] 블록을 정밀 해석하세요. 키, 체형, 이목구비, 분위기, 첫인상을 사진 보듯 구체적으로 묘사하세요.`
+    : `[👤 배우자 외모 및 분위기] (700~900자)
+7하우스 별자리 및 지배성의 기질을 바탕으로 배우자의 전체적인 인상, 체형, 외적 분위기, 타인에게 주는 첫인상을 구체적으로 묘사하세요.`;
 
-    /* 🚨 차트에는 생년월일이 들어가지 않는다. 행성 위치만 들어간다.
-       나이를 안 주면 22세에게 "수없이 반복돼 왔습니다", 54세에게 "2033년에 만납니다"가 나간다.
-       과거 트랜짓 스캔 범위도 이 나이로 잘라야 한다. */
-    const birthY = parseInt(String(date).slice(0, 4), 10);
-    const ageNow = (birthY > 1900 && birthY <= now.getFullYear()) ? (now.getFullYear() - birthY) : null;
-
-    let astrologyDataText = null;   // 🚨 기본값을 문장으로 두면 데이터 없이도 리포트가 나간다
-    /* 이 요청 전용 차트 컨텍스트 — 동시 주문끼리 절대 섞이지 않는다 */
-    const chartCtx = {
-      snapshot: null, strongestYears: [], pastYears: [], windowCount: 0,
-      hasAppearance: false, rulerName: null, noRulerAspect: false, ageNow: ageNow
-    };
-
-    try {
-      if (process.env.PROKERALA_CLIENT_ID && process.env.PROKERALA_CLIENT_SECRET) {
-        const tokenResponse = await fetch('https://api.prokerala.com/token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({
-            grant_type: 'client_credentials',
-            client_id: process.env.PROKERALA_CLIENT_ID,
-            client_secret: process.env.PROKERALA_CLIENT_SECRET
-          })
-        });
-        if (tokenResponse.ok) {
-          const tokenData = await tokenResponse.json();
-          const astroResponse = await fetch(
-            'https://api.prokerala.com/v2/astrology/planet-position?datetime=' +
-            encodeURIComponent(dateTimeIso) + '&coordinates=' + location.lat + ',' + location.lon + '&ayanamsa=1',
-            { headers: { 'Authorization': 'Bearer ' + tokenData.access_token } }
-          );
-          if (astroResponse.ok) {
-            const astroJson = await astroResponse.json();
-            /* 🚨 예전에는 digest 가 null 이면 원본 JSON 을 그대로 프롬프트에 부었다.
-                  사이더리얼 좌표에 하우스도 없는 덩어리라 AI 가 지어낼 수밖에 없었다. */
-            const digest = buildChartDigest(astroJson.data, dateTimeIso, location, chartCtx);
-            if (digest) {
-              astrologyDataText = digest;
-              console.log('📊 차트 다이제스트(Prokerala):\n' + digest);
-            } else {
-              console.warn('⚠️ Prokerala 응답으로 차트를 못 만듦 → 자체 계산으로 전환');
-            }
-          }
-        }
-      }
-    } catch (e) { console.log('⚠️ Prokerala 실패:', e.message); }
-
-    /* Prokerala 가 죽었거나 비었으면 자체 계산으로 만든다.
-       오차 1.7분이라 트로피컬 해석에는 아무 지장이 없다. */
-    if (!astrologyDataText) {
-      try {
-        const localDigest = buildChartDigest(
-          { planet_position: localPlanetList(dateTimeIso) }, dateTimeIso, location, chartCtx);
-        if (localDigest) {
-          astrologyDataText = localDigest;
-          console.log('📊 차트 다이제스트(자체 계산):\n' + localDigest);
-        }
-      } catch (e) { console.error('🔥 자체 계산도 실패:', e.message); }
-    }
-
-    /* 🚨 최종 가드 — 차트가 없으면 리포트를 만들지 않는다.
-       예전에는 '정밀 천체 궤도 역산 데이터 기반.' 한 문장만 들고 리포트를 썼다.
-       손님은 돈을 내고 통째로 지어낸 글을 받았다. */
-    if (!astrologyDataText) {
-      console.error('🔥 차트를 만들지 못했습니다 — 생성 중단');
-      return await finishFail(500, '출생 차트를 계산하지 못했습니다. 잠시 후 다시 시도해주세요.', '차트 생성 실패');
-    }
-
-    console.log('✅ [2] 차트 확보 (외모재료=' + chartCtx.hasAppearance +
-                ', 시기창=' + chartCtx.windowCount + ', 과거=' + chartCtx.pastYears.length + ')');
-
-    const customerName = String(name || '고객').trim();
-    const cityResolved = !!(cityCoordinates && cityCoordinates[city]);
-
-    const genderLine = (myGender && targetGender)
-      ? '손님은 ' + myGender + '이고, 찾는 상대는 ' + targetGender + '이다. 배우자 묘사는 ' + targetGender + ' 기준으로 써라.'
-      : '손님의 성별 정보가 없으니 배우자 묘사에서 성별을 단정하지 말고 중립적으로 써라.';
-
-    const ageLine = ageNow
-      ? customerName + '님은 올해 만 ' + ageNow + '세 안팎이다.\n' +
-        '🚨 연애 경험의 분량과 시기 안내를 반드시 이 나이에 맞춰라.\n' +
-        '   20대 초반에게 "수없이 반복돼 온 패턴"을 단정하지 마라. 그럴 시간이 없었다.\n' +
-        '   40대 이상에게 먼 미래 시기만 말하고 끝내지 마라. 시기보다 "어디서 어떻게"에 무게를 실어라.\n' +
-        '   나이를 본문에 숫자로 적지는 마라. 톤만 맞추면 된다.'
-      : '';
-
-    const timeUnknownLine = isTimeUnknown
-      ? '\n[🚨 태어난 시각을 모르는 손님이다]\n' +
-        '정오로 잡고 계산했다. 별자리와 행성 간 각도는 그대로 유효하지만 상승점과 하우스는 근사치다.\n' +
-        '그래도 문장을 흐리멍덩하게 쓰지 마라. 정보가 적다고 발뺌하면 그게 더 큰 실패다.\n' +
-        'card3 에서 생김새를 단정하는 비중을 줄이고, 말투·움직임·분위기처럼 하우스 오차에 덜 민감한 쪽에 무게를 실어라.\n' +
-        '사과나 변명은 금지다.\n'
-      : '';
-
-    /* 🚨 외모 재료 유무에 따라 card3 의 지시 자체가 갈린다.
-       블록이 없는데 "블록을 보고 900자를 써라"고 하면 3회 재생성에 품질 최악이다. */
-    const card3Spec = chartCtx.hasAppearance
-      ? "(800~1000자) 배우자의 외모. 🚨 위 [👤 배우자 외모] 블록이 이 카드의 유일한 재료다. 거기 없는 특징은 한 글자도 쓰지 마라. 재료에 있는 것은 사진을 보고 받아쓰듯 단정하라. 🚨 항목별로 나열하면 실패다. 그 사람이 카페 문을 열고 들어와 앞에 앉는 장면 하나로 녹여라. 순서: ① 들어올 때 가장 먼저 눈에 들어오는 것 ② 마주 앉았을 때 얼굴에서 오래 머무는 지점 ③ 몸을 쓰는 방식 — 앉는 자세, 걷는 속도, 손이 어디로 가는지 ④ 첫마디의 목소리와 말의 속도 ⑤ 그날 입고 온 옷에서 읽히는 것 ⑥ 동물상 한 줄 ⑦ 돌아오는 길에 머릿속에 남아 있을 한 가지. 🚨 '7하우스가 ○○자리라'는 근거는 첫 문장에 딱 한 번만 쓰고 그 뒤로는 묘사만 하라. 용어를 반복하면 상담이 아니라 해설서가 된다."
-      : "(600~800자) 배우자의 인상과 태도. 🚨 얼굴 생김새·체형을 특정할 근거가 이 차트에는 없다. 지어내지 마라. 대신 '만났을 때 어떤 느낌을 주는 사람인가'를 써라. 7하우스 별자리와 지배성을 근거로 ① 첫인상 ② 말수와 말의 속도 ③ 거리를 좁히는 방식 ④ 세 번째 만남쯤 알게 되는 반전 한 가지. '처음엔 차갑다고 느끼실 겁니다. 세 번째 만남쯤 그게 신중함이었다는 걸 아시게 됩니다' 같은 문장이 목표다. 근거도 있고 나중에 검증도 된다.";
-
-    const card6Base = (chartCtx.rulerName && !chartCtx.noRulerAspect)
-      ? "🚨 근거는 위 [card6 전용 — 지배성 " + chartCtx.rulerName + "이 손님 본인과 맺는 각도] 목록이다. 거기서 최소 2개를 오차까지 인용하라. 조화각은 편해지는 지점, 마찰각은 부딪히는 지점이다."
-      : "🚨 이 차트에는 근거로 쓸 지배성 각도가 없다. 없는 각도를 지어내지 말고 7하우스 지배성의 별자리·하우스·품위만으로 서술하라.";
-
-    /* 분량 게이트 — card3 은 위 지시에 맞춰 달라진다 */
-    const NEED_LEN = {
-      card2_analysis: 620,
-      card3_appearance: chartCtx.hasAppearance ? 600 : 460,
-      card4_career: 640,
-      card5_timing: 640,
-      card6_chemistry: 620,
-      card7_destiny_guide: 470
-    };
-
-    function gateCheck(d) {
-      if (!d || typeof d !== 'object') return '파싱 결과 없음';
-      const all = Object.keys(d).map(function (k) { return strip(d[k]); }).join(' ');
-      for (const w of BANNED) if (all.indexOf(w) >= 0) return '금지 표현: ' + w;
-      for (const k in NEED_LEN) {
-        const n = strip(d[k]).length;
-        if (n < NEED_LEN[k]) return k + ' 분량 부족 (' + n + '/' + NEED_LEN[k] + ')';
-      }
-      /* 오차까지 인용했는지 — 계산했다는 유일한 증거다 */
-      if (!/오차\s*[\d.]+\s*도/.test(all)) return '각도 오차 인용 없음';
-      /* 최강 시기를 계산했는데 card5 가 그 연도를 안 썼으면 실패.
-         해를 걸치는 구간이면 시작·종료 어느 쪽이든 인정한다. */
-      if (chartCtx.strongestYears.length) {
-        const t5 = strip(d.card5_timing);
-        if (!chartCtx.strongestYears.some(function (y) { return t5.indexOf(y) >= 0; })) {
-          return 'card5 최강 시기(' + chartCtx.strongestYears.join('/') + '년) 미인용';
-        }
-      }
-      /* 과거 검증 재료를 줬는데 card2 가 안 썼으면 반려.
-         신뢰를 가장 싸게 얻는 장치인데 모델이 자주 건너뛴다. */
-      if (chartCtx.pastYears.length) {
-        const t2 = strip(d.card2_analysis);
-        if (!chartCtx.pastYears.some(function (y) { return t2.indexOf(y) >= 0; })) {
-          return 'card2 과거 검증 연도(' + chartCtx.pastYears.join('/') + ') 미인용';
-        }
-      }
-      for (const k in NEED_LEN) {
-        const em = emphasisIssue(d[k]);
-        if (em) return k + ' — ' + em;
-      }
-      return null;
-    }
-
-    /* ══════════════════════════════════════════════════════════════════
-       프롬프트 — correction 을 받는 함수다.
-       예전에는 상수 문자열이라, 게이트에 걸려 재생성할 때도 똑같은 글을
-       똑같이 물어봤다. 같은 질문이니 같은 실패가 반복됐다.
-       ══════════════════════════════════════════════════════════════════ */
-    function buildPrompt(correction) {
-      const head = correction
-        ? '[🚨🚨🚨 직전 원고 반려 — 아래를 반드시 고쳐서 다시 써라]\n' + correction +
-          '\n이 지적을 무시하면 또 반려된다. 나머지 규칙은 그대로 지키면서 이 부분을 확실히 고쳐라.\n\n'
-        : '';
-
-      return head + `[🚨 절대 금지]
-'undefined', 'null', 'NaN', '트랜짓 항목', '데이터에 없음' 같은 시스템 용어를 본문에 쓰지 마라. 손님은 일반인이다.
-아래 [실제 계산] 항목에 없는 각도·날짜·배치를 지어내면 치명적 실패다.
-🚨 이 차트에는 천왕성·해왕성·명왕성이 계산되어 있지 않다. 그 세 이름을 한 번도 쓰지 마라.
-
-[🚨 시간 기준]
-오늘은 ${todayStr}이다. 모든 미래 시기는 오늘 이후의 연·월로만 써라. 지난 연도를 미래로 쓰면 실패다.
-
-너는 명리학을 십 년 넘게 공부한 뒤 서양 점성술로 옮겨온 상담가다.
-이과 출신이라 근거 없는 말을 싫어하고, 손님이 확인할 수 없는 이야기를 파는 걸 부끄러워한다.
-${customerName}님이 9,900원을 내고 "내 배우자는 어떤 사람인가"를 물으러 왔다.
-
-${genderLine}
+  const userPrompt = `[손님 정보]
+이름: ${cleanedName}
 ${ageLine}
 ${timeUnknownLine}
-────────────────────────────────────────
-${astrologyDataText}
-────────────────────────────────────────
 
-[이 리포트가 반드시 지켜야 할 것 — 여기서 승부가 난다]
+[점성술 차트 정밀 다이제스트]
+${chartDigest}
 
-■ 1. 과거를 먼저 맞혀라
-   미래 이야기만 하면 손님은 확인할 방법이 없다. 읽는 순간엔 재밌지만 남는 게 없고,
-   "이게 맞는 말인지 내가 어떻게 아나" 하고 덮는다.
-   그래서 card2 의 첫 단락은 반드시 과거다.
-   위 [🕰 지난 목성 통과] 항목이 있으면 그 연·월을 그대로 인용해
-   "그 무렵 관계가 시작됐거나, 정리됐거나, 한 번 크게 흔들렸습니다"라고 단정하라.
-   그다음 금성·화성 배치로 지금까지의 연애 패턴을 장면으로 그려라.
-   여기서 "어떻게 알았지" 소리가 나와야 뒤의 미래 이야기가 전부 믿음이 된다.
+위 차트 재료를 완벽히 숙지하고 아래 7개 키를 가지는 JSON 객체로 작성하세요.
 
-■ 2. 각도를 오차까지 인용하라
-   위 [실제 계산된 각도]에서 최소 2개를 골라 오차까지 밝혀 써라.
-   예: "금성과 토성이 <b>오차 0.8도</b>로 맞물려 있습니다."
-   이 한 줄이 "계산했다"는 유일한 증거다. 없으면 별자리 운세와 구분이 안 된다.
-
-■ 3. 시기도 개수도 준 것만 써라
-   [실제 계산된 목성 트랜짓] 목록에 있는 구간을 전부 다뤄라.
-   🚨 목록이 세 개면 세 개, 하나면 하나다. 개수를 채우려고 목록에 없는 연도를 만들지 마라.
-   목록이 하나뿐이면 "흔치 않게 시기가 한 곳으로 모여 있습니다"라고 오히려 강조하라.
-   "없다"고 나왔으면 정직하게 말하고 시기 대신 자리와 태도로 안내하라.
-   지어낸 연월은 손님이 몇 달 뒤에 알아차린다. 그 순간 이 리포트 전체가 거짓말이 된다.
-
-■ 4. 반증 조건을 앞에서 밝혀라
-   card2 의 마지막 문단에 한 줄. "이 해석이 어긋난다면 그건 ○○ 때문입니다."
-   🚨 리포트 맨 끝이 아니라 앞쪽이어야 한다.
-   끝에 두면 글 전체가 변명으로 닫히고 손님은 그 문단만 기억한다.
-   앞에서 한 번 밝히고 나면 뒤의 단정들이 오히려 더 단단하게 읽힌다.
-
-■ 5. 읽고 나서 할 일이 남아야 한다
-   다 읽고 "재밌었다"로 끝나면 9,900원은 오락비다.
-   "내일 뭘 해야 하는지 알겠다"로 끝나야 상담비가 된다.
-   card7 은 반드시 손이 움직이는 행동으로 닫아라.
-
-[문장 규칙]
-· 발뺌 금지: '~일 수 있습니다', '~한 느낌도 있습니다', '아마', '경우에 따라' 금지.
-  '~한 편입니다', '~합니다'로 부드럽게 단정하라.
-· 유사영성 금지: 우주가 당신에게, 에너지, 파동, 기운이 흐르다.
-· 덕담 금지: 긍정적으로 생각하세요, 시간이 해결해줍니다.
-· 연민 금지: "얼마나 힘드셨어요", "안타깝네요"는 손님을 약자로 만든다.
-  정확히 읽어주는 것(공감)과 불쌍하게 여기는 것(연민)은 완전히 다르다.
-· 각 단락에 15자 이내의 짧은 단정문을 하나씩 넣어라. 문장 길이가 균일하면 기계가 쓴 것처럼 읽힌다.
-· 별자리 일반론 금지. "사자자리는 열정적" 같은 문장은 한 줄도 쓰지 마라.
-· 🚨 카드끼리 같은 말을 반복하지 마라. card2 에서 쓴 근거를 card6 에서 또 풀어쓰면
-  손님은 곧바로 "돌려막기"라고 느낀다. 카드마다 다른 재료를 써라.
-· 🚨 분량은 지정된 범위 안에서 끝내라. 하한만 보고 늘리면 앞 문장을 말만 바꿔 반복하게 된다.
-  재료가 떨어졌는데 분량이 남으면 그건 늘릴 게 아니라 이미 충분히 쓴 것이다.
-· 마크다운(*) 금지. 단락 구분은 <br><br>.
-
-[강조 표시 — 리포트의 인상을 결정한다]
-  금색 형광펜 : <b>...</b>
-  빨간 경고   : <span style="color:#ff3b30;font-weight:900;">...</span>
-
-■ 금색은 손님에 대한 판정에만. 한 카드에 2~3개, 최대 4개.
-   캡처해서 친구에게 보낼 만한 문장에만 친다.
-   예) 금성이 전갈자리에 있습니다. <b>좋아하면 다 주는 사람입니다.</b>
-■ 빨강은 경고에만. 한 카드에 최대 1개.
-   예외 하나: card5 의 '가장 강력한 결혼의 창' 시기 문장은 빨간 강조로 못 박는다.
-■ 절대 강조하지 않는 것: 행성 이름, 별자리 이름, 하우스 번호, 각도 수치, 날짜.
-   그건 정보지 판정이 아니다. 명사에 색을 칠하면 정작 중요한 문장이 묻힌다.
-   ❌ <b>금성</b>이 <b>전갈자리</b>에 있어서
-   ✅ 금성이 전갈자리에 있습니다. <b>좋아하면 다 주는 사람입니다.</b>
-■ 한 문단에 두 개 이상 치지 마라. 많이 칠수록 아무것도 안 보인다.
-
-[💥 팩트폭력 — 캡처되어 퍼지게 만드는 장치]
-🚨 위치를 지켜라. card2 에 두 개, card7 에 하나. 그 외 카드에는 넣지 마라.
-   card3·4·5·6 은 배우자 이야기다. 거기서 손님을 찌르지 마라.
-   배우자 외모를 읽다가 "당신은 늘 외모만 봤습니다"가 튀어나오면,
-   손님은 배우자가 궁금해서 돈을 냈는데 자기가 여섯 번 맞는 셈이 된다.
-   팩폭은 한곳에 모일 때 가장 세다. 흩어지면 그냥 시비조가 된다.
-① 🚨 위 차트에 실제로 있는 배치에서만 도출하라. 근거 없는 팩폭은 치명적 실패다.
-   아래는 형식 예시다. 해당 각도가 위 목록에 없으면 그 문장을 쓰지 마라.
-   · 금성-토성 긴장 → "사랑에 조건을 붙여왔습니다. 이 사람이면 안전한가부터 계산하죠. 그래서 마음이 늦게 열립니다."
-   · 금성-화성 긴장 → "끌리는 사람과 편한 사람이 늘 따로였습니다. 그래서 매번 둘 중 하나를 포기해오셨죠."
-   · 달-토성 긴장 → "집에 사랑이 없던 게 아닙니다. 사랑에 조건이 붙어 있었죠. 그래서 받는 게 어색한 겁니다."
-   · 달-화성 긴장 → "서운하면 말보다 날이 먼저 섭니다. 싸우고 나서 후회하는 쪽은 늘 본인이었습니다."
-   · 토성-상승점 긴장 → "실제보다 차갑게 보입니다. 먼저 다가오려던 사람을 그렇게 여럿 놓치셨습니다."
-② 팩폭과 근거(도수 또는 각도 오차)는 같은 단락 안에 붙여 써라. 근거 없이 던지면 점쟁이 사기가 된다.
-③ 팩폭으로 끝내지 마라. 반드시 '그래서 그 기질을 어떻게 쓰면 무기가 되는지'로 닫아라.
-④ 팩폭 문장이야말로 금색 <b> 1순위 후보다. 명사가 아니라 판정 문장에 쳐라.
-
-· 순수 JSON 객체만 출력. 앞뒤에 아무것도 붙이지 마라.
-
-[출력 JSON]
 {
-  "core_sentence": "(45자 이내) 이 사람의 인연을 관통하는 한 문장. 차트 근거에서 나온 것이어야 한다. 예: '먼저 다가가지 않아서 놓친 사람이 많았습니다'",
-  "card1_title": "(20자 이내) 배우자를 한 마디로. 예: '말수 적고 뒤가 단단한 사람'",
-  "guardian_symbol_1": "(이모지 1개)",
-  "guardian_name_1": "(2~4자) 배우자의 강점 키워드",
-  "guardian_symbol_2": "(이모지 1개)",
-  "guardian_name_2": "(2~4자) 이 관계의 성격 키워드",
-  "guardian_symbol_3": "(이모지 1개)",
-  "guardian_name_3": "(2~4자) 🚨 셋 중 이것만은 반드시 '불편한 진실'이어야 한다. 예: '늦은인연', '무뚝뚝', '속앓이'. 셋 다 좋은 말이면 손님은 셋 다 안 믿는다.",
+  "card1": "[🔮 총운 & 타고난 인상/기질] (700~900자) 상승점(ASC), 태양, 달을 바탕으로 타고난 기질, 외적 분위기, 속마음의 핵심 구조를 설명하세요.",
+  "card2": "[💔 과거 연애 패턴 & 팩폭] (800~1000자) 금성/화성 배치 및 각도를 바탕으로 어떤 사람에게 끌렸고 왜 반복해서 어긋났는지 짚으세요. 과거 목성 통과 연도(${chartCtx.pastYears.join(', ')} 무렵)를 언급하여 검증하고, 날카로운 팩폭 2개를 포함하세요.",
+  "card3": "${card3Spec}",
+  "card4": "[💼 배우자 직업 및 경제력] (700~900자) 8하우스 및 지배성의 배치를 근거로 배우자의 수입 구조, 직업군, 경제적 역량을 정밀 분석하세요.",
+  "card5": "[📅 결정적 만남 & 결혼 시기] (600~800자) 계산된 목성 트랜짓 시기를 인용하세요. 가장 강력한 구간(${chartCtx.strongestYears.join(', ')}년)을 반드시 빨간 강조(<span style=\\"color:#ff3b30\\">...</span>)로 명시하세요. 지어낸 연도를 추가하지 마세요.",
+  "card6": "[🧩 두 사람이 만나면 벌어지는 케미스트리] (800~1000자) 7하우스 지배성과 손님의 태양·달·금성 간 어스펙트를 근거로, 편안해지는 지점과 충돌하는 지점, 이를 극복하는 관계의 법칙을 서술하세요.",
+  "card7": "[💡 최종 현실 조언 & 핵심 팩폭] (700~900자) 차트의 원소 결핍 및 전체 구조를 종합하여 만남을 현실로 만들기 위한 실전 행동 지침과 핵심 팩폭 1개를 전달하세요."
+}`;
 
-  "card2_analysis": "(700~900자) ★가장 중요한 카드★ 네 단락으로 써라.\\n① 과거 검증 — [🕰 지난 목성 통과]의 연·월을 그대로 인용해 그때 무슨 일이 있었는지 단정한다. 그 항목이 없으면 이 단락은 건너뛰고 ②로 시작한다.\\n② 연애 패턴 — 금성·화성 배치와 각도를 근거로, 어떤 사람에게 반복해서 끌렸는지, 관계가 어느 지점에서 늘 같은 방식으로 어긋났는지를 대사가 들릴 만큼 구체적인 장면으로.\\n③ 그 패턴의 뿌리 — 달·토성·4하우스·12하우스 등에서 끌어와 '왜 그렇게 됐는지'를 짚는다.\\n④ 반증 조건 한 줄 — '이 해석이 어긋난다면 그건 ○○ 때문입니다'. 그리고 '이걸 알고 나면 다음 사람은 달라집니다' 방향으로 닫아라.\\n🚨 팩폭 두 개는 이 카드에 넣는다.",
+  let lastGood = null;
+  let correctionNotice = '';
 
-  "card3_appearance": "${card3Spec}",
-
-  "card4_career": "(750~950자) 그 사람의 사회적 위치와 돈. 두 부분으로.\\n\\n① 직업의 결: [7하우스 지배성] 항목의 하우스를 근거로. 두루뭉술한 묘사 금지, 어떤 방식으로 일하는 사람인지.\\n\\n② 돈을 다루는 방식 — 이 카드의 승부처다. 근거는 [8하우스] 항목이다. 8하우스는 7하우스에서 두 번째 방, 즉 배우자의 지갑이다. 사주 용어와 대비해 단정하라: 다달이 꼬박꼬박 쌓는 사람(정관·정재 스타일)인가, 한 번에 크게 당기는 사람(편재 스타일)인가. 애매하게 '둘 다 가능' 금지.\\n🚨 재산의 '규모'는 단정하지 마라('부자입니다', '결혼이 곧 재테크입니다' 금지). 결혼 뒤에 반증되는 종류의 약속이고, 그때 손님은 자기 결혼 결정에 이 리포트가 끼어들었다고 생각한다. 규모 대신 돈이 들어오고 나가는 방식을 단정하라. 그게 더 구체적으로 읽히고 반증되지 않는다.\\n   8하우스에 목성·금성이 있거나 지배성 품위가 좋으면 → '월급 하나로 끝내지 않는 사람입니다. 돈이 들어올 구멍을 스스로 만듭니다' 방향으로 화끈하게.\\n   8하우스에 토성이 있거나 비어 있고 지배성이 약하면 → '배우자 돈으로 편하게 살 팔자는 아닙니다. 같이 벌어야 합니다'라고 정직하게.",
-
-  "card5_timing": "(800~1000자) ★두 번째로 중요★ 만남의 시기와 자리.\\n① [실제 계산된 목성 트랜짓] 목록의 구간을 전부, 있는 개수만큼 다뤄라. 🚨 개수를 늘리거나 줄이지 마라.\\n② ★★ 표시된 구간을 <span style='color:#ff3b30;font-weight:900;'>가장 강력한 결혼의 창</span>으로 빨간 강조에 못 박아라 — 시기 문장 통째로. 왜 최강인지를 쉬운 말로 붙여라(합은 목성이 배우자궁 문 앞에 정확히 서는 각이라 가장 세다는 식으로). 다른 구간을 최강으로 바꾸면 치명적 실패다.\\n③ [7하우스 지배성]이 있는 하우스를 근거로 '어디서 어떻게 만나는지'를 구체적으로. 소개팅·같은 회사·거래처·소모임·취미 모임·맞선·오래 알던 사이의 재회 등에서 그 하우스가 가리키는 쪽으로 단정하라.\\n④ 마지막 한 줄: 그 시기가 왔을 때 손님이 어떤 상태여야 잡을 수 있는지.",
-
-  "card6_chemistry": "(800~1000자) 그 사람과 실제로 지냈을 때 벌어지는 일. ${card6Base}\\n🚨 '두 사람의 궁합'이라는 표현은 쓰지 마라. 아직 만나지 않은 사람이라 별도 차트가 없다. 대신 '이 기질과 당신 기질이 만나면 무슨 일이 생기는가'로 써라.\\n순서: ① 편해지는 지점 — 말 안 해도 통하는 부분을 장면으로 ② <span style='color:#ff3b30;font-weight:900;'>반드시 부딪히는 지점</span> — 3년쯤 지나면 반복될 싸움의 모양을 대사가 들리게 ③ 그 마찰을 다루는 구체적 방법 한 가지. 좋은 말만 있으면 안 믿는다.",
-
-  "card7_destiny_guide": "(600~750자) 이 인연을 잡기 위해 오늘부터 할 일 3가지.\\n🚨 다짐이 아니라 행동으로. '마음을 열어보세요'(X) → '연락이 오면 24시간 안에 답한다'(O)처럼 손이 움직이는 동사로 끝나야 한다. 각 항목에 왜 그게 이 차트에 필요한지 한 줄씩 근거를 붙여라.\\n그리고 <span style='color:#ff3b30;font-weight:900;'>피해야 할 상대의 특징</span>을 빨간 글씨로 경고하라.\\n🚨 반증 조건은 card2 에 이미 썼으니 반복하지 마라. 팩폭 하나는 여기에 넣되, 마지막 문장은 반드시 힘이 나게 닫아라. 손님이 내일 뭘 할지 알고 덮게 만드는 게 이 카드의 목적이다.",
-
-  "card8_teaser": "(150자 내외) 배우자 이야기는 여기까지. 그런데 왜 이 패턴이 반복됐는지, 그 뿌리는 본인 차트에 있다는 방향으로 이어라. 이번 리포트에서 실제로 드러난 지점 하나를 직접 지목하라. 강매 톤·가격 언급 금지. 마지막은 질문으로 끝내 궁금증을 남겨라."
-}
-`;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const elapsed = Date.now() - startTime;
+    if (elapsed > TIME_BUDGET_MS) {
+      console.warn(`⏰ 시간 예산 초과 (${elapsed}ms / ${TIME_BUDGET_MS}ms). 현재까지 확보된 원고 활용.`);
+      if (lastGood) break;
     }
 
-    // ✅ Gemini v1beta 직접 호출
-    // - responseMimeType JSON: 순수 JSON만 답하도록 강제
-    // - temperature 0.8: 형식 제약이 이렇게 많으면 0.9는 창의성보다 형식 위반을 더 만든다
-    // - 🚨 3차는 어차피 게이트를 통과시킨다. 생각 예산을 줄여 시간을 아낀다.
-    const T0 = Date.now();
-    let parsedData = null;
-    let lastGood = null;      // 게이트에 걸렸지만 내용은 있는 원고. 시간이 떨어지면 이걸 쓴다.
-    let lastErr = '';
-    let correction = '';
-
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      /* 🚨 남은 시간이 한 번 더 생성할 만큼 없으면 여기서 끝낸다.
-         게이트를 완벽히 통과시키려다 타임아웃 나는 게 훨씬 큰 손해다.
-         손님에게 '조금 아쉬운 리포트'와 '결제하고 500' 은 비교 대상이 아니다. */
-      if (attempt > 1 && Date.now() - T0 > TIME_BUDGET_MS) {
-        console.warn('⏱ 시간 예산 초과 — 재생성 중단, 직전 원고 채택');
-        break;
-      }
-
-      try {
-        const geminiRes = await fetch(
-          'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' +
-          process.env.GEMINI_API_KEY,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: buildPrompt(correction) }] }],
-              generationConfig: {
-                maxOutputTokens: 32768,
-                temperature: 0.8,
-                responseMimeType: 'application/json',
-                thinkingConfig: { thinkingBudget: attempt === 3 ? 1024 : 4096 }
-              }
-            })
-          }
-        );
-
-        if (!geminiRes.ok) {
-          lastErr = 'Gemini ' + geminiRes.status + ': ' + (await geminiRes.text()).slice(0, 300);
-          console.error('🔥 [시도 ' + attempt + ']', lastErr);
-          /* 503·429 는 구글 쪽 일시 과부하다. 수십 초 지속되므로 짧게 두드리면 같은 거절만 받는다.
-             단 남은 시간이 대기 시간보다 짧으면 기다리지 않는다. */
-          if (geminiRes.status === 503 || geminiRes.status === 429) {
-            const w = RETRY_WAIT_MS[attempt - 1] || 0;
-            const room = TIME_BUDGET_MS - (Date.now() - T0);
-            if (w && room > w) {
-              console.warn('⏳ Gemini ' + geminiRes.status + ' — ' + (w / 1000) + '초 대기 후 재시도');
-              await new Promise(function (r) { setTimeout(r, w); });
-            }
-          }
-          continue;
-        }
-
-        const geminiData = await geminiRes.json();
-        console.log('✅ [3] Gemini 응답 수신 (시도 ' + attempt + ', ' +
-                    Math.round((Date.now() - T0) / 1000) + '초 경과)');
-
-        const parts = (geminiData.candidates && geminiData.candidates[0] &&
-                       geminiData.candidates[0].content && geminiData.candidates[0].content.parts) || [];
-        const responseText = parts.map(function (p) { return p.text || ''; }).join('');
-        const s = responseText.indexOf('{');
-        const e = responseText.lastIndexOf('}');
-        if (s === -1 || e === -1) {
-          lastErr = '응답에 JSON 없음: ' + responseText.slice(0, 200);
-          correction = '순수 JSON 객체만 출력하라. 앞뒤에 설명이나 코드블록을 붙이지 마라.';
-          console.error('🔥 [시도 ' + attempt + ']', lastErr);
-          continue;
-        }
-
-        const cand = JSON.parse(responseText.slice(s, e + 1));
-        const bad = gateCheck(cand);
-        if (bad && attempt < 3) {
-          lastGood = cand;        // 🚨 버리지 않는다. 시간이 떨어지면 이걸 쓴다
-          lastErr = bad;
-          correction = bad;       // 🚨 실패 사유를 모델에게 돌려준다
-          console.warn('⚠️ [시도 ' + attempt + '] 재생성 — ' + bad);
-          continue;
-        }
-        if (bad) console.warn('⚠️ 마지막 시도라 그대로 채택 — ' + bad);
-        parsedData = cand;
-        break;
-      } catch (err) {
-        lastErr = err.message;
-        correction = '직전 응답이 올바른 JSON 이 아니었다. 따옴표와 중괄호를 정확히 닫아라.';
-        console.error('🔥 [시도 ' + attempt + '] 실패:', err.message);
-      }
-    }
-
-    /* 게이트는 못 넘었지만 내용은 있는 원고. 500 보다 이게 낫다. */
-    if (!parsedData && lastGood) {
-      console.warn('⚠️ 게이트 미통과 원고 채택 — ' + lastErr);
-      parsedData = lastGood;
-    }
-    if (!parsedData) {
-      return await finishFail(500, '리포트 생성이 지연되고 있습니다. 잠시 후 다시 열어주세요.', lastErr);
-    }
-
-    /* ══════════════════════════════════════════════════════════════════
-       🚨 2026-08-26 최후 방어선 — 실제 사고로 추가
-
-       손님이 "데이터가 부족합니다"만 가득한 리포트를 받았다.
-       원인은 재시도 루프의 '마지막 시도라 그대로 채택' 이다.
-       분량이 조금 모자란 원고를 살리려고 만든 관용 규칙인데,
-       내용이 아예 빈 원고까지 통과시켰다. 그리고 if(!parsedData)는
-       빈 객체({})도 truthy 라 못 잡는다.
-
-       분량이 조금 모자란 것과 내용이 없는 것은 완전히 다른 문제다.
-       "조금 모자람"은 관용하되 "사실상 비어 있음"은 절대 내보내지 않는다.
-       손님에게는 빈 리포트보다 "잠시 후 다시 열어주세요"가 훨씬 낫다.
-       ══════════════════════════════════════════════════════════════════ */
-    const MUST_FIELDS = ['card2_analysis','card3_appearance','card4_career',
-                         'card5_timing','card6_chemistry','card7_destiny_guide'];
-    const HARD_MIN = 150;   // 이 밑이면 문단 하나도 안 되는 분량이다
-    const emptyFields = MUST_FIELDS.filter(function (k) {
-      return strip(parsedData[k]).length < HARD_MIN;
-    });
-    if (emptyFields.length > 0) {
-      console.error('🚨 빈 리포트 방출 차단 —', emptyFields.join(', '));
-      return await finishFail(500,
-        '리포트 생성이 지연되고 있습니다. 잠시 후 다시 열어주세요.',
-        '빈 카드: ' + emptyFields.join(', '));
-    }
-
-    /* 🚨 마크다운이 새어나오면 손님 화면에 별표가 그대로 보인다.
-       프롬프트로 여러 번 막았는데도 뚫린다. 결정론적으로 고치면 비용이 안 든다. */
-    for (const k of Object.keys(parsedData)) {
-      if (typeof parsedData[k] !== 'string') continue;
-      parsedData[k] = parsedData[k]
-        .replace(/\*\*\*(.+?)\*\*\*/g, '<b>$1</b>')
-        .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
-        .replace(/(^|[^*])\*([^*\n]+?)\*(?!\*)/g, '$1<b>$2</b>')
-        .replace(/^#{1,6}\s+/gm, '')
-        /* 브랜드 밖 색상 → 금색. 경고용 빨강(#ff3b30)만 남긴다 */
-        .replace(/color:\s*#(?!ff3b30\b)[0-9a-fA-F]{3,8}/gi, 'color:#d4af37')
-        .replace(/\u00a0/g, ' ')
-        .trim();
-    }
-
-    /* ── 서버가 만든 사실 자료를 응답에 붙인다 ──
-       AI 가 손대지 않으므로 지어낼 수 없다. "진짜 계산했다"의 증거물이다. */
     try {
-      if (chartCtx.snapshot && chartCtx.snapshot.planets) {
-        parsedData.chart_table = buildChartTable(chartCtx.snapshot.planets, chartCtx.snapshot.ascAbs);
-        parsedData.method_note = buildMethodNote(dateTimeIso, cityResolved, isTimeUnknown);
-        parsedData.time_unknown = isTimeUnknown;
-      }
-    } catch (e) { console.warn('⚠️ 명세표 생성 실패:', e.message); }
+      const resultJson = await callGeminiApi(systemPrompt, userPrompt, correctionNotice);
+      lastGood = resultJson;
 
-    console.log('✅ [4] 완료 (' + Math.round((Date.now() - T0) / 1000) + '초)');
-
-    // 🚨 [다시보기] 주문번호가 함께 왔으면 KV에 저장 → GET ?orderId=... 로 재조회
-    if (orderId) {
-      try {
-        /* 30일 → 180일 → 365일(VVIP 와 통일).
-           카페24 주문내역은 훨씬 오래 남는데 리포트만 먼저 사라지면
-           그때부터 "다시보기가 안 돼요" 문의가 시작된다. */
-        await kv.set('report:' + orderId, parsedData, { ex: 60 * 60 * 24 * 365 });
-        await kv.set('status:' + orderId, { state: 'completed', at: Date.now() }, { ex: 60 * 60 * 24 * 365 });
-        console.log('💾 KV 저장 완료: report:' + orderId);
-      } catch (e) {
-        console.log('⚠️ KV 저장 실패(리포트 전송은 정상 진행):', e.message);
+      const gateErr = gateCheck(resultJson, chartCtx);
+      if (!gateErr) {
+        console.log(`✅ 생성 성공 및 게이트 통과 (시도 ${attempt + 1})`);
+        break;
       }
-      if (lockKey) { try { await kv.del(lockKey); } catch (e) {} }
+
+      console.warn(`⚠️ 게이트 통과 실패 (시도 ${attempt + 1}): ${gateErr}`);
+      correctionNotice = gateErr;
+    } catch (err) {
+      console.error(`🔥 Gemini 호출 에러 (시도 ${attempt + 1}):`, err.message);
+      const waitMs = RETRY_WAIT_MS[attempt] || 0;
+      if (waitMs > 0 && (Date.now() - startTime + waitMs) < TIME_BUDGET_MS) {
+        console.log(`⏱ ${waitMs / 1000}초 대기 후 재시도...`);
+        await new Promise(r => setTimeout(r, waitMs));
+      }
     }
-
-    res.setHeader('Cache-Control', 'no-store');
-    res.status(200).json(parsedData);
-
-  } catch (error) {
-    console.error('🔥 gemini.js 에러:', error);
-    return await finishFail(500, '잠시 문제가 있었습니다. 다시 열어주세요.', error.message);
   }
+
+  if (!lastGood) {
+    await kv.set('status:' + orderId, { state: 'failed', reason: '원고 생성 실패' });
+    return res.status(500).json({ error: '리포트 생성을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.' });
+  }
+
+  const finalReport = {
+    orderId,
+    name: cleanedName,
+    methodNote,
+    cards: lastGood,
+    createdAt: new Date().toISOString()
+  };
+
+  await Promise.all([
+    kv.set('report:' + orderId, finalReport, { ex: 86400 * 30 }),
+    kv.set('status:' + orderId, { state: 'completed', updatedAt: new Date().toISOString() }, { ex: 86400 * 30 })
+  ]);
+
+  return res.status(200).json(finalReport);
 };
 
 module.exports = allowCors(handler);
