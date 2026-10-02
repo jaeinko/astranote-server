@@ -386,8 +386,8 @@ const handler = async (req, res) => {
         .map(k => (payload.report[k] || '').length).join('/'));
 
     if (b.orderId) {
-      try { await kv.set(KEY(b.orderId), payload, { ex: TTL });
-        console.log('💾 KV 저장(60일): ' + KEY(b.orderId));
+      try { await kv.set(KEY(b.orderId), payload);   /* 2026-10-02 봉인 — 만료 없이 영구 보관 */
+        console.log('💾 KV 저장(영구): ' + KEY(b.orderId));
       } catch (e) { console.log('⚠️ KV 저장 실패:', e.message); }
     }
 
