@@ -1,12 +1,29 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "regions": ["icn1"],
+  "regions": [
+    "icn1"
+  ],
   "functions": {
-    "api/gemini.js":         { "maxDuration": 300 },
-    "api/gemini-vip.js":     { "maxDuration": 300 },
-    "api/gemini-couple.js":  { "maxDuration": 300 },
-    "api/gemini-monthly.js": { "maxDuration": 300 },
-    "api/gemini-child.js":   { "maxDuration": 300 },
-    "api/admin-order.js":    { "maxDuration": 60 }
+    "api/gemini.js": {
+      "maxDuration": 300
+    },
+    "api/gemini-vip.js": {
+      "maxDuration": 300
+    },
+    "api/gemini-couple.js": {
+      "maxDuration": 300
+    },
+    "api/gemini-monthly.js": {
+      "maxDuration": 300
+    },
+    "api/gemini-child.js": {
+      "maxDuration": 300
+    },
+    "api/admin-order.js": {
+      "maxDuration": 60
+    },
+    "api/admin-seal.js": {
+      "maxDuration": 60
+    }
   }
 }
