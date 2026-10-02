@@ -720,7 +720,8 @@ const handler = async (req, res) => {
 
     if (orderId) {
       try {
-        await kv.set(KEY_PREFIX + orderId, payload, { ex: 60 * 60 * 24 * TTL_DAYS });
+        /* 2026-10-02 봉인 — 완성본만 만료 없이 영구 보관(pending·failed 표시는 기존대로 짧게 만료) */
+        await kv.set(KEY_PREFIX + orderId, payload);
         await kv.del(lockKey);
       } catch (e) {
         console.log('⚠️ KV 저장 실패(전송은 정상):', e.message);
