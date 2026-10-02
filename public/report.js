@@ -1,5 +1,10 @@
 /* ============================================================================
-   ASTRANOTE report.js  —  v2.0 (FIX #1: 재방문 무한로딩 차단)
+   ASTRANOTE report.js  —  v2.1 (v5 원고: 형광펜·체크리스트·얼굴상 배지)
+   ----------------------------------------------------------------------------
+   v2.1 (2026-10-02): report_version >= 5 원고에만 새 스타일·배지를 붙인다.
+   예전 원고는 한 글자·한 픽셀도 다르게 그리지 않는다.
+   ----------------------------------------------------------------------------
+   v2.0 (FIX #1: 재방문 무한로딩 차단)
    ----------------------------------------------------------------------------
    [이번에 고친 것]
    1) ASTRO_USER_DATA를 DOMContentLoaded 최상단에서 먼저 확보
@@ -57,6 +62,60 @@ function stopTimers() {
     stopPolling();
     if (loadingMsgTimer) { clearInterval(loadingMsgTimer); loadingMsgTimer = null; }
     if (safetyTimer)     { clearTimeout(safetyTimer);      safetyTimer = null; }
+}
+
+/* ---------------------------------------------------------------------------
+   v5 (2026-10-02) — 형광펜 · 체크리스트 · 얼굴상 배지 스타일
+   카페24 템플릿을 건드리지 않고 여기서 주입한다.
+   🚨 예전 리포트(report_version 없음)에는 <mark>·<ul>·배지가 없으므로
+      이 스타일이 있어도 예전 모습 그대로 그려진다.
+   형광펜 색: 예시의 연분홍(#ffe4e1)+진회색 글씨는 흰 배경용이다.
+   이 리포트는 검정 배경이라 그대로 쓰면 형광 밖 글씨가 안 보인다 →
+   코랄 핑크 반투명 띠 + 흰 글씨로 바꿨다. 금색 <b>와도 한눈에 구분된다.
+--------------------------------------------------------------------------- */
+function ensureV5Style() {
+    if (document.getElementById('astro-v5-style')) return;
+    const st = document.createElement('style');
+    st.id = 'astro-v5-style';
+    st.textContent = [
+        '#astro-result-container .card-content mark{',
+        '  background:linear-gradient(to top,rgba(255,107,129,.42) 46%,transparent 46%);',
+        '  color:#fff;font-weight:700;padding:0 3px;border-radius:2px;',
+        '  -webkit-box-decoration-break:clone;box-decoration-break:clone;}',
+        '#astro-result-container .card-content ul{list-style:none;margin:20px 0 24px;padding:0;}',
+        '#astro-result-container .card-content ul li{position:relative;margin:0 0 10px;',
+        '  padding:12px 14px;background:rgba(255,255,255,.035);border:1px solid rgba(212,175,55,.16);',
+        '  border-left:3px solid #d4af37;border-radius:10px;line-height:1.75;font-size:.95em;}',
+        '#astro-result-container .ax-face{display:flex;flex-direction:column;align-items:center;',
+        '  margin:0 0 26px;padding:18px 14px 16px;border-radius:16px;text-align:center;',
+        '  background:radial-gradient(circle at 50% 0%,rgba(255,107,129,.16),rgba(212,175,55,.05) 70%);',
+        '  border:1px solid rgba(212,175,55,.45);}',
+        '#astro-result-container .ax-face-k{font-family:Cinzel,serif;font-size:11px;letter-spacing:3px;',
+        '  color:#a18cd1;margin-bottom:8px;}',
+        '#astro-result-container .ax-face-v{font-family:"Noto Serif KR",serif;font-size:22px;font-weight:900;',
+        '  color:#f0d77b;line-height:1.4;word-break:keep-all;text-shadow:0 0 18px rgba(212,175,55,.35);}',
+        '#astro-result-container .ax-face-s{margin-top:6px;font-size:11.5px;color:#8b829e;',
+        '  font-family:"Noto Sans KR",sans-serif;}',
+        '@media screen and (max-width:480px){#astro-result-container .ax-face-v{font-size:19px;}}'
+    ].join('');
+    document.head.appendChild(st);
+}
+
+function escText(v) {
+    return String(v == null ? '' : v).replace(/[&<>"]/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+}
+
+/* card3 위에 붙는 얼굴상 배지. 서버가 코드로 판정한 값만 쓴다(v5 원고에만 존재). */
+function faceBadgeHTML(data) {
+    if (!data || !data.card3_face_type) return '';
+    const sub = data.card3_face_mode === 'attraction'
+        ? '출생 시각 미상 · 끌림의 별(금성)로 판정'
+        : '7하우스(배우자궁) 기준 판정';
+    return '<div class="ax-face"><span class="ax-face-k">FACE TYPE</span>' +
+           '<span class="ax-face-v">' + escText(data.card3_face_type) + '</span>' +
+           '<span class="ax-face-s">' + sub + '</span></div>';
 }
 
 /* ---------------------------------------------------------------------------
@@ -517,7 +576,8 @@ function bindDataToUI(data) {
         setText('out-sym3-name', data.guardian_name_3 || '달');
 
         setHTML('out-card2-analysis',  data.card2_analysis      || '데이터가 부족합니다.');
-        setHTML('out-card3-appearance', data.card3_appearance   || '데이터가 부족합니다.');
+        if (data.report_version >= 5) ensureV5Style();
+        setHTML('out-card3-appearance', faceBadgeHTML(data) + (data.card3_appearance || '데이터가 부족합니다.'));
         setHTML('out-card4-career',    data.card4_career        || '데이터가 부족합니다.');
         setHTML('out-card5-timing',    data.card5_timing        || '데이터가 부족합니다.');
         setHTML('out-card6-chemistry', data.card6_chemistry     || '데이터가 부족합니다.');
