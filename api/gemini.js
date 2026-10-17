@@ -808,7 +808,9 @@ const handler = async (req, res) => {
         }
         return res.status(200).json(saved);
       }
-      if (st && st.state === 'pending') return res.status(202).json({ status: 'pending' });
+      /* 🚨 2026-10-17 — 예전 결과 페이지는 202 도 res.ok 로 보고 '빈 리포트'를 그려 저장했다.
+         error 를 같이 실어 보내면 옛 페이지도 '아직 없음'으로 처리한다. report.js 는 영향 없음. */
+      if (st && st.state === 'pending') return res.status(202).json({ status: 'pending', error: 'pending' });
       /* ⚠️ 출생정보를 응답에 실어 보내면 안 된다. 주문번호가 날짜+연번이라
          순서대로 찍어보면 남의 개인정보를 그대로 긁어갈 수 있다.
          "다시 만들 수 있다"는 사실만 boolean 으로 알린다. */
@@ -940,7 +942,7 @@ const handler = async (req, res) => {
         if (!got) {
           console.log('⏳ 이미 생성 중:', orderId);
           res.setHeader('Cache-Control', 'no-store');
-          return res.status(202).json({ status: 'pending', message: '리포트를 만들고 있습니다.' });
+          return res.status(202).json({ status: 'pending', error: 'pending', message: '리포트를 만들고 있습니다.' });
         }
         await kv.set('status:' + orderId, { state: 'pending', at: Date.now() }, { ex: 60 * 60 });
       } catch (e) { lockKey = null; }
