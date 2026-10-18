@@ -55,6 +55,18 @@ const { kv } = require('@vercel/kv');
    함수 제한 300초 안에 들어온다. */
 const RETRY_WAIT_MS = [20000, 45000, 0];   // 1·2차 실패 후 대기. 3차는 마지막이라 0.
 
+/* 🚨 2026-10-18 — 시간 예산.
+   [무슨 일이 있었나] 병렬 2회 호출이 각각 '최대 3회 생성 + 65초 대기'를 할 수 있어
+   300초(maxDuration)를 넘겼다. 넘기면 Vercel 이 함수를 죽이고 KV 저장도 못 한다.
+   손님 화면은 응답 없이(Status 0) 멈추고, 다시 누르면 처음부터 또 만든다.
+   [조치] 전체 260초 안에서만 움직인다.
+     · 남은 시간이 부족하면 새 시도를 시작하지 않는다
+     · 대기(20·45초)도 남은 시간 안에서만 한다
+     · 한 번의 생성 호출에도 남은 시간만큼만 기다린다(AbortController)
+     · 분량만 모자란 원고는 보관해 두었다가 시간이 다 되면 그걸 쓴다(누락 원고는 절대 안 씀) */
+const TOTAL_BUDGET_MS = 260000;
+const MIN_ATTEMPT_MS  = 70000;    // 남은 시간이 이보다 적으면 새 생성을 시작하지 않는다
+
 
 /* 🚨 CORS 는 lib/cors.js 화이트리스트 정본 하나만 씁니다.
    예전의 '*' 는 아무 사이트나 우리 Gemini 크레딧을 태울 수 있게 했습니다. */
@@ -1041,11 +1053,20 @@ function extractJson(text) {
 
 async function callGemini(o) {
   let lastErr = '';
+  let lastGood = null;   // 분량만 모자란(누락 없는) 원고 — 시간이 다 되면 이걸 쓴다
+  const deadline = o.deadline || (Date.now() + TOTAL_BUDGET_MS);
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const isLast = attempt === MAX_ATTEMPTS;
+    const left = deadline - Date.now();
+    if (attempt > 1 && left < MIN_ATTEMPT_MS) {
+      console.warn('⏱️ [' + o.label + '] 남은 시간 ' + Math.round(left / 1000) + '초 — 새 시도 중단');
+      break;
+    }
+    const isLast = attempt === MAX_ATTEMPTS || (deadline - Date.now()) < MIN_ATTEMPT_MS * 2;
+    const ac = new AbortController();
+    const killer = setTimeout(function () { ac.abort(); }, Math.max(10000, deadline - Date.now()));
     try {
       const r = await fetch(GEMINI_URL + '?key=' + process.env.GEMINI_API_KEY, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ac.signal,
         body: JSON.stringify({
           contents: [{ parts: [{ text: o.prompt }] }],
           generationConfig: {
@@ -1059,7 +1080,9 @@ async function callGemini(o) {
         lastErr = 'Gemini ' + r.status + ': ' + (await r.text()).slice(0, 250);
         console.error('🔥 [' + o.label + ' ' + attempt + '/' + MAX_ATTEMPTS + '] ' + lastErr);
         if (r.status === 503 || r.status === 429) {
-          const w = RETRY_WAIT_MS[attempt - 1] || 0;
+          let w = RETRY_WAIT_MS[attempt - 1] || 0;
+          // 기다린 뒤에도 생성할 시간이 남아 있어야 의미가 있다
+          w = Math.min(w, Math.max(0, deadline - Date.now() - MIN_ATTEMPT_MS));
           if (w) { console.warn('⏳ Gemini ' + r.status + ' — ' + (w / 1000) + '초 대기 후 재시도'); await new Promise(s => setTimeout(s, w)); }
         }
         continue;
@@ -1079,6 +1102,7 @@ async function callGemini(o) {
       if (!chk.ok) {
         lastErr = chk.reason;
         console.warn('⚠️ [' + o.label + ' ' + attempt + '] 재생성: ' + chk.reason);
+        if (!/누락/.test(chk.reason)) lastGood = parsed;   // 분량 미달만 보관
         if (!isLast) continue;
 
         /* 🚨 2026-08-02 수정 — 손님이 "리포트가 3장부터 시작한다" 고 문의한 사고
@@ -1105,9 +1129,15 @@ async function callGemini(o) {
       console.log('✅ [' + o.label + '] 통과 (' + attempt + '회)' + (chk.ok ? '' : ' — 마지막 시도라 미달 상태로 채택'));
       return { ok: true, data: parsed };
     } catch (e) {
-      lastErr = e.message;
-      console.error('🔥 [' + o.label + ' ' + attempt + '] ' + e.message);
+      lastErr = e.name === 'AbortError' ? '시간 예산 초과로 생성 중단' : e.message;
+      console.error('🔥 [' + o.label + ' ' + attempt + '] ' + lastErr);
+    } finally {
+      clearTimeout(killer);
     }
+  }
+  if (lastGood) {
+    console.warn('⚠️ [' + o.label + '] 시간 내 완벽본 없음 → 분량 미달 원고 채택 (누락 없음)');
+    return { ok: true, data: lastGood };
   }
   return { ok: false, error: '[' + o.label + '] ' + lastErr };
 }
@@ -1141,14 +1171,26 @@ const handler = async (req, res) => {
     const orderId = req.query && req.query.orderId;
     if (!orderId) return res.status(400).json({ error: 'orderId 필요' });
     try {
-      const saved = await kv.get('vip-report:' + orderId);
+      const [saved, st] = await Promise.all([
+        kv.get('vip-report:' + orderId),
+        kv.get('vip-status:' + orderId).catch(function () { return null; })
+      ]);
       res.setHeader('Cache-Control', 'no-store');
-      return saved ? res.status(200).json(saved) : res.status(404).json({ error: '저장된 리포트 없음' });
+      if (saved) return res.status(200).json(saved);
+      if (st && st.state === 'pending') return res.status(202).json({ status: 'pending', error: 'pending' });
+      return res.status(404).json({ error: '저장된 리포트 없음', state: st ? st.state : 'none' });
     } catch (e) { return res.status(500).json({ error: 'KV 조회 실패: ' + e.message }); }
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST 요청만 받습니다.' });
 
   console.log('✅ [1] gemini-vip 진입');
+  const T0 = Date.now();
+  let vipLockKey = null;
+  const orderIdForStatus = (req.body && req.body.orderId) ? String(req.body.orderId).slice(0, 60) : null;
+  async function markFailed(msg) {
+    if (!orderIdForStatus) return;
+    try { await kv.set('vip-status:' + orderIdForStatus, { state: 'failed', error: String(msg).slice(0, 300), at: Date.now() }, { ex: 60 * 60 * 24 * 30 }); } catch (e) {}
+  }
   try {
     const b = req.body || {};
     let { name, date, city, myGender } = b;
@@ -1171,6 +1213,25 @@ const handler = async (req, res) => {
     name = cleanName(name, 20);
     if (!name) return res.status(400).json({ error: '이름을 다시 입력해 주세요.' });
     if (!process.env.GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY 없음' });
+
+    /* 🚨 2026-10-18 — 완성본 재사용 + 생성 락.
+       예전에는 손님이 '다시 시도'를 누를 때마다 처음부터 새로 만들었다.
+       · 이미 완성본이 있으면 덮어써서 내용이 바뀌었다(봉인 위반)
+       · 앞의 생성이 아직 도는 중이면 Gemini 를 두 배로 태웠다 */
+    if (b.orderId) {
+      try {
+        const done = await kv.get('vip-report:' + b.orderId);
+        if (done) { res.setHeader('Cache-Control', 'no-store'); return res.status(200).json(done); }
+        vipLockKey = 'vip-lock:' + b.orderId;
+        const got = await kv.set(vipLockKey, '1', { nx: true, ex: 290 });
+        if (!got) {
+          vipLockKey = null;   // 남의 락은 풀지 않는다
+          res.setHeader('Cache-Control', 'no-store');
+          return res.status(202).json({ status: 'pending', error: 'pending', message: '리포트를 만들고 있습니다.' });
+        }
+        await kv.set('vip-status:' + b.orderId, { state: 'pending', at: Date.now() }, { ex: 60 * 60 });
+      } catch (e) { vipLockKey = null; console.log('⚠️ 락/재사용 확인 실패(생성은 계속):', e.message); }
+    }
 
     let location = cityCoordinates[city];
     const cityResolved = !!location && !timeUnknown;
@@ -1227,12 +1288,13 @@ const handler = async (req, res) => {
 
     console.log('✅ [2] 차트 준비 완료 → Gemini 2회 병렬 호출');
     const [A, B] = await Promise.all([
-      callGemini({ prompt: buildPromptA(v), thinkingBudget: 8192, label: 'CH01-02', validate: VALIDATE_A }),
-      callGemini({ prompt: buildPromptB(v), thinkingBudget: 6144, label: 'CH03-04', validate: VALIDATE_B })
+      callGemini({ prompt: buildPromptA(v), thinkingBudget: 8192, label: 'CH01-02', validate: VALIDATE_A, deadline: T0 + TOTAL_BUDGET_MS }),
+      callGemini({ prompt: buildPromptB(v), thinkingBudget: 6144, label: 'CH03-04', validate: VALIDATE_B, deadline: T0 + TOTAL_BUDGET_MS })
     ]);
     if (!A.ok || !B.ok) {
       const err = [A.ok ? null : A.error, B.ok ? null : B.error].filter(Boolean).join(' | ');
       console.error('🔥 병렬 호출 실패:', err);
+      await markFailed(err);
       return res.status(500).json({ error: '[Gemini VIP 실패] ' + err });
     }
 
@@ -1249,6 +1311,7 @@ const handler = async (req, res) => {
     const empty = MUST.filter(k => !out[k] || String(out[k]).trim().length < 200);
     if (empty.length) {
       console.error('🔥 저장 차단 — 내용이 비었거나 너무 짧음: ' + empty.join(', '));
+      await markFailed('빈 항목: ' + empty.join(', '));
       return res.status(500).json({
         error: '[VIP 생성 미완] ' + empty.join(', ') + ' 항목이 비어 있어 저장하지 않았습니다.'
       });
@@ -1267,14 +1330,18 @@ const handler = async (req, res) => {
       try {
         /* 2026-10-02 봉인 — 만료 없이 영구 보관. 사라지면 재생성돼 내용이 바뀐다. */
         await kv.set('vip-report:' + b.orderId, out);
-        console.log('💾 KV 저장(영구): vip-report:' + b.orderId);
+        await kv.set('vip-status:' + b.orderId, { state: 'completed', at: Date.now() });
+        console.log('💾 KV 저장(영구): vip-report:' + b.orderId + ' (' + Math.round((Date.now() - T0) / 1000) + '초)');
       } catch (e) { console.log('⚠️ KV 저장 실패(전송은 진행):', e.message); }
     }
     res.setHeader('Cache-Control', 'no-store');
     return res.status(200).json(out);
   } catch (error) {
     console.error('🔥 gemini-vip 에러:', error);
+    await markFailed(error.message);
     return res.status(500).json({ error: '[VIP 서버 에러] ' + error.message });
+  } finally {
+    if (vipLockKey) { try { await kv.del(vipLockKey); } catch (e) {} }
   }
 };
 
