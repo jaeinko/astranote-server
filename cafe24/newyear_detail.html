@@ -1,0 +1,163 @@
+<!-- ======================================================================
+  아스트라노트 2027 신년운세 — 카페24 18번 상품 '상세설명' (HTML 모드로 붙여넣기)
+  · 스크립트 없음 · 입력폼은 상세 스킨의 intake.js 가 구매 버튼 위에 자동으로 띄웁니다
+  · '2027 하늘' 섹션의 날짜는 Swiss Ephemeris 로 검증한 값입니다 (2026-11-09)
+  · 2027년 11월이 되면 연도와 '2027 하늘' 섹션을 2028년 것으로 바꿔야 합니다
+    (서버는 11월 1일부터 자동으로 다음 해를 계산합니다)
+  · 후기 자리는 비워 두었습니다. 실제 손님 후기만 넣어주세요.
+====================================================================== -->
+<style>
+.anx{max-width:640px;margin:0 auto;background:#0A0C16;color:#E8E6EF;font-family:"Noto Sans KR","Apple SD Gothic Neo",sans-serif;letter-spacing:-.03em;word-break:keep-all;line-height:1.75;text-align:left}
+.anx *{box-sizing:border-box}
+.anx .sec{padding:56px 22px}
+.anx .gold{color:#E7CE8E}.anx .mute{color:#8b829e}
+.anx .eyebrow{color:#C9A24B;font-size:11.5px;font-weight:700;letter-spacing:.32em;margin-bottom:14px}
+.anx h2{font-family:"Noto Serif KR",serif;font-size:25px;line-height:1.5;font-weight:900;color:#fff;margin:0 0 18px;letter-spacing:-.05em}
+.anx h2 em{font-style:normal;color:#E7CE8E}
+.anx p{font-size:15.5px;color:#cfc9d9;margin:0 0 14px}
+.anx .card{background:#151827;border:1px solid rgba(201,162,75,.28);border-radius:16px;padding:20px 18px;margin:12px 0}
+.anx .line{width:48px;height:1px;background:linear-gradient(90deg,transparent,#C9A24B,transparent);margin:0 auto}
+.anx .hero{text-align:center;padding:64px 22px 56px;background:radial-gradient(circle at 50% 0%,#2a2614 0%,#0A0C16 70%)}
+.anx .yr{font-family:"Cormorant Garamond","Noto Serif KR",serif;font-size:76px;line-height:1;font-weight:700;color:#E7CE8E;text-shadow:0 0 34px rgba(201,162,75,.35);margin-bottom:14px}
+.anx .hero h1{font-family:"Noto Serif KR",serif;font-size:28px;line-height:1.45;font-weight:900;color:#fff;margin:0 0 16px;letter-spacing:-.06em}
+.anx .hero h1 em{font-style:normal;color:#E7CE8E}
+.anx .price{display:inline-block;margin-top:16px;padding:10px 22px;border:1px solid #C9A24B;border-radius:30px;color:#E7CE8E;font-weight:900;font-size:17px}
+.anx .anchor{display:flex;gap:8px;margin:18px 0 6px}
+.anx .anchor div{flex:1;border-radius:14px;padding:16px 10px;text-align:center}
+.anx .anchor .a{background:#151827;border:1px solid rgba(255,255,255,.1)}
+.anx .anchor .b{background:rgba(201,162,75,.12);border:1px solid #C9A24B}
+.anx .anchor small{display:block;font-size:12px;color:#8b829e;margin-bottom:4px}
+.anx .anchor s{color:#8b829e;font-size:17px;font-weight:800}
+.anx .anchor strong{color:#E7CE8E;font-size:20px}
+.anx .vs{display:flex;gap:8px}
+.anx .vs div{flex:1;border-radius:14px;padding:16px 14px;font-size:13.5px;line-height:1.65}
+.anx .vs .x{background:#151827;border:1px solid rgba(255,255,255,.08);color:#8b829e}
+.anx .vs .o{background:rgba(201,162,75,.08);border:1px solid rgba(201,162,75,.45);color:#ded7cc}
+.anx .vs b{display:block;margin-bottom:6px;font-size:14px}
+.anx .vs .x b{color:#b9b5c8}.anx .vs .o b{color:#E7CE8E}
+.anx .feat{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.anx .feat .i{width:34px;height:34px;flex:none;border-radius:50%;background:rgba(201,162,75,.14);color:#E7CE8E;display:flex;align-items:center;justify-content:center;font-size:16px}
+.anx .feat .t{color:#fff;font-weight:800;font-size:15.5px}
+.anx .feat .d{color:#8b829e;font-size:13px;line-height:1.6;margin-top:2px}
+.anx .sky .it{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px}
+.anx .sky .w{width:96px;flex:none;color:#E7CE8E;font-weight:800;font-size:13px}
+.anx .sky .v{color:#cfc9d9}
+.anx .mbar{display:flex;align-items:flex-end;gap:5px;height:90px;margin:14px 0 6px}
+.anx .mbar i{display:block;flex:1;border-radius:4px 4px 0 0;background:rgba(201,162,75,.45)}
+.anx .mbar i.b{background:#E7CE8E}.anx .mbar i.c{background:#E8654F}
+.anx .mlab{display:flex;gap:5px;font-size:10px;color:#6b687a;text-align:center}
+.anx .mlab span{flex:1}
+.anx .faq{border-top:1px solid rgba(255,255,255,.08);padding:16px 0}
+.anx .faq b{display:block;color:#E7CE8E;font-size:15px;margin-bottom:6px}
+.anx .faq span{color:#b9b5c8;font-size:14px}
+.anx .cta{text-align:center;padding:60px 22px 80px;background:radial-gradient(circle at 50% 100%,#2a2614 0%,#0A0C16 70%)}
+.anx .small{font-size:12px;color:#6b687a;line-height:1.7}
+</style>
+
+<div class="anx">
+
+  <!-- ① 히어로 -->
+  <div class="hero">
+    <div class="yr">2027</div>
+    <div class="eyebrow">ASTRANOTE · NEW YEAR REPORT</div>
+    <h1>띠별 운세 말고,<br><em>내가 태어난 하늘</em>로 보는<br>2027년</h1>
+    <p class="mute" style="font-size:14.5px">365일의 실제 행성 위치를<br>당신의 출생차트에 하루씩 겹쳐 계산했어요.</p>
+    <div class="anchor">
+      <div class="a"><small>30일 운세 × 12달</small><s>22,800원</s></div>
+      <div class="b"><small>1년을 한 번에</small><strong>14,900원</strong></div>
+    </div>
+  </div>
+
+  <!-- ② 다른 점 -->
+  <div class="sec">
+    <div class="eyebrow">WHY DIFFERENT</div>
+    <h2>같은 띠, 같은 별자리라도<br><em>올해는 전부 달라요</em></h2>
+    <div class="vs">
+      <div class="x"><b>보통 신년운세</b>같은 띠·같은 별자리면 같은 내용. 미리 써둔 글.</div>
+      <div class="o"><b>아스트라노트</b>태어난 날짜·시간·장소로 하우스가 갈려요. 같은 날 태어나도 시간이 다르면 다른 해가 나와요.</div>
+    </div>
+    <p style="margin-top:18px">올해 목성이 지나는 자리가 어떤 사람에겐 <b class="gold">연애의 방</b>이고, 어떤 사람에겐 <b class="gold">돈의 방</b>이에요. 그걸 나눠주는 게 출생 시간이에요. 그래서 신년운세는 꼭 내 차트로 봐야 해요.</p>
+  </div>
+
+  <div class="line"></div>
+
+  <!-- ③ 받는 것 -->
+  <div class="sec">
+    <div class="eyebrow">WHAT YOU GET</div>
+    <h2>이만큼 들어 있어요</h2>
+    <div class="feat"><div class="i">◎</div><div><div class="t">올해 내 인생의 무대</div><div class="d">올해가 내 차트의 몇 번째 방의 해인지, 한 해를 끌고 가는 '올해의 주인 행성'은 무엇인지 (연간 프로펙션)</div></div></div>
+    <div class="feat"><div class="i">♃</div><div><div class="t">복이 들어오는 방</div><div class="d">목성이 내 차트 어느 방을 지나는지, 들어오고 나가는 날짜까지</div></div></div>
+    <div class="feat"><div class="i">♄</div><div><div class="t">올해의 시험</div><div class="d">토성이 다지는 자리. 무엇을 단단히 하면 내년에 남는지</div></div></div>
+    <div class="feat"><div class="i">♥</div><div><div class="t">애정 · 금전 · 일 · 컨디션</div><div class="d">영역별 점수와 영역별 가장 좋은 달. 솔로·연애 중·기혼에 맞춰 다르게 써요</div></div></div>
+    <div class="feat"><div class="i">☾</div><div><div class="t">열두 달, 한 장씩</div><div class="d">달마다 할 것 하나, 피할 것 하나. 1년 흐름 곡선과 함께</div></div></div>
+    <div class="feat"><div class="i">✦</div><div><div class="t">꼭 기억할 날</div><div class="d">일식·월식이 내 행성 위에 떨어지는 날, 목성·토성이 정확히 닿는 날, 역행 구간</div></div></div>
+    <div class="feat"><div class="i">✓</div><div><div class="t">2027년 실천 지침 3가지</div><div class="d">다이어리에 적어둘 수 있는 행동으로</div></div></div>
+
+    <div class="card" style="margin-top:22px">
+      <div style="text-align:center;color:#C9A24B;font-size:11px;font-weight:700;letter-spacing:.3em">예시 · 2027 FLOW</div>
+      <div class="mbar">
+        <i style="height:48%"></i><i style="height:68%"></i><i style="height:61%"></i><i style="height:61%"></i><i style="height:59%"></i><i class="c" style="height:24%"></i>
+        <i class="c" style="height:38%"></i><i style="height:64%"></i><i style="height:67%"></i><i class="b" style="height:80%"></i><i class="b" style="height:71%"></i><i class="b" style="height:92%"></i>
+      </div>
+      <div class="mlab"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span></div>
+      <div class="small" style="text-align:center;margin-top:8px">※ 예시 화면이에요. 좋은 달·숨 고를 달은 사람마다 다르게 나와요.</div>
+    </div>
+  </div>
+
+  <div class="line"></div>
+
+  <!-- ④ 2027 하늘 (권위) -->
+  <div class="sec sky">
+    <div class="eyebrow">THE SKY OF 2027</div>
+    <h2>2027년 하늘은<br><em>이렇게 움직여요</em></h2>
+    <div class="it"><div class="w">1년 내내</div><div class="v">토성이 양자리에 머물러요. 누군가에겐 새 출발의 시험, 누군가에겐 관계의 시험이에요.</div></div>
+    <div class="it"><div class="w">~ 7월 26일</div><div class="v">목성이 사자자리에. 7월 27일부터 처녀자리로 옮겨가요. 복의 방이 한 해에 두 번 바뀌는 셈이에요.</div></div>
+    <div class="it"><div class="w">1/11 ~ 4/1</div><div class="v">화성 역행. 밀어붙이면 되돌아오는 구간이에요. 연초 계획은 4월 이후에 속도를 내세요.</div></div>
+    <div class="it"><div class="w">2월 7일</div><div class="v">물병자리 금환일식. 이 자리에 행성이 있는 사람에겐 판이 바뀌는 날이에요.</div></div>
+    <div class="it"><div class="w">8월 2일</div><div class="v">사자자리 개기일식. 올해 가장 큰 하늘의 사건이에요.</div></div>
+    <div class="it" style="border:0"><div class="w">수성 역행</div><div class="v">2/10~3/3 · 6/11~7/4 · 10/8~10/28. 계약·연락·전자기기가 꼬이기 쉬운 구간이에요.</div></div>
+    <p class="small" style="margin-top:14px">하늘은 모두에게 같지만, 이 사건들이 <b class="gold">내 차트의 어느 방</b>에 떨어지는지는 사람마다 달라요. 리포트에서 그걸 정확히 짚어드려요.</p>
+  </div>
+
+  <div class="line"></div>
+
+  <!-- ⑤ 누가 쓰나 -->
+  <div class="sec">
+    <div class="eyebrow">WHO READS YOUR CHART</div>
+    <h2>명리학을 오래 공부하다<br><em>서양 점성술에 빠진</em> 사람</h2>
+    <p>저는 원래 사주를 봤어요. 이과 출신이라 근거 없는 말을 싫어하는데, 서양 점성술은 행성 위치를 실제로 계산해서 각도로 말해요. 그래서 빠질 수밖에 없었어요.</p>
+    <p>이 리포트의 점수·날짜·하우스는 전부 코드가 실제 천체 위치로 계산하고, 글은 그 계산을 해석만 해요. 계산값은 Swiss Ephemeris 기준값과 대조해 검증했어요.</p>
+  </div>
+
+  <!-- ⑥ 후기 자리 — 실제 손님 후기만 넣어주세요 -->
+  <!--
+  <div class="sec">
+    <div class="eyebrow">REVIEWS</div>
+    <h2>먼저 받아본 분들</h2>
+    <div class="card">실제 후기 1</div>
+  </div>
+  -->
+
+  <div class="line"></div>
+
+  <!-- ⑦ FAQ -->
+  <div class="sec">
+    <div class="eyebrow">FAQ</div>
+    <h2>자주 묻는 것</h2>
+    <div class="faq"><b>지금 사면 몇 년 운세인가요?</b><span>11월·12월에 사시면 다음 해(2027년) 1월~12월을 봐요. 1월~10월에 사시면 그해 1월~12월이고, 이미 지난 달은 "이 무렵 이런 일 있지 않으셨나요?"로 짚어드려요.</span></div>
+    <div class="faq"><b>태어난 시간을 몰라요</b><span>괜찮아요. 태양 별자리를 1하우스로 두는 '솔라 차트'로 계산해요. 시간을 모를 때 쓰는 표준 방식이에요. 시간을 알면 방이 더 정확하게 나뉘어요.</span></div>
+    <div class="faq"><b>결제하고 언제 받나요?</b><span>결제 직후 결과 화면에서 바로 만들어져요. 보통 1~3분 걸려요.</span></div>
+    <div class="faq"><b>나중에 다시 볼 수 있나요?</b><span>네. 주문내역에서 1년 내내 다시 열 수 있고, 이미지로 저장도 돼요. 매달 초에 그 달 장만 다시 읽어보세요.</span></div>
+    <div class="faq"><b>가족·친구 것도 사줄 수 있나요?</b><span>네. 그분의 생년월일과 태어난 시간으로 입력하시면 돼요. 연말 선물로 많이 하세요.</span></div>
+  </div>
+
+  <!-- ⑧ 마지막 -->
+  <div class="cta">
+    <div class="eyebrow">LAST</div>
+    <h2 style="text-align:center">2027년이 오기 전에<br><em>내 하늘부터</em> 보세요</h2>
+    <p class="mute" style="text-align:center">좋은 달을 미리 알면 그 달에 힘을 모을 수 있어요.<br>숨 고를 달을 미리 알면 그 달에 덜 다쳐요.</p>
+    <div class="price">2027 신년운세 14,900원</div>
+    <p class="small" style="margin-top:18px;text-align:center">아래에서 출생 정보를 입력한 뒤 구매해 주세요.</p>
+  </div>
+
+</div>

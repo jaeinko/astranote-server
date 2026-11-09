@@ -1,5 +1,5 @@
 /* ============================================================================
-   ASTRANOTE — 리포트 이미지 저장 오버라이드 (배우자 9번 · 궁합 15번)
+   ASTRANOTE — 리포트 이미지 저장 오버라이드 (배우자 9 · 궁합 15 · 양육 17 · 재회 16 · 신년 18)
    ----------------------------------------------------------------------------
    ▣ 배포 위치 : public/save.js  (GitHub 저장소)
    ▣ 카페24 order_result.html 맨 아래에 아래 한 줄만 넣습니다.
@@ -69,6 +69,26 @@
       grad: ['#1b2140', '#0A0C16', '#050308'],
       name: '양육설명서'
     },
+    /* 재회운 (16) — reunion.js 결과화면 */
+    '16': {
+      root: '#rnn',
+      order: ['.rnn-cover', '.rnn-hero', '.rnn-mix', '.rnn-card', '.rnn-close'],
+      hideInClone: ['#rnn-save-wrap', '.rnn-teaser'],
+      unhide: '.rnn-card',
+      grad: ['#2a1a33', '#0A0C16', '#050308'],
+      name: '재회운리포트',
+      docOrder: true
+    },
+    /* 신년운세 (18) — newyear.js 결과화면 */
+    '18': {
+      root: '#nyr',
+      order: ['.nyr-cover', '.nyr-hero', '.nyr-sc', '.nyr-flow', '.nyr-rooms', '.nyr-card', '.nyr-months', '.nyr-close'],
+      hideInClone: ['#nyr-save-wrap', '.nyr-teaser'],
+      unhide: '.nyr-card,.nyr-m',
+      grad: ['#2a2614', '#0A0C16', '#050308'],
+      name: '신년운세',
+      docOrder: true
+    },
     '11': {
       root: '#astro-vip-result-container',
       order: ['.vip-report-header', '.apx-hero', '#apx-chart', '#apx-method',
@@ -129,9 +149,13 @@
     spec.order.forEach(function (sel) {
       var list = root.querySelectorAll(sel);
       Array.prototype.forEach.call(list, function (e) {
-        if (e && e.offsetHeight > 12) out.push(e);
+        if (e && e.offsetHeight > 12 && out.indexOf(e) === -1) out.push(e);
       });
     });
+    /* docOrder: 화면에 보이는 순서 그대로 (16·18 은 카드 종류가 섞여 있다) */
+    if (spec.docOrder) {
+      out.sort(function (a, b) { return (a.compareDocumentPosition(b) & 4) ? -1 : 1; });
+    }
     return out;
   }
 
@@ -145,7 +169,14 @@
     if (e.id === 'apx-closing') return '맺음말';
     if (e.id === 'cpr-hero') return '궁합 점수';
     if (e.id === 'upsell-gate' || e.id === 'cpr-upsell') return '안내';
-    var t = $('.card-title', e) || $('.cpr-tt', e) || $('.vip-card-title', e);
+    if (e.classList.contains('rnn-cover') || e.classList.contains('nyr-cover') || e.classList.contains('chd-cover')) return '표지';
+    if (e.classList.contains('rnn-mix')) return '사랑 vs 관성';
+    if (e.classList.contains('nyr-sc')) return '올해의 점수';
+    if (e.classList.contains('nyr-flow')) return '열두 달 흐름';
+    if (e.classList.contains('nyr-rooms')) return '목성·토성의 방';
+    if (e.classList.contains('nyr-months')) return '월별 운세';
+    var t = $('.card-title', e) || $('.cpr-tt', e) || $('.vip-card-title', e) ||
+            $('.chd-tt', e) || $('.rnn-tt', e) || $('.nyr-tt', e);
     return t ? t.textContent.trim().slice(0, 22) : '본문';
   }
 
@@ -409,6 +440,11 @@
     console.log('[저장v2] VVIP 저장 버튼을 새로 만들었습니다');
     return $('#asv-vipbtn');
   }
+
+  /* ── 결과화면 스크립트가 직접 부르는 입구 (child.js · reunion.js · newyear.js) ──
+     🚨 2026-11-09: 양육설명서는 이 함수가 있다고 믿고 불렀는데 정의가 없었다.
+        그래서 장별 갤러리 대신 화면 통째 캡처(긴 화면은 iOS 에서 빈 이미지)로만 저장됐다. */
+  window.__astroSaveOpen = function (pn, btn) { run(String(pn), btn || null); };
 
   /* ── 기존 저장 버튼 가로채기 ─────────────────────────────── */
   function hook() {

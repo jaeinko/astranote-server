@@ -35,12 +35,22 @@ const { kv } = require('@vercel/kv');
 
 /* 상품별 저장 규칙이 파일마다 다르게 자라났습니다.
    여기 한 곳에 정리해 두면 앞으로 상품이 늘어도 이 표만 고치면 됩니다. */
+/* 🚨 2026-11-09 정정
+   · 양육설명서가 16번으로 적혀 있었다. 실제는 17번(16번은 재회운).
+     그래서 양육설명서 주문을 진단하면 "다시보기 링크"에 product_no=16 이 붙어
+     손님에게 재회운 화면이 열렸다.
+   · 30일 운세 키가 'monthly-report:' 로 적혀 있었다. 실제 저장 키는 'monthly:'.
+     그래서 30일 운세 주문은 항상 "아무 기록이 없습니다" 로 나왔다. */
 const PRODUCTS = [
-  { no: '9',  label: '배우자 분석 리포트',  reportKey: id => `report:${id}`,        api: '/api/gemini' },
-  { no: '11', label: 'VVIP 심층 리포트',    reportKey: id => `vip-report:${id}`,    api: '/api/gemini-vip' },
-  { no: '14', label: '30일 운세',           reportKey: id => `monthly-report:${id}`, api: '/api/gemini-monthly' },
-  { no: '15', label: '궁합 리포트',         reportKey: id => `couple-report:${id}`, api: '/api/gemini-couple' },
-  { no: '16', label: '우리 아이 양육설명서', reportKey: id => `child-report:${id}`,  api: '/api/gemini-child' }
+  { no: '9',  label: '배우자 분석 리포트',  reportKey: id => `report:${id}`,         api: '/api/gemini' },
+  { no: '11', label: 'VVIP 심층 리포트',    reportKey: id => `vip-report:${id}`,     api: '/api/gemini-vip' },
+  { no: '14', label: '30일 운세',           reportKey: id => `monthly:${id}`,        api: '/api/gemini-monthly' },
+  { no: '15', label: '궁합 리포트',         reportKey: id => `couple-report:${id}`,  api: '/api/gemini-couple' },
+  { no: '16', label: '재회운 리포트',       reportKey: id => `reunion-report:${id}`, api: '/api/gemini-reunion',
+    intakeKey: id => `reunion-intake:${id}` },
+  { no: '17', label: '우리 아이 양육설명서', reportKey: id => `child-report:${id}`,   api: '/api/gemini-child' },
+  { no: '18', label: '신년운세',            reportKey: id => `newyear-report:${id}`, api: '/api/gemini-newyear',
+    intakeKey: id => `newyear-intake:${id}` }
 ];
 
 const RESULT_PAGE = 'https://astra-note.com/order/order_result.html';
@@ -120,6 +130,12 @@ const handler = async (req, res) => {
         const st = await kv.get(k);
         if (st && st.state === 'failed') items.push({ id: k.slice(7), st });
       }
+      /* 재회운·신년운세는 'failed:주문번호' 에 30일 남긴다 */
+      const fk = await kv.keys('failed:*').catch(() => []);
+      for (const k of fk.slice(0, 200)) {
+        const f = await kv.get(k);
+        if (f) items.push({ id: k.slice(7), st: { at: f.at, error: '[' + f.product + '번] ' + f.error } });
+      }
       items.sort((a, b) => (b.st.at || 0) - (a.st.at || 0));
       if (items.length) {
         rows = items.map(it =>
@@ -156,6 +172,14 @@ const handler = async (req, res) => {
      어느 상품인지 모르므로 5개 저장소를 전부 훑습니다. */
   const intake = await safeGet(`intake:${orderId}`);
   const status = await safeGet(`status:${orderId}`);
+  const failRec = await safeGet(`failed:${orderId}`);
+  /* 재회운·신년운세 입력값 (상품별 키) */
+  const pIntakes = [];
+  for (const p of PRODUCTS) {
+    if (!p.intakeKey) continue;
+    const r = await safeGet(p.intakeKey(orderId));
+    if (r && !r.__err) pIntakes.push({ p, r });
+  }
 
   const found = [];
   for (const p of PRODUCTS) {
@@ -172,10 +196,17 @@ const handler = async (req, res) => {
          <div class="muted" style="margin-top:8px">아래 "다시보기 링크"를 손님에게 보내면 재생성이 걸립니다.</div></div>`
       : `<div class="card"><h2>진단</h2><span class="ok">✅ 리포트는 서버에 정상 저장되어 있습니다</span>
          <div class="muted" style="margin-top:8px">손님 화면 문제입니다. 아래 링크를 그대로 보내주세요. 바로 열립니다.</div></div>`;
+  } else if (failRec && !failRec.__err) {
+    head = `<div class="card"><h2>진단</h2><span class="bad">🔥 ${esc(failRec.product)}번 생성이 실패했습니다</span>
+      <pre>${esc(failRec.error)}</pre>
+      <div class="muted" style="margin-top:8px">입력값이 아래에 남아 있으면 링크만 보내도 재생성됩니다.</div></div>`;
   } else if (status && status.state === 'failed') {
     head = `<div class="card"><h2>진단</h2><span class="bad">🔥 생성이 실패했습니다</span>
       <pre>${esc(status.error)}</pre>
       <div class="muted" style="margin-top:8px">출생정보가 아래에 남아 있으면 링크만 보내도 재생성됩니다.</div></div>`;
+  } else if (pIntakes.length) {
+    head = `<div class="card"><h2>진단</h2><span class="warn">⚠️ ${esc(pIntakes[0].p.label)} 입력값은 받았으나 리포트가 없습니다</span>
+      <div class="muted" style="margin-top:8px">손님이 생성 도중 창을 닫았을 가능성이 높습니다. 링크를 보내면 됩니다.</div></div>`;
   } else if (intake && !intake.__err) {
     head = `<div class="card"><h2>진단</h2><span class="warn">⚠️ 출생정보는 받았으나 리포트가 없습니다</span>
       <div class="muted" style="margin-top:8px">손님이 생성 도중 창을 닫았을 가능성이 높습니다. 링크를 보내면 됩니다.</div></div>`;
@@ -193,7 +224,16 @@ const handler = async (req, res) => {
     <div class="row"><div class="k">출생지</div><div class="v">${esc(intake.city)}</div></div>
     <div class="row"><div class="k">성별</div><div class="v">${esc(intake.myGender)} → ${esc(intake.targetGender)}</div></div>
     <div class="row"><div class="k">입력 시각</div><div class="v">${esc(when(intake.at))}</div></div>`
-    : '<div class="muted">저장된 출생정보가 없습니다.</div>';
+    : '';
+  const fmtP = (x) => x ? `${esc(x.name)} · ${esc(x.date)} ${x.timeUnknown ? '<span class="muted">(시간 모름)</span>' : esc(x.time)} · ${esc(x.city)} · ${esc(x.gender)}` : '-';
+  const pIntakeRows = pIntakes.map(({ p, r }) => `
+    <div class="row"><div class="k">상품</div><div class="v">${esc(p.no)}번 ${esc(p.label)}</div></div>
+    <div class="row"><div class="k">나</div><div class="v">${fmtP(r.me)}</div></div>
+    ${r.ex ? `<div class="row"><div class="k">상대</div><div class="v">${fmtP(r.ex)}</div></div>
+    <div class="row"><div class="k">상황</div><div class="v">${esc(r.stage)} · ${esc(r.initiator)} 끝냄 · ${esc(r.contact)}</div></div>` : ''}
+    ${r.status ? `<div class="row"><div class="k">상황</div><div class="v">${esc(r.status)} · 궁금한 것: ${esc(r.focus)}</div></div>` : ''}
+    <div class="row"><div class="k">입력 시각</div><div class="v">${esc(when(r.at))}</div></div>`).join('');
+  const birthCard = (intakeRows + pIntakeRows) || '<div class="muted">저장된 출생정보가 없습니다.</div>';
 
   const prodRows = PRODUCTS.map(p => {
     const hit = found.find(f => f.p.no === p.no);
@@ -203,8 +243,10 @@ const handler = async (req, res) => {
     return `<div class="row"><div class="k">${esc(p.no)}번</div><div class="v">${esc(p.label)} &nbsp; ${mark}</div></div>`;
   }).join('');
 
-  const link = found.length
-    ? `${RESULT_PAGE}?order_id=${encodeURIComponent(orderId)}&product_no=${found[0].p.no}`
+  const knownNo = found.length ? found[0].p.no
+    : (pIntakes.length ? pIntakes[0].p.no : (failRec && !failRec.__err && failRec.product ? failRec.product : null));
+  const link = knownNo
+    ? `${RESULT_PAGE}?order_id=${encodeURIComponent(orderId)}&product_no=${knownNo}`
     : `${RESULT_PAGE}?order_id=${encodeURIComponent(orderId)}`;
 
   return res.status(200).send(PAGE_HEAD + `
@@ -219,7 +261,7 @@ const handler = async (req, res) => {
       <a class="btn" href="${esc(link)}" target="_blank">직접 열어보기</a>
     </div>
 
-    <div class="card"><h2>출생정보</h2>${intakeRows}</div>
+    <div class="card"><h2>출생정보</h2>${birthCard}</div>
     <div class="card"><h2>상품별 저장 상태</h2>${prodRows}</div>
     <div class="card"><h2>상태 기록</h2>
       <div class="row"><div class="k">state</div><div class="v">${esc(status && status.state || '-')}</div></div>

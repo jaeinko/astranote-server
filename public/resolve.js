@@ -21,7 +21,7 @@
    서버에 물어보는 경로도 11·9번만 봅니다. 14·15번은 목록에 없습니다.
    그래서 메일로 들어오면 궁합·30일 손님까지 배우자 리포트가 떴습니다.
 
-   이 파일은 다른 스크립트가 읽기 전에 4개 엔드포인트를 동시에 조회해
+   이 파일은 다른 스크립트가 읽기 전에 모든 상품 엔드포인트를 동시에 조회해
    상품을 확정하고, 주소에 product_no 를 붙여 다시 엽니다.
    그러면 그다음부터는 추측이 필요 없습니다.
 
@@ -45,9 +45,9 @@
   var ENDPOINTS = [
     { no: '11', path: '/api/gemini-vip',     label: 'VVIP 심층 리포트' },
     { no: '17', path: '/api/gemini-child',   label: '우리 아이 양육설명서' },
-    /* ⚠️ 16번(재회운)은 아직 서버 엔드포인트가 없어 목록에 넣지 않는다.
-       넣으면 조회가 항상 실패해 다른 상품 판정까지 늦어진다.
-       재회운 API 를 만들면 여기에 { no:'16', path:'/api/gemini-reunion' } 를 추가할 것. */
+    /* 2026-11-09 — 신년운세(18)·재회운(16) 추가 */
+    { no: '18', path: '/api/gemini-newyear', label: '신년운세' },
+    { no: '16', path: '/api/gemini-reunion', label: '재회운 리포트' },
     { no: '15', path: '/api/gemini-couple',  label: '궁합 리포트' },
     { no: '14', path: '/api/gemini-monthly', label: '30일 운세' },
     { no: '9',  path: '/api/gemini',         label: '배우자 분석 리포트' }
@@ -103,6 +103,9 @@
           /* 30일 운세는 기간이 지나면 404 + stale 을 준다.
              리포트는 다시 만들어야 하지만 상품이 무엇인지는 확실하다. */
           if (d && d.stale) return ep;
+          /* 리포트는 아직 없지만 그 상품의 입력값이 서버에 있다 = 그 상품이 맞다.
+             (생성이 한 번 실패한 손님이 메일 링크로 다시 들어오는 경우) */
+          if (d && d.canRegenerate) return ep;
           return null;
         });
       })

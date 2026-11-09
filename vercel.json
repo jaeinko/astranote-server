@@ -24,6 +24,12 @@
     },
     "api/admin-seal.js": {
       "maxDuration": 60
+    },
+    "api/gemini-reunion.js": {
+      "maxDuration": 300
+    },
+    "api/gemini-newyear.js": {
+      "maxDuration": 300
     }
   }
 }

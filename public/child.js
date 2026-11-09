@@ -59,6 +59,9 @@
      그래서 16번은 "이 기기에 양육설명서 입력값이 실제로 있을 때"만 받는다.
      재회운 손님에게는 astro_child_data 가 없으므로 안전하게 갈린다. */
   var legacyOk = (String(hinted) === '16') && !!(stored && stored.child);
+  /* 🚨 2026-11-09 — 재회운(16)이 실제로 출시됐다. 같은 기기에 예전 양육설명서 입력값이 남아 있어도
+     재회운 입력값이 있으면 16번은 무조건 재회운이다. 여기서 가로채면 재회운 손님이 양육설명서를 본다. */
+  try { if (legacyOk && localStorage.getItem('astro_reunion_data')) legacyOk = false; } catch (e) {}
   if (String(hinted) !== NO && !legacyOk) return;
   if (window.__astroReportInit) return;
   window.__astroChildV1 = true;
@@ -508,7 +511,7 @@
       /* 저장 버튼 — save.js 갤러리가 있으면 그쪽, 없으면 기본 캡처 */
       var sb = $('chd-save-btn');
       if (sb) sb.onclick = function () {
-        if (typeof window.__astroSaveOpen === 'function') { window.__astroSaveOpen(NO); return; }
+        if (typeof window.__astroSaveOpen === 'function') { window.__astroSaveOpen(NO, sb); return; }
         basicSave();
       };
 
