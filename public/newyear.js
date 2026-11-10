@@ -199,9 +199,9 @@
   var stepTimer = null;
   function startLoading() {
     var steps = ['태어난 순간의 하늘을<br>다시 그리고 있습니다.',
-      '올해가 내 인생의 <b>몇 번째 방</b>인지<br>계산하고 있습니다.',
-      '<b>365일</b>의 하늘을<br>하루씩 겹쳐보고 있습니다.',
-      '목성이 복을 들고 오는 <b>방</b>과<br>토성이 시험하는 방을 찾고 있습니다.',
+      '나의 새해 <b>메인테마</b>를<br>찾고 있습니다.',
+      '<b>365일</b> 하늘을<br>하루씩 넘겨 보고 있습니다.',
+      '복이 들어오는 <b>자리</b>와<br>고비가 오는 자리를 찾고 있습니다.',
       '일식과 월식이 내 차트의<br><b>어디에 떨어지는지</b> 보고 있습니다.',
       '열두 달을 한 장씩<br>써 내려가고 있습니다.'];
     var i = 0, el = $('nyr-step'); if (!el) return;
@@ -253,10 +253,10 @@
       return '<div class="row"><span class="nm">' + d[0] + '</span><span class="tr"><i class="fl" data-w="' + (s[d[1]] || 0) + '"></i></span>' +
         '<span class="pc">' + (s[d[1]] || 0) + '</span><span class="bm">' + (bb[d[1]] ? bb[d[1]] + '월★' : '') + '</span></div>';
     }).join('');
-    var turn = (p.before && p.after && p.before !== p.after) ? '생일(' + kd(p.birthday) + ')부터는 ' + p.after + '하우스의 해로 넘어갑니다' : '';
+    var turn = (p.before && p.after && p.before !== p.after) ? '생일(' + kd(p.birthday) + ')부터는 ' + p.after + '하우스의 해로 바뀌어요' : '';
     return '<div class="nyr-sc"><div class="top">' + ringHTML(s.total || 0) +
-      '<div class="nyr-prof"><div class="k">올해의 무대</div><div class="w">' + h(p.house) + '하우스의 해 — ' + h(String(p.theme || '').split(' — ')[0]) + '</div>' +
-      '<div class="y">올해의 주인 행성 <b style="color:#E7CE8E">' + h(p.lord || '') + '</b>' + (turn ? '<br>' + h(turn) : '') + '</div></div></div>' +
+      '<div class="nyr-prof"><div class="k">' + h(meta.year || '') + ' 메인테마</div><div class="w">' + h(p.house) + '하우스의 해 — ' + h(String(p.theme || '').split(' — ')[0]) + '</div>' +
+      '<div class="y">올해를 이끄는 별 <b style="color:#E7CE8E">' + h(p.lord || '') + '</b>' + (turn ? '<br>' + h(turn) : '') + '</div></div></div>' +
       '<div class="nyr-dm">' + rows + '</div></div>';
   }
   function flowHTML(meta) {
@@ -290,7 +290,7 @@
       '<path d="' + area + '" fill="url(#nyrG)"/><path d="' + d + '" fill="none" stroke="#E7CE8E" stroke-width="2.4" stroke-linecap="round"/>' +
       dots + labels + '</svg>' +
       '<div class="cap"><b>● 가장 좋은 달 ' + best.map(function (m) { return m + '월'; }).join('·') + '</b> &nbsp; <i>● 숨 고를 달 ' +
-      care.map(function (m) { return m + '월'; }).join('·') + '</i><br>365일의 실제 행성 위치를 내 차트에 겹쳐 계산한, 그 해 안에서의 높낮이입니다.</div></div>';
+      care.map(function (m) { return m + '월'; }).join('·') + '</i><br>1년 365일 하늘을 내 차트에 하루씩 겹쳐 본 결과예요. 높을수록 일이 잘 풀리는 달이에요.</div></div>';
   }
   function roomsHTML(meta) {
     var seg = function (arr) {
@@ -299,7 +299,7 @@
       }).join('<br>');
     };
     return '<div class="nyr-rooms"><div class="j"><div class="k">♃ 복이 들어오는 방</div><div class="seg">' + seg(meta.jupiter) + '</div></div>' +
-      '<div class="s"><div class="k">♄ 시험받는 방</div><div class="seg">' + seg(meta.saturn) + '</div></div></div>';
+      '<div class="s"><div class="k">♄ 고비가 오는 방</div><div class="seg">' + seg(meta.saturn) + '</div></div></div>';
   }
   function datesHTML(meta) {
     var items = [];
@@ -322,7 +322,7 @@
 
   /* ══════════════ 렌더 ══════════════ */
   var rendered = false;
-  var CH1 = [['01', 'ch1_overview', '총론'], ['02', 'ch2_theme', '올해 내 인생의 무대'], ['03', 'ch3_jupiter', '복이 들어오는 방'],
+  var CH1 = [['01', 'ch1_overview', '총론'], ['02', 'ch2_theme', '메인테마'], ['03', 'ch3_jupiter', '복이 들어오는 방'],
              ['04', 'ch4_saturn', '올해의 시험'], ['05', 'ch5_love', '애정운'], ['06', 'ch6_money', '금전운'],
              ['07', 'ch7_work', '일과 성취'], ['08', 'ch8_body', '컨디션과 마음']];
   var FOCUS_KEY = { '연애·결혼': 'ch5_love', '돈': 'ch6_money', '일·이직': 'ch7_work', '건강': 'ch8_body', '공부·시험': 'ch7_work' };
@@ -339,7 +339,7 @@
       var fk = FOCUS_KEY[meta.focus];
       var P = [];
       P.push('<div class="nyr-cover"><div class="yr">' + h(Y) + '</div><div class="lb">ASTRANOTE NEW YEAR REPORT</div>' +
-        '<h1><em>' + h(name) + '</em>님의 ' + h(Y) + '년</h1><div class="who">태어난 순간의 하늘 위에 365일을 하루씩 겹쳐 계산했습니다</div><div class="nyr-line"></div></div>');
+        '<h1><em>' + h(name) + '</em>님의 ' + h(Y) + '년</h1><div class="who">태어난 순간의 하늘에 1년 365일을 하루씩 겹쳐 봤어요</div><div class="nyr-line"></div></div>');
       P.push('<div class="nyr-hero"><div class="t">' + h(Y) + '년을 한 문장으로</div><div class="h">' + safe(rep.headline) + '</div>' +
         '<div class="nyr-kw">' + [rep.keyword_1, rep.keyword_2, rep.keyword_3].filter(Boolean).map(function (k) { return '<span>' + h(k) + '</span>'; }).join('') + '</div></div>');
       P.push(scoreHTML(meta));
@@ -350,7 +350,7 @@
         var body = rep[c[1]]; if (!body) return;
         var isF = fk === c[1];
         P.push('<div class="nyr-card' + (isF ? ' focus' : '') + '"><div class="nyr-no">CHAPTER ' + c[0] + (isF ? '<em>가장 궁금한 것</em>' : '') + '</div>' +
-          '<div class="nyr-tt">' + h(c[2]) + '</div><div class="nyr-ct">' + safe(body) + '</div></div>');
+          '<div class="nyr-tt">' + h(c[1] === 'ch2_theme' ? '나의 ' + Y + '년 메인테마' : c[2]) + '</div><div class="nyr-ct">' + safe(body) + '</div></div>');
       });
 
       var M = meta.months || [];

@@ -268,11 +268,11 @@
         '<span class="ds">' + f[2] + '</span><span class="pc">' + (sh[f[0]] || 0) + '%</span></div>';
     }).join('');
     return '<div class="rnn-mix"><div class="t">WHY YOU CAN\'T LET GO</div>' +
-      '<div class="q">이 관계가 당신을 붙잡는 힘의 성분</div>' +
+      '<div class="q">이 관계가 나를 붙잡는 힘</div>' +
       '<div class="rnn-vs"><div class="l"><small>사랑 쪽</small>' + (meta.love || 0) + '%</div>' +
       '<div class="r"><small>관성 쪽</small>' + (meta.inertia || 0) + '%</div></div>' +
       '<div class="rnn-bar">' + bar + '</div><div class="rnn-rows">' + rows + '</div>' +
-      '<div class="cap">재회 확률이 아닙니다. 두 사람의 차트 사이 각도로 계산한, 이 관계가 사람을 붙잡는 힘의 비율입니다. 자세한 해석은 3장에 있습니다.</div></div>';
+      '<div class="cap">재회 확률이 아니에요. 두 사람 차트 사이의 각도로, 이 관계가 나를 붙잡는 힘이 무엇으로 이뤄져 있는지 나눠 본 거예요. 자세한 풀이는 3장에 있어요.</div></div>';
   }
 
   var KIND = {

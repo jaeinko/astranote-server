@@ -137,6 +137,7 @@ ${D.text}
 · 연민 금지("얼마나 힘드셨어요"). 정확히 읽어주는 것이 위로다.
 · 소제목이 필요하면 【】로 감싸고 반드시 문장으로.
 
+${GR.KO_STYLE}
 [강조]
 금색 <b>...</b> — 손님이 캡처할 판정 문장에만. 한 장에 2~3개. 행성·별자리·숫자·날짜에는 치지 마라.
 빨강 <span style="color:#ff3b30;font-weight:900;">...</span> — 리포트 전체에 최대 2개. 하면 안 되는 행동에만.
@@ -250,6 +251,8 @@ function validate(c, A, B, ctx, isLast) {
     if (hedges > HEDGE_LIMIT) return { msg: `발뺌 화법 과다 (${hedges}회 / 허용 ${HEDGE_LIMIT}회)` };
     for (const sp of SPEC) if (METAPHOR_OPEN.test(String(c[sp.key]))) return { msg: sp.key + ' 이 비유로 시작함' };
     if (/(자석처럼|붉은 실|운명의 실|퍼즐 조각|반쪽)/.test(body)) return { msg: '상투적 비유 사용 (자석/붉은 실/퍼즐/반쪽)' };
+    const ko = GR.koStyleIssue(body);
+    if (ko) return { msg: ko };
   }
   return null;
 }
