@@ -1832,12 +1832,12 @@ document.querySelectorAll(".faq-q").forEach(function (q) {
               #newyear-sales .ny-price small { display: block; font-size: 12px; color: #9a9a9a; margin-bottom: 5px; }
               #newyear-sales .ny-price s { color: #8a8a8a; font-size: 17px; font-weight: 800; }
               #newyear-sales .ny-price strong { color: #f0d77b; font-size: 22px; font-weight: 900; }
-              #newyear-extra .ny-chips { display: flex; flex-wrap: wrap; gap: 7px; }
-              #newyear-extra .ny-chips input { position: absolute; opacity: 0; pointer-events: none; }
-              #newyear-extra .ny-chips label { padding: 10px 15px; border-radius: 22px; cursor: pointer; font-size: 14px; font-weight: 700;
+              #newyear-extra .ny-chips, #reunion-extra .ny-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+              #newyear-extra .ny-chips input, #reunion-extra .ny-chips input { position: absolute; opacity: 0; pointer-events: none; }
+              #newyear-extra .ny-chips label, #reunion-extra .ny-chips label { padding: 10px 15px; border-radius: 22px; cursor: pointer; font-size: 14px; font-weight: 700;
                 color: #888; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.03); font-family: 'Noto Sans KR', sans-serif; transition: all .15s; }
-              #newyear-extra .ny-chips input:checked + label { color: #fff; border-color: #d4af37; background: rgba(212,175,55,.16); }
-              #newyear-extra .ny-chips.error-shake label { border-color: rgba(255,90,90,.7); }
+              #newyear-extra .ny-chips input:checked + label, #reunion-extra .ny-chips input:checked + label { color: #fff; border-color: #d4af37; background: rgba(212,175,55,.16); }
+              #newyear-extra .ny-chips.error-shake label, #reunion-extra .ny-chips.error-shake label { border-color: rgba(255,90,90,.7); }
             </style>
             <div id="newyear-sales" style="display:none;">
 
@@ -1911,7 +1911,7 @@ document.querySelectorAll(".faq-q").forEach(function (q) {
                   <p>언제, 어떤 모습으로 오는지. 그리고 <span class="hl">그 행운을 잡으려면 무엇을 해야 하는지</span>까지.</p></div></div>
                 <div class="cs-toc" style="border-color:rgba(212,175,55,.42); background:linear-gradient(90deg,rgba(212,175,55,.09),transparent 70%);">
                   <div class="cs-n" style="color:#f0d77b;">04</div><div><b style="color:#f0d77b;">2027년 미리 알면 약이 되는 세 가지 ★</b>
-                  <p>언제 무엇을 챙기면 되는지. <b style="color:#fff">알고 넘기면 내년이 더 단단해집니다.</b></p></div></div>
+                  <p>언제 무엇을 챙기면 되는지. <span class="hl">알고 넘기면 내년이 더 단단해집니다.</span></p></div></div>
                 <div class="cs-toc"><div class="cs-n">05</div><div><b>애정운</b><p>솔로 · 연애 중 · 기혼 · 복잡한 관계에 맞춰 따로 씁니다.</p></div></div>
                 <div class="cs-toc"><div class="cs-n">06</div><div><b>금전운</b><p>돈이 들어오는 길과 새는 구멍. 지갑을 열어도 되는 때와 닫아야 할 때.</p></div></div>
                 <div class="cs-toc"><div class="cs-n">07</div><div><b>일과 성취</b><p>성과가 나는 때와 무리하면 안 되는 때. 이직·승진·창업 타이밍.</p></div></div>
@@ -1949,6 +1949,126 @@ document.querySelectorAll(".faq-q").forEach(function (q) {
               <div class="cs-sub">1분이면 끝납니다 · 입력 정보는 리포트 생성에만 쓰입니다</div>
             </div>
             <!-- ▲ 신년운세 판매 섹션 끝 -->
+
+            <!-- ▼ 재회운 판매 섹션 (16번 전용) — 기본 숨김 · 2026-11-10 -->
+            <style>
+              #reunion-sales, #reunion-faq { font-family: 'Noto Sans KR', sans-serif !important; letter-spacing: -0.5px; }
+              #reunion-sales .rn-venus { display:none; margin-bottom:22px; border-radius:16px; padding:18px 16px; text-align:center;
+                background:linear-gradient(160deg,rgba(90,30,60,.55),rgba(20,12,24,.9)); border:1px solid rgba(255,138,128,.5); }
+              #reunion-sales .rn-venus b { display:block; color:#ff9d95; font-size:12.5px; letter-spacing:2px; margin-bottom:6px; }
+              #reunion-sales .rn-venus p { margin:0; color:#eadde3; font-size:14px; line-height:1.75; word-break:keep-all; }
+              #reunion-sales .rn-q { font-family:'Noto Serif KR',serif; color:#fff; font-size:17px; font-weight:700; line-height:1.6;
+                padding:14px 4px; border-top:1px solid rgba(255,255,255,.07); }
+              #reunion-sales .rn-q:first-child { border-top:0; }
+              #reunion-sales .rn-mix { background:rgba(255,255,255,.03); border:1px solid rgba(212,175,55,.3); border-radius:16px; padding:18px 16px 14px; margin-top:14px; }
+              #reunion-sales .rn-vs { display:flex; justify-content:space-between; font-weight:900; font-size:20px; margin-bottom:8px; }
+              #reunion-sales .rn-vs small { display:block; font-size:11.5px; color:#9a9a9a; font-weight:700; }
+              #reunion-sales .rn-vs .l { color:#f0d77b; } #reunion-sales .rn-vs .r { color:#d9a0bd; text-align:right; }
+              #reunion-sales .rn-bar { display:flex; height:14px; border-radius:7px; overflow:hidden; margin-bottom:12px; }
+              #reunion-sales .rn-bar i { display:block; height:100%; }
+              #reunion-sales .rn-row { display:flex; align-items:center; gap:9px; font-size:13px; color:#cfcfcf; margin:7px 0; }
+              #reunion-sales .rn-row .dt { width:9px; height:9px; border-radius:50%; flex:none; }
+              #reunion-sales .rn-row .nm { width:46px; flex:none; font-weight:800; color:#fff; }
+              #reunion-sales .rn-row .ds { flex:1; color:#8a8a8a; font-size:12px; word-break:keep-all; }
+              #reunion-sales .rn-row b { color:#fff; }
+              #reunion-sales .rn-tl { border-left:1px solid rgba(212,175,55,.35); margin:14px 0 0 6px; padding-left:18px; }
+              #reunion-sales .rn-tl div { position:relative; margin-bottom:14px; font-size:13px; color:#bdbdbd; line-height:1.6; word-break:keep-all; }
+              #reunion-sales .rn-tl div:before { content:''; position:absolute; left:-23px; top:6px; width:9px; height:9px; border-radius:50%; background:#d4af37; }
+              #reunion-sales .rn-tl div.r:before { background:#b39ddb; } #reunion-sales .rn-tl div.c:before { background:#ff8a80; }
+              #reunion-sales .rn-tl b { display:block; color:#fff; font-size:14px; }
+            </style>
+            <div id="reunion-sales" style="display:none;">
+
+              <!-- 0. 금성 역행 — 2026-11-14 까지만 JS 가 켠다 -->
+              <div class="rn-venus" id="rn-venus">
+                <b>지금 금성 역행 중 · 11월 14일까지</b>
+                <p>금성이 거꾸로 가는 동안엔 지나간 사람이 유난히 자주 떠오릅니다.<br><strong style="color:#fff">요즘 그 사람 생각이 부쩍 났다면, 이유가 있습니다.</strong></p>
+              </div>
+
+              <!-- 1. 공감 -->
+              <div class="cs-block">
+                <div class="cs-title">이런 말, <span class="g">이미 들어 보셨죠?</span></div>
+                <div class="cs-sub">듣는 순간은 숨이 쉬어지는데, 며칠 지나면 다시 같은 자리입니다</div>
+                <div class="cs-pv" style="text-align:left; padding:8px 18px;">
+                  <div class="rn-q">"상대도 아직 당신을 생각하고 있어요"</div>
+                  <div class="rn-q">"3개월 안에 연락 옵니다"</div>
+                  <div class="rn-q">"재회 확률 78%예요"</div>
+                </div>
+                <p class="cs-note2" style="margin-top:14px;">그 사람 마음은 누구도 볼 수 없습니다. 차트도 마찬가지입니다.<br>
+                대신 차트가 <b style="color:#f0d77b">정확하게 보여주는 것</b>이 있습니다. 두 사람 사이에 어떤 각도가 걸려 있어서 이렇게 못 놓는지, 그리고 하늘이 언제 문을 열고 언제 닫는지.</p>
+              </div>
+
+              <!-- 2. 핵심 — 사랑 vs 관성 -->
+              <div class="cs-block">
+                <div class="cs-title">못 놓는 이유를<br><span class="g">다섯 가지로 쪼개서</span> 보여 드립니다</div>
+                <div class="cs-sub">그리운 게 그 사람인지, 그 사람 곁에 있던 내 모습인지</div>
+                <div class="rn-mix">
+                  <div class="rn-vs"><div class="l"><small>사랑 쪽</small>58%</div><div class="r"><small>관성 쪽</small>42%</div></div>
+                  <div class="rn-bar"><i style="width:38%;background:#f0d77b"></i><i style="width:20%;background:#d4af37"></i><i style="width:4%;background:#b39ddb"></i><i style="width:34%;background:#9575cd"></i><i style="width:4%;background:#d9a0bd"></i></div>
+                  <div class="rn-row"><span class="dt" style="background:#f0d77b"></span><span class="nm">정</span><span class="ds">함께 있으면 편하고 따뜻했던 힘</span><b>38%</b></div>
+                  <div class="rn-row"><span class="dt" style="background:#d4af37"></span><span class="nm">성장</span><span class="ds">서로를 앞으로 가게 했던 힘</span><b>20%</b></div>
+                  <div class="rn-row"><span class="dt" style="background:#b39ddb"></span><span class="nm">익숙함</span><span class="ds">이미 아는 사람이라 돌아가고 싶은 힘</span><b>4%</b></div>
+                  <div class="rn-row"><span class="dt" style="background:#9575cd"></span><span class="nm">책임감</span><span class="ds">의무와 미안함으로 붙잡는 힘</span><b>34%</b></div>
+                  <div class="rn-row"><span class="dt" style="background:#d9a0bd"></span><span class="nm">집착</span><span class="ds">떨어져 있을수록 더 당기는 힘</span><b>4%</b></div>
+                </div>
+                <p class="cs-note2" style="margin-top:12px; text-align:center;">위 화면은 <b>가상 인물 두 사람(1995년 3월생 · 1993년 12월생)으로 실제 계산한 예시</b>입니다.<br>실제 비율은 두 분의 차트로 계산됩니다.</p>
+                <p class="cs-note2" style="margin-top:10px;"><span class="hl-r">이 비율은 재회 확률이 아닙니다.</span> 아스트라노트는 재회 확률을 숫자로 말하지 않습니다. 그런 숫자는 사람을 붙잡아 두는 미끼가 되기 때문입니다.</p>
+              </div>
+
+              <!-- 3. 시기 -->
+              <div class="cs-block">
+                <div class="cs-title">앞으로 18개월,<br><span class="g">하루 단위로</span> 넘겨 봤습니다</div>
+                <div class="cs-sub">미리 찍어 둔 "이번 달 재회운"이 아닙니다</div>
+                <div class="rn-tl">
+                  <div><b>문이 열리는 때</b>목성이 두 사람 관계의 금성을 순하게 비추는 구간</div>
+                  <div class="r"><b>옛 감정이 되살아나는 때</b>금성·수성 역행 — 지나간 관계를 다시 꺼내 보게 되는 구간</div>
+                  <div class="c"><b>먼저 움직이면 손해 보는 때</b>토성이 내 금성·달을 누르는 구간, 화성 역행</div>
+                </div>
+                <p class="cs-note2" style="margin-top:6px;">연락한다면 언제가 좋은지, 보낸다면 <b style="color:#fff">부담 없는 첫 문장</b>까지 적어 드립니다.<br>
+                연락이 차단된 상태라면 그 선택을 존중하는 쪽으로 — 마음을 정리하기 좋은 때와, 상대가 먼저 손을 내밀면 받아도 되는 때를 알려 드립니다.</p>
+              </div>
+
+              <!-- 4. 목차 -->
+              <div class="cs-block">
+                <div class="cs-title">받아보실 <span class="g">9장</span></div>
+                <div class="cs-sub">두 사람의 차트를 겹치고, 앞으로 18개월의 하늘을 계산합니다</div>
+                <div class="cs-toc"><div class="cs-n">01</div><div><b>이 관계는 왜 끝났는가</b><p>누가 부족해서가 아니라, 두 기질이 어디서 어긋났는지.</p></div></div>
+                <div class="cs-toc"><div class="cs-n">02</div><div><b>지금도 남아 있는 것</b><p>시간이 지나도 계속 생각나는 진짜 이유.</p></div></div>
+                <div class="cs-toc" style="border-color:rgba(212,175,55,.42); background:linear-gradient(90deg,rgba(212,175,55,.09),transparent 70%);">
+                  <div class="cs-n" style="color:#f0d77b;">03</div><div><b style="color:#f0d77b;">못 놓는 이유는 사랑인가 관성인가 ★</b>
+                  <p>정 · 성장 · 익숙함 · 책임감 · 집착. <span class="hl">다섯 성분과 그 근거</span>.</p></div></div>
+                <div class="cs-toc"><div class="cs-n">04</div><div><b>다시 만나면 반복될 것</b><p>같은 각도는 다시 만나도 그대로 작동합니다.</p></div></div>
+                <div class="cs-toc"><div class="cs-n">05</div><div><b>다시 만나면 달라질 것</b><p>헤어질 무렵의 하늘과 지금 하늘은 무엇이 다른가.</p></div></div>
+                <div class="cs-toc"><div class="cs-n">06</div><div><b>그 사람은 지금 어떤 시기인가</b><p>마음이 아니라, 그 사람이 지나고 있는 시기의 성격.</p></div></div>
+                <div class="cs-toc" style="border-color:rgba(212,175,55,.42); background:linear-gradient(90deg,rgba(212,175,55,.09),transparent 70%);">
+                  <div class="cs-n" style="color:#f0d77b;">07</div><div><b style="color:#f0d77b;">연락한다면 언제 ★</b>
+                  <p>18개월 실계산 날짜. 그리고 <span class="hl">보낸다면 이렇게</span> — 첫 메시지 예시까지.</p></div></div>
+                <div class="cs-toc" style="border-color:rgba(212,175,55,.42); background:linear-gradient(90deg,rgba(212,175,55,.09),transparent 70%);">
+                  <div class="cs-n" style="color:#f0d77b;">08</div><div><b style="color:#f0d77b;">놓아야 한다면, 그 근거 ★</b>
+                  <p>재회를 원하는 분께도 <span class="hl">반드시</span> 들어갑니다.</p></div></div>
+                <div class="cs-toc"><div class="cs-n">09</div><div><b>결론</b><p>다시 두드려 볼 만한 쪽 · 조건이 맞을 때만 · 놓는 쪽 — 셋 중 하나로 분명하게.</p></div></div>
+                <p class="cs-note2" style="margin-top:14px;">"다시 만나세요"만 말하는 리포트는 아무에게나 쓸 수 있습니다. 그래서 결론이 사람마다 다르게 나오도록 <b style="color:#e8c766">무작위 1,500쌍으로 검증</b>했습니다.</p>
+              </div>
+
+              <!-- 5. 하지 않는 것 -->
+              <div class="cs-block">
+                <div class="cs-title">이 리포트가 <span class="g">하지 않는 것</span></div>
+                <div class="ch-not">
+                  <b>절대 하지 않습니다</b>
+                  <ul>
+                    <li>그 사람의 속마음을 단정하지 않습니다.</li>
+                    <li>재회 확률을 숫자로 말하지 않습니다.</li>
+                    <li>밀당·질투 유발 같은 기술을 가르치지 않습니다.</li>
+                    <li>차단된 상대에게 다른 길로 연락하라고 하지 않습니다.</li>
+                  </ul>
+                  <div class="y">대신 <b>당신이 처음으로 자기 이유로 결정할 수 있게</b>, 정확하게 보여 드립니다.</div>
+                </div>
+              </div>
+
+              <div class="cs-title" style="margin-bottom:9px;">두 사람의 <span class="g">출생 정보</span></div>
+              <div class="cs-sub">그 사람 태어난 시간은 몰라도 됩니다 · 입력 정보는 리포트 생성에만 쓰입니다</div>
+            </div>
+            <!-- ▲ 재회운 판매 섹션 끝 -->
 
             <!-- 🚀 입력 진행 표시 바 -->
             <div class="progress-wrap">
@@ -2152,6 +2272,38 @@ document.querySelectorAll(".faq-q").forEach(function (q) {
                 <div class="cp-note" style="margin-top:14px;">같은 차트라도 지금 어떤 사이인지에 따라 필요한 답이 다릅니다. 리포트의 방향이 여기에 맞춰집니다.</div>
               </div>
             </div><!-- ▲ 2인 입력 영역 끝 -->
+
+            <!-- ▼ 재회운(16번) 전용 질문 — 기본 숨김 -->
+            <div id="reunion-extra" style="display:none;">
+              <div class="input-group">
+                <label class="main-label font-sans">헤어진 지 얼마나 됐나요?</label>
+                <div class="ny-chips" id="rn-stage">
+                  <input type="radio" name="rn_stage" id="rns1" value="1개월 이내"><label for="rns1">1개월 이내</label>
+                  <input type="radio" name="rn_stage" id="rns2" value="3개월"><label for="rns2">3개월쯤</label>
+                  <input type="radio" name="rn_stage" id="rns3" value="6개월"><label for="rns3">6개월쯤</label>
+                  <input type="radio" name="rn_stage" id="rns4" value="1년 이상"><label for="rns4">1년 이상</label>
+                  <input type="radio" name="rn_stage" id="rns5" value="몇 년"><label for="rns5">몇 년 됐어요</label>
+                </div>
+              </div>
+              <div class="input-group">
+                <label class="main-label font-sans">누가 먼저 끝냈나요?</label>
+                <div class="ny-chips" id="rn-init">
+                  <input type="radio" name="rn_init" id="rni1" value="내가"><label for="rni1">내가</label>
+                  <input type="radio" name="rn_init" id="rni2" value="상대가"><label for="rni2">그 사람이</label>
+                  <input type="radio" name="rn_init" id="rni3" value="서로"><label for="rni3">서로</label>
+                  <input type="radio" name="rn_init" id="rni4" value="애매함"><label for="rni4">애매해요</label>
+                </div>
+              </div>
+              <div class="input-group">
+                <label class="main-label font-sans">지금 연락은 어떤가요?</label>
+                <div class="ny-chips" id="rn-contact">
+                  <input type="radio" name="rn_contact" id="rnc1" value="완전히 끊김"><label for="rnc1">완전히 끊김</label>
+                  <input type="radio" name="rn_contact" id="rnc2" value="가끔 연락"><label for="rnc2">가끔 연락</label>
+                  <input type="radio" name="rn_contact" id="rnc3" value="차단된 상태"><label for="rnc3">차단된 상태</label>
+                  <input type="radio" name="rn_contact" id="rnc4" value="친구처럼 지냄"><label for="rnc4">친구처럼 지냄</label>
+                </div>
+              </div>
+            </div>
 
             <!-- ▼ 양육 입력 영역 (17번) — 기본 숨김, JS가 켬 -->
             <div id="child-area" style="display:none;">
@@ -2470,6 +2622,23 @@ document.querySelectorAll(".faq-q").forEach(function (q) {
             </div>
             <!-- ▲ 신년운세 FAQ 끝 -->
 
+            <!-- ▼ 재회운 FAQ (16번) -->
+            <div id="reunion-faq" style="display:none; margin-top:44px;">
+              <div class="cs-title">자주 묻는 질문</div>
+              <div class="cs-sub">결제 전 궁금한 점을 확인하세요</div>
+              <div class="cs-faq"><button class="cs-q" type="button">그 사람 태어난 시간을 몰라요<span class="arw">▼</span></button>
+                <div class="cs-a"><p>괜찮습니다. 생년월일만 있으면 됩니다. 시간에 따라 달라지는 항목은 <strong>추측해서 채우지 않고 빼고</strong> 계산합니다. 본인 시간은 꼭 필요합니다. 그래야 그 사람이 내 인생의 어느 자리에 들어왔는지 볼 수 있습니다.</p></div></div>
+              <div class="cs-faq"><button class="cs-q" type="button">재회 확률도 알려 주나요?<span class="arw">▼</span></button>
+                <div class="cs-a"><p>아니요. 확률은 누구도 계산할 수 없습니다. 대신 <strong>이 관계가 나를 붙잡는 힘의 성분</strong>과, 하늘이 열리고 닫히는 <strong>날짜</strong>를 정확하게 드립니다.</p></div></div>
+              <div class="cs-faq"><button class="cs-q" type="button">궁합 리포트랑 뭐가 다른가요?<span class="arw">▼</span></button>
+                <div class="cs-a"><p>궁합은 "이 사람과 어떻게 잘 지낼까"를 봅니다. 재회운은 이미 끝난 관계에서 <strong>"왜 못 놓는지, 다시 두드려도 되는지, 언제인지"</strong>를 봅니다. 헤어진 시기와 지금의 하늘을 비교하는 계산이 따로 들어갑니다.</p></div></div>
+              <div class="cs-faq"><button class="cs-q" type="button">리포트는 언제 받나요?<span class="arw">▼</span></button>
+                <div class="cs-a"><p>결제 완료 화면에서 <strong>즉시 자동 생성</strong>됩니다. 1~3분 걸립니다. 내 보관소에서 언제든 다시 열 수 있고, 다른 기기에서 열어도 다시 입력할 필요가 없습니다.</p></div></div>
+              <div class="cs-faq"><button class="cs-q" type="button">그 사람 이름을 꼭 적어야 하나요?<span class="arw">▼</span></button>
+                <div class="cs-a"><p>아니요. 부르는 호칭이나 닉네임으로 적으셔도 됩니다. 입력하신 정보는 리포트 계산에만 쓰입니다.</p></div></div>
+            </div>
+            <!-- ▲ 재회운 FAQ 끝 -->
+
             <div class="footer-section">
                 <div class="footer-links">
                     <a href="/member/mall_agreement.html" target="_blank">이용약관</a> |
@@ -2608,7 +2777,7 @@ document.querySelectorAll(".faq-q").forEach(function (q) {
         var coupleArea = document.getElementById('couple-area');
         var childArea  = document.getElementById('child-area');
 
-        window.ASTRO_MODE = (productNo === '15') ? 'couple'
+        window.ASTRO_MODE = (productNo === '15' || productNo === '16') ? 'couple'
                           : (productNo === '17') ? 'child'
                           : 'single';
 
@@ -2786,6 +2955,68 @@ document.querySelectorAll(".faq-q").forEach(function (q) {
                     });
                     updateProgress();
                 });
+            });
+
+        } else if (productNo === '16') {
+            /* ── 재회운 (2인 입력 + 상황 질문 세 개) · 2026-11-10 ── */
+            premiumArea.style.display = 'none';
+            if (singleArea) singleArea.style.display = 'none';
+            if (coupleArea) coupleArea.style.display = 'block';
+            /* 궁합의 '지금 두 분은' 질문은 재회운에 필요 없다 — 재회운 전용 질문으로 바꾼다 */
+            var cpStage = document.querySelector('input[name="cp_stage"]');
+            if (cpStage && cpStage.closest('.cp-person')) cpStage.closest('.cp-person').style.display = 'none';
+            var rnx = document.getElementById('reunion-extra');
+            var rns = document.getElementById('reunion-sales');
+            var rnf = document.getElementById('reunion-faq');
+            if (rnx) rnx.style.display = 'block';
+            if (rns) rns.style.display = 'block';
+            if (rnf) rnf.style.display = 'block';
+            /* 금성 역행 안내는 11월 14일까지만 */
+            var rv = document.getElementById('rn-venus');
+            if (rv && Date.now() < Date.parse('2026-11-15T00:00:00+09:00')) rv.style.display = 'block';
+
+            heroTitle.innerHTML = "다시 만나도 될까?<br><span class='gold-highlight'>그보다 먼저, 왜 못 놓는지부터</span>";
+            heroDesc.innerHTML = "두 사람이 태어난 순간의 하늘을 겹쳐서<br>나를 붙잡는 힘이 <b style='color:#d4af37'>사랑인지, 관성인지</b> 계산합니다.";
+            buyBtnText.innerHTML = "12,900원 못 놓는 이유 확인하기";
+            buyBtn.style.background = "linear-gradient(135deg, #d4af37, #8e24aa)";
+            buyBtn.style.color = "#fff";
+            buyBtn.setAttribute('onclick', 'startReunionCheckout()');
+
+            var srcCity16 = document.getElementById('customCity');
+            if (srcCity16) {
+                var html16 = srcCity16.innerHTML;
+                ['a_city','b_city'].forEach(function (id) {
+                    var el = document.getElementById(id);
+                    if (el) el.innerHTML = html16;
+                });
+            }
+            var pv16 = document.querySelector('.privacy-list');
+            if (pv16) pv16.innerHTML =
+                '<li>수집항목: 두 분의 성함(호칭), 생년월일, 태어난 시간, 출생 지역, 성별, 이별 상황</li>' +
+                '<li>수집 및 이용 목적: 재회운 리포트 제공</li>' +
+                '<li>보유 및 이용기간: 유저의 삭제 요청 시 즉시 파기</li>';
+            var CH16 = {
+                a_y:['a_mo',4], a_mo:['a_d',2], a_d:['a_h',2], a_h:['a_mi',2], a_mi:[null,2],
+                b_y:['b_mo',4], b_mo:['b_d',2], b_d:['b_h',2], b_h:['b_mi',2], b_mi:[null,2]
+            };
+            Object.keys(CH16).forEach(function (id) {
+                var el = document.getElementById(id);
+                if (el) el.addEventListener('input', function () { cpAdvance(el, CH16[id][1], CH16[id][0]); });
+            });
+            ['a_name','b_name'].forEach(function (id) {
+                var el = document.getElementById(id);
+                if (el) el.addEventListener('input', updateProgress);
+            });
+            var bu16 = document.getElementById('b_unknown');
+            if (bu16) bu16.addEventListener('change', function () {
+                var on = bu16.checked;
+                ['b_h','b_mi'].forEach(function (id) {
+                    var e = document.getElementById(id);
+                    if (!e) return;
+                    e.disabled = on; e.style.opacity = on ? '0.2' : '1';
+                    if (on) { e.value = ''; e.classList.remove('field-done'); }
+                });
+                updateProgress();
             });
 
         } else if (productNo === '18') {
@@ -3022,6 +3253,66 @@ document.querySelectorAll(".faq-q").forEach(function (q) {
             document.cookie = 'astro_couple_data=' + encodeURIComponent(JSON.stringify(payload)) + '; path=/; max-age=86400;';
         } catch (e) {}
 
+        goToPayment();
+    }
+
+    /* ══════════ 재회운(16번) 전용 · 2026-11-10 ══════════
+       궁합(15번)과 같은 2인 폼을 쓰고, 상황 질문 세 개를 더 받는다.
+       저장 형식은 재회운 결과화면(reunion.js)·서버(gemini-reunion)가 기대하는 모양 그대로. */
+    function startReunionCheckout() {
+        var $ = function (id) { return document.getElementById(id); };
+        var bad = null;
+        var need = function (id) {
+            var el = $(id);
+            if (!el || !el.value || !el.value.trim()) {
+                if (el) el.classList.add('error-shake');
+                if (!bad) bad = el;
+            }
+        };
+        ['a_name','a_y','a_mo','a_d','a_h','a_mi','b_name','b_y','b_mo','b_d'].forEach(need);
+        var bUnknown = $('b_unknown').checked;
+        if (!bUnknown) { need('b_h'); need('b_mi'); }
+        ['rn_stage','rn_init','rn_contact'].forEach(function (nm) {
+            if (!document.querySelector('input[name="' + nm + '"]:checked')) {
+                var box = $(nm.replace('_', '-').replace('rn-init', 'rn-init'));
+                if (box) box.classList.add('error-shake');
+                if (!bad) bad = box;
+            }
+        });
+        if (!$('agreeCheck').checked) {
+            document.querySelector('.custom-check').classList.add('error-shake');
+            if (!bad) bad = document.querySelector('.agree-wrapper');
+        }
+        if (bad) {
+            bad.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (bad.focus) setTimeout(function () { bad.focus(); }, 400);
+            setTimeout(function () {
+                document.querySelectorAll('.error-shake').forEach(function (el) { el.classList.remove('error-shake'); });
+            }, 600);
+            return;
+        }
+        if (!checkBirthFields('a', '본인', false)) return;
+        if (!checkBirthFields('b', '상대방', bUnknown)) return;
+
+        var pad = function (x) { return String(x).padStart(2, '0'); };
+        var dateOf = function (pfx) { return $(pfx+'_y').value + '-' + pad($(pfx+'_mo').value) + '-' + pad($(pfx+'_d').value); };
+        var genderOf = function (pfx) { return document.querySelector('input[name="'+pfx+'_gender"]:checked').value; };
+        var val = function (nm) { return document.querySelector('input[name="' + nm + '"]:checked').value; };
+
+        /* 🚨 시각 미상이면 time 을 비워 보낸다 — 임의값을 넣으면 서버가 진짜로 믿는다 */
+        var data = {
+            productNo: '16',
+            me: { name: $('a_name').value.trim(), date: dateOf('a'), time: pad($('a_h').value) + ':' + pad($('a_mi').value),
+                  timeUnknown: false, city: $('a_city').value, gender: genderOf('a') },
+            ex: { name: $('b_name').value.trim(), date: dateOf('b'),
+                  time: bUnknown ? '' : (pad($('b_h').value) + ':' + pad($('b_mi').value)),
+                  timeUnknown: bUnknown, city: $('b_city').value, gender: genderOf('b') },
+            stage: val('rn_stage'), initiator: val('rn_init'), contact: val('rn_contact'),
+            savedAt: Date.now()
+        };
+        astroKeepOnly('astro_reunion_data');
+        try { localStorage.setItem('astro_reunion_data', JSON.stringify(data)); } catch (e) {}
+        try { document.cookie = 'astro_reunion_data=' + encodeURIComponent(JSON.stringify(data)) + '; path=/; max-age=86400;'; } catch (e) {}
         goToPayment();
     }
 
