@@ -109,6 +109,20 @@
 '.nyr-flow .cap b{color:#E7CE8E;} .nyr-flow .cap i{font-style:normal;color:#E8654F;}',
 /* 목성·토성 방 */
 '.nyr-rooms{display:flex;gap:8px;margin-bottom:24px;font-family:"Noto Sans KR",sans-serif;}',
+'.nyr-conv{background:linear-gradient(160deg,#1d1a2e,#151827);border:1px solid rgba(201,162,75,.45);border-radius:16px;padding:18px 16px;margin-bottom:24px;font-family:"Noto Sans KR",sans-serif;}',
+'.nyr-conv .k{color:#E7CE8E;font:800 14px "Noto Sans KR",sans-serif;margin-bottom:4px;}',
+'.nyr-conv .s{color:#8b829e;font:500 11.5px/1.6 "Noto Sans KR",sans-serif;margin-bottom:12px;word-break:keep-all;}',
+'.nyr-conv .cv-row{padding:10px 0;border-top:1px solid rgba(255,255,255,.07);}',
+'.nyr-conv .cv-a{color:#fff;font:900 15.5px "Noto Sans KR",sans-serif;margin-bottom:6px;}',
+'.nyr-conv .cv-t{display:flex;flex-wrap:wrap;gap:5px;}',
+'.nyr-conv .cv-t span{font:700 11px "Noto Sans KR",sans-serif;color:#E7CE8E;background:rgba(201,162,75,.12);border:1px solid rgba(201,162,75,.35);border-radius:10px;padding:3px 8px;}',
+'.nyr-conv .cv-none{color:#b9b5c8;font:500 13px "Noto Sans KR",sans-serif;padding:8px 0;border-top:1px solid rgba(255,255,255,.07);}',
+'.nyr-conv .cv-x{color:#b9b5c8;font:500 12.5px/1.6 "Noto Sans KR",sans-serif;padding-top:8px;word-break:keep-all;}',
+'.nyr-conv .cv-x b{color:#E7CE8E;margin-right:4px;}',
+'.nyr-conv .cv-m{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;}',
+'.nyr-conv .cv-m span{font:800 12px "Noto Sans KR",sans-serif;border-radius:12px;padding:5px 10px;}',
+'.nyr-conv .cv-m .g{background:rgba(201,162,75,.18);color:#E7CE8E;}',
+'.nyr-conv .cv-m .c{background:rgba(232,101,79,.14);color:#f19a8a;}',
 '.nyr-rooms>div{flex:1;border-radius:14px;padding:14px 13px;}',
 '.nyr-rooms .j{background:rgba(201,162,75,.09);border:1px solid rgba(201,162,75,.4);}',
 '.nyr-rooms .s{background:rgba(140,180,255,.07);border:1px solid rgba(140,180,255,.35);}',
@@ -318,6 +332,28 @@
     return '<div class="nyr-rooms"><div class="j"><div class="k">🍀 행운이 들어오는 곳</div><div class="seg">' + seg(meta.jupiter) + '</div></div>' +
       '<div class="s"><div class="k">🌿 미리 챙길 곳</div><div class="seg">' + seg(meta.saturn) + '</div></div></div>';
   }
+  /* 네 가지 기법이 겹친 곳 — 시각 미상이면 생일 차트·진행 달이 없어 카드 자체를 뺀다 */
+  function convHTML(meta) {
+    var c = meta.converge, sr = meta.solarReturn, pm = meta.progMoon;
+    if (!c || !sr) return '';
+    var rows = (c.themes || []).map(function (t) {
+      return '<div class="cv-row"><div class="cv-a">' + h(t.areas.join(' · ')) + '</div><div class="cv-t">' +
+        t.techs.map(function (x) { return '<span>' + h(x) + '</span>'; }).join('') + '</div></div>';
+    }).join('');
+    if (!rows) rows = '<div class="cv-none">한 곳에 몰리지 않고 고르게 흘러가는 해예요.</div>';
+    var pmTxt = (pm || []).map(function (s, i) {
+      return (i === 0 ? '' : kd(s.from) + '부터 ') + '\'' + h(AREA[s.house] || '') + '\'';
+    }).join(' → ');
+    var mos = (c.months || []).filter(function (x) { return x.tone !== 'mixed'; }).map(function (x) {
+      return '<span class="' + (x.tone === 'good' ? 'g' : 'c') + '">' + x.m + '월 ' + (x.tone === 'good' ? '순풍' : '숨 고르기') + '</span>';
+    }).join('');
+    return '<div class="nyr-conv"><div class="k">🔭 여러 기법이 함께 가리킨 곳</div>' +
+      '<div class="s">1년의 행성 이동 · 메인테마 · 올해 생일 차트 · 마음의 시계 — 네 가지로 따로 보고, 겹치는 곳만 골랐어요</div>' +
+      rows +
+      '<div class="cv-x"><b>올해 생일 차트</b> ' + h(sr.ascSign) + ' 상승 · \'' + h(AREA[sr.ascHouse] || '') + '\'의 얼굴</div>' +
+      (pmTxt ? '<div class="cv-x"><b>마음의 시계</b> ' + pmTxt + '</div>' : '') +
+      (mos ? '<div class="cv-m">' + mos + '</div>' : '') + '</div>';
+  }
   function datesHTML(meta) {
     var items = [];
     (meta.eclipses || []).forEach(function (e) {
@@ -364,6 +400,7 @@
       P.push(scoreHTML(meta));
       P.push(flowHTML(meta));
       P.push(roomsHTML(meta));
+      P.push(convHTML(meta));
 
       CH1.forEach(function (c) {
         var body = rep[c[1]]; if (!body) return;

@@ -82,7 +82,7 @@
     /* 신년운세 (18) — newyear.js 결과화면 */
     '18': {
       root: '#nyr',
-      order: ['.nyr-cover', '.nyr-hero', '.nyr-sc', '.nyr-flow', '.nyr-rooms', '.nyr-card', '.nyr-months', '.nyr-close'],
+      order: ['.nyr-cover', '.nyr-hero', '.nyr-sc', '.nyr-flow', '.nyr-rooms', '.nyr-conv', '.nyr-card', '.nyr-months', '.nyr-close'],
       hideInClone: ['#nyr-save-wrap', '.nyr-teaser'],
       unhide: '.nyr-card,.nyr-m',
       grad: ['#2a2614', '#0A0C16', '#050308'],
@@ -174,6 +174,7 @@
     if (e.classList.contains('nyr-sc')) return '올해의 점수';
     if (e.classList.contains('nyr-flow')) return '열두 달 흐름';
     if (e.classList.contains('nyr-rooms')) return '행운이 들어오는 곳';
+    if (e.classList.contains('nyr-conv')) return '여러 기법이 겹친 곳';
     if (e.classList.contains('nyr-months')) return '월별 운세';
     var t = $('.card-title', e) || $('.cpr-tt', e) || $('.vip-card-title', e) ||
             $('.chd-tt', e) || $('.rnn-tt', e) || $('.nyr-tt', e);

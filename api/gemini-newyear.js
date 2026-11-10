@@ -22,6 +22,7 @@
 
 const { kv } = require('@vercel/kv');
 const NY = require('../lib/astro-newyear.js');
+const FC = require('../lib/astro-forecast.js');
 const NA = require('../lib/natal.js');
 const GR = require('../lib/gemini-run.js');
 const V = require('../lib/validate.js');
@@ -123,6 +124,15 @@ ${P.timeUnknown ? `[태어난 시간을 모른다]
 ${D.text}
 
 위 날짜·하우스·점수는 전부 실제 천체 계산 결과다. 이 데이터만 인용하고 없는 것을 지어내지 마라.
+
+[🔭 네 가지 기법을 이렇게 써라]
+이 리포트는 기법 네 개로 1년을 본다: ① 1년 365일 행성의 이동  ② 올해의 메인테마(나이마다 한 칸씩 도는 인생의 주제)
+③ 올해 생일 차트(솔라 리턴 — 태양이 태어난 자리로 돌아오는 순간의 차트)  ④ 마음의 시계(진행 달 — 태어난 뒤 하루가 인생 1년)
+· 손님에게는 "올해 생일 차트", "마음의 시계"라고 부르고, 처음 한 번만 괄호로 원래 이름을 붙여라.
+· ★ '여러 기법이 겹치는 곳'은 이 리포트의 중심이다. 1장에서 "기법 몇 개가 같은 곳을 가리킨다"고 분명히 밝히고 확신 있게 말하라.
+  한 기법만 가리키는 것은 가볍게. 겹치지 않는 것을 세게 말하면 틀린다.
+· 2장 메인테마는 메인테마 + 올해 생일 차트의 얼굴(상승 별자리가 떨어진 자리)을 엮어서.
+· 열두 달은 마음의 시계가 출생 행성에 닿는 달을 그 달의 핵심으로 써라. 마음의 시계가 자리를 옮기는 날은 "이때부터 마음이 ○○ 쪽으로 기웁니다"처럼 날짜와 함께.
 
 [✍️ 문장 규칙]
 · 첫 문장은 장면이나 단정으로. 첫 문장에 '마치·~같은·~듯한·~처럼' 금지.
@@ -352,7 +362,14 @@ const handler = async (req, res) => {
     const N = await NA.fetchNatal(P);
     const todayYmd = GR.seoulToday();
     const [ty, tm, td] = todayYmd.split('-').map(Number);
-    const D = NY.buildNewYearDigest(N, P.name, { todayYmd });
+    /* 솔라 리턴 · 진행 달 — 시각 미상이면 null. 실패해도 리포트는 나간다 */
+    let fc = null;
+    try {
+      const tok = (process.env.PROKERALA_CLIENT_ID && process.env.PROKERALA_CLIENT_SECRET)
+        ? NA.getToken().catch(() => null) : null;
+      fc = await FC.computeForecast(N, NY.targetYear(todayYmd), { token: tok });
+    } catch (e) { console.warn('⚠️ [신년] 솔라 리턴·진행 달 계산 실패(리포트는 계속):', e.message); }
+    const D = NY.buildNewYearDigest(N, P.name, { todayYmd, fc });
     console.log(`✅ [신년] ${D.year}년 계산 — 총운 ${D.meta.scores.total} / ${D.meta.profection.house}하우스의 해 / 좋은 달 ${D.meta.bestMonths.join(',')}`);
 
     const ctx = { status, focusKey: FOCUS_CH[focus] || null, bestMonths: D.meta.bestMonths };
