@@ -170,6 +170,9 @@
     });
   }
   function $(id) { return document.getElementById(id); }
+  var AREA = { 1: '나 자신·새 출발', 2: '돈·수입', 3: '공부·계약·이동', 4: '집·가족', 5: '연애·취미',
+    6: '일·몸 관리', 7: '결혼·파트너', 8: '큰돈·정리', 9: '여행·유학·자격증', 10: '커리어·평판',
+    11: '인맥·오래 품은 꿈', 12: '휴식·마무리' };
   function kd(ymd) { var p = String(ymd).split('-'); return (+p[1]) + '월 ' + (+p[2]) + '일'; }
 
   function inject() {
@@ -253,9 +256,11 @@
       return '<div class="row"><span class="nm">' + d[0] + '</span><span class="tr"><i class="fl" data-w="' + (s[d[1]] || 0) + '"></i></span>' +
         '<span class="pc">' + (s[d[1]] || 0) + '</span><span class="bm">' + (bb[d[1]] ? bb[d[1]] + '월★' : '') + '</span></div>';
     }).join('');
-    var turn = (p.before && p.after && p.before !== p.after) ? '생일(' + kd(p.birthday) + ')부터는 ' + p.after + '하우스의 해로 바뀌어요' : '';
+    var turn = (p.before && p.after && p.before !== p.after) ? '생일(' + kd(p.birthday) + ')부터는 \'' + (AREA[p.after] || '') + '\'의 해로 바뀌어요' : '';
+    var th = String(p.theme || '').split(' — ');
     return '<div class="nyr-sc"><div class="top">' + ringHTML(s.total || 0) +
-      '<div class="nyr-prof"><div class="k">' + h(meta.year || '') + ' 메인테마</div><div class="w">' + h(p.house) + '하우스의 해 — ' + h(String(p.theme || '').split(' — ')[0]) + '</div>' +
+      '<div class="nyr-prof"><div class="k">' + h(meta.year || '') + ' 메인테마</div><div class="w">' + h(th[0]) + '</div>' +
+      (th[1] ? '<div class="y" style="margin-top:2px">' + h(th[1]) + '</div>' : '') +
       '<div class="y">올해를 이끄는 별 <b style="color:#E7CE8E">' + h(p.lord || '') + '</b>' + (turn ? '<br>' + h(turn) : '') + '</div></div></div>' +
       '<div class="nyr-dm">' + rows + '</div></div>';
   }
@@ -293,25 +298,28 @@
       care.map(function (m) { return m + '월'; }).join('·') + '</i><br>1년 365일 하늘을 내 차트에 하루씩 겹쳐 본 결과예요. 높을수록 일이 잘 풀리는 달이에요.</div></div>';
   }
   function roomsHTML(meta) {
+    /* '5하우스' 같은 숫자 대신 생활 영역으로 보여준다 */
     var seg = function (arr) {
+      var full = arr && arr.length === 1;
       return (arr || []).map(function (s) {
-        return h(s.sign) + ' · <b style="color:inherit">' + s.house + '하우스</b><br><small>' + kd(s.from) + ' ~ ' + kd(s.to) + '</small>';
+        return '<b style="color:inherit">' + h(AREA[s.house] || '') + '</b><br><small>' +
+          (full ? '1년 내내' : kd(s.from) + ' ~ ' + kd(s.to)) + '</small>';
       }).join('<br>');
     };
-    return '<div class="nyr-rooms"><div class="j"><div class="k">♃ 복이 들어오는 방</div><div class="seg">' + seg(meta.jupiter) + '</div></div>' +
-      '<div class="s"><div class="k">♄ 고비가 오는 방</div><div class="seg">' + seg(meta.saturn) + '</div></div></div>';
+    return '<div class="nyr-rooms"><div class="j"><div class="k">🍀 행운이 들어오는 곳</div><div class="seg">' + seg(meta.jupiter) + '</div></div>' +
+      '<div class="s"><div class="k">🌿 미리 챙길 곳</div><div class="seg">' + seg(meta.saturn) + '</div></div></div>';
   }
   function datesHTML(meta) {
     var items = [];
     (meta.eclipses || []).forEach(function (e) {
       items.push({ ymd: e.ymd, c: e.personal ? '#E7CE8E' : '#a07fb0', w: kd(e.ymd) + ' · ' + e.type + (e.personal ? ' ★' : ''),
-        y: e.sign + ', 내 ' + e.house + '하우스' + (e.personal ? ' — 내 행성 위에 떨어지는 날' : '') });
+        y: (AREA[e.house] || '') + ' 쪽' + (e.personal ? ' — 내 행성 위에 떨어지는 날' : '') });
     });
     (meta.keyDays || []).forEach(function (k) {
       items.push({ ymd: k.ymd, c: k.tone === 'good' ? '#C9A24B' : (k.tone === 'hard' ? '#E8654F' : '#8cb4ff'), w: k.text.split(' — ')[0], y: k.text.split(' — ')[1] || '' });
     });
     (meta.retro || []).forEach(function (r) {
-      items.push({ ymd: r.from, c: '#6b687a', w: kd(r.from) + ' ~ ' + kd(r.to) + ' · ' + r.P + ' 역행', y: '내 ' + r.house + '하우스에서' });
+      items.push({ ymd: r.from, c: '#6b687a', w: kd(r.from) + ' ~ ' + kd(r.to) + ' · ' + r.P + ' 역행', y: (AREA[r.house] || '') + ' 쪽에서' });
     });
     if (!items.length) return '';
     items.sort(function (a, b) { return a.ymd < b.ymd ? -1 : 1; });
@@ -322,8 +330,10 @@
 
   /* ══════════════ 렌더 ══════════════ */
   var rendered = false;
-  var CH1 = [['01', 'ch1_overview', '총론'], ['02', 'ch2_theme', '메인테마'], ['03', 'ch3_jupiter', '복이 들어오는 방'],
-             ['04', 'ch4_saturn', '올해의 시험'], ['05', 'ch5_love', '애정운'], ['06', 'ch6_money', '금전운'],
+  /* 제목 안의 {Y} 는 렌더할 때 연도로 바뀐다 */
+  var CH1 = [['01', 'ch1_overview', '한눈에 보는 {Y}년'], ['02', 'ch2_theme', '나의 {Y}년 메인테마'],
+             ['03', 'ch3_jupiter', '{Y}년 나에게 오는 세 가지 행운'],
+             ['04', 'ch4_saturn', '{Y}년 미리 알면 약이 되는 세 가지'], ['05', 'ch5_love', '애정운'], ['06', 'ch6_money', '금전운'],
              ['07', 'ch7_work', '일과 성취'], ['08', 'ch8_body', '컨디션과 마음']];
   var FOCUS_KEY = { '연애·결혼': 'ch5_love', '돈': 'ch6_money', '일·이직': 'ch7_work', '건강': 'ch8_body', '공부·시험': 'ch7_work' };
 
@@ -350,7 +360,7 @@
         var body = rep[c[1]]; if (!body) return;
         var isF = fk === c[1];
         P.push('<div class="nyr-card' + (isF ? ' focus' : '') + '"><div class="nyr-no">CHAPTER ' + c[0] + (isF ? '<em>가장 궁금한 것</em>' : '') + '</div>' +
-          '<div class="nyr-tt">' + h(c[1] === 'ch2_theme' ? '나의 ' + Y + '년 메인테마' : c[2]) + '</div><div class="nyr-ct">' + safe(body) + '</div></div>');
+          '<div class="nyr-tt">' + h(c[2].replace('{Y}', Y)) + '</div><div class="nyr-ct">' + safe(body) + '</div></div>');
       });
 
       var M = meta.months || [];
@@ -368,7 +378,7 @@
 
       if (rep.ch9_keydates) P.push('<div class="nyr-card"><div class="nyr-no">KEY DATES</div><div class="nyr-tt">' + h(Y) + '년 꼭 기억할 날</div>' +
         '<div class="nyr-ct">' + safe(rep.ch9_keydates) + '</div>' + datesHTML(meta) + '</div>');
-      if (rep.ch10_action) P.push('<div class="nyr-card focus"><div class="nyr-no">ACTION</div><div class="nyr-tt">' + h(Y) + '년, 이것만은</div>' +
+      if (rep.ch10_action) P.push('<div class="nyr-card focus"><div class="nyr-no">THREE HINTS</div><div class="nyr-tt">' + h(Y) + '년의 세 가지 힌트</div>' +
         '<div class="nyr-ct">' + safe(rep.ch10_action) + '</div></div>');
       if (rep.closing) P.push('<div class="nyr-close"><div class="t">마지막으로</div><div class="c">' + safe(rep.closing) + '</div></div>');
       if (rep.teaser) P.push('<div class="nyr-teaser">' + safe(rep.teaser) + '<a href="/product/detail.html?product_no=11">내 차트 전체 보기 — VVIP 운명 리포트</a></div>');

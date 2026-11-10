@@ -173,7 +173,7 @@
     if (e.classList.contains('rnn-mix')) return '사랑 vs 관성';
     if (e.classList.contains('nyr-sc')) return '올해의 점수';
     if (e.classList.contains('nyr-flow')) return '열두 달 흐름';
-    if (e.classList.contains('nyr-rooms')) return '목성·토성의 방';
+    if (e.classList.contains('nyr-rooms')) return '행운이 들어오는 곳';
     if (e.classList.contains('nyr-months')) return '월별 운세';
     var t = $('.card-title', e) || $('.cpr-tt', e) || $('.vip-card-title', e) ||
             $('.chd-tt', e) || $('.rnn-tt', e) || $('.nyr-tt', e);
