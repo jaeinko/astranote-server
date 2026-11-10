@@ -19,9 +19,19 @@
   var REP_PREFIX = 'astro_rep:16:';
 
   function qs(k) { try { return new URLSearchParams(location.search).get(k); } catch (e) { return null; } }
-  var hinted = qs('product_no') || qs('productNo');
+  /* 이 기기에 저장된 입력값 — localStorage 가 막힌 브라우저(일부 인앱)는 쿠키에서 */
   var DATA = null;
   try { DATA = JSON.parse(localStorage.getItem(DATA_KEY) || 'null'); } catch (e) {}
+  if (!DATA) {
+    try {
+      var ck = document.cookie.match(new RegExp('(^| )' + DATA_KEY + '=([^;]+)'));
+      if (ck) DATA = JSON.parse(decodeURIComponent(ck[2]));
+    } catch (e) {}
+  }
+  /* 🚨 결제 직후 주문완료 화면 주소에는 product_no 가 없다.
+     그때는 상세페이지가 남긴 입력값의 productNo 로 판단한다.
+     (상세페이지가 결제 직전에 다른 상품 입력값을 전부 지우므로 오판하지 않는다) */
+  var hinted = qs('product_no') || qs('productNo') || (DATA && DATA.productNo) || null;
   if (String(hinted) !== NO) return;
   if (window.__astroReportInit) return;
   window.__astroReportInit = true;

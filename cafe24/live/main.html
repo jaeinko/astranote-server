@@ -1,0 +1,1499 @@
+<div data-ez-module="user-defined/1" data-ez-name="USER DEFINED" data-ez-type="plain" data-ez="module-066vk67-1"><meta charset="UTF-8"></div>
+<div data-ez-module="user-defined/1" data-ez-name="USER DEFINED" data-ez-type="plain" data-ez="module-0vv7f8k-1"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"></div>
+<div data-ez-module="user-defined/1" data-ez-name="USER DEFINED" data-ez-type="plain" data-ez="module-fmtdet-1"><meta name="format-detection" content="telephone=no"></div>
+<div data-ez-module="user-defined/1" data-ez-name="USER DEFINED" data-ez-type="plain" data-ez="module-0bwl1ft-1"><title>아스트라노트 | 서양 점성술 1:1 맞춤 리포트</title></div>
+<div data-ez-module="user-defined/1" data-ez-name="USER DEFINED" data-ez-type="plain" data-ez="module-1d7pkgo-1"><meta name="description" content="출생 차트를 실제 천체력으로 계산합니다. 배우자 분석, 두 사람의 궁합, 우리 아이 양육설명서, 오늘부터 30일 운세까지 1:1 맞춤 리포트로 받아보세요."></div>
+<div data-ez-module="user-defined/1" data-ez-name="USER DEFINED" data-ez-type="plain" data-ez="module-1rwyrvm-1"><link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&amp;family=Noto+Serif+KR:wght@300;400;700;900&amp;family=Noto+Sans+KR:wght@400;500;700;900&amp;display=swap" rel="stylesheet"></div>
+<div data-ez-module="user-defined/1" data-ez-name="USER DEFINED" data-ez-type="plain" data-ez="module-1r35l1m-1"><style>
+/* ==========================================================
+   ASTRANOTE — 원페이지 (메인 + 상세 통합) v4
+   ▣ v4 변경점
+     · 라우터 3번째에 양육설명서(17번) 카드 추가
+     · format-detection 메타 추가 (가격 파란색 문제 해결)
+     · FAQ 첫 항목에 양육 안내 추가
+   ========================================================== */
+:root {
+  --bg: #050505;
+  --gold: #d4af37;
+  --gold-light: #e8c766;
+  --purple: #8e24aa;
+  --lav: #b39ddb;
+  --red: #ff3b30;
+  --card: rgba(20, 15, 25, 0.72);
+  --line: rgba(179, 157, 219, 0.18);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  background: var(--bg); color: #fff;
+  font-family: 'Noto Serif KR', serif;
+  -webkit-font-smoothing: antialiased; overflow-x: hidden;
+}
+.app { width: 100%; max-width: 500px; margin: 0 auto; position: relative;
+  min-height: 100vh; padding-bottom: 130px; overflow: hidden; background: var(--bg); }
+/* --- 배경 --- */
+.bg-glow { position: absolute; top: -15%; left: -20%; width: 140%; height: 60%;
+  background: radial-gradient(circle at 50% 30%, rgba(142,36,170,.18) 0%, transparent 65%);
+  z-index: 0; pointer-events: none; }
+.bg-stars { position: fixed; inset: 0; z-index: 0; opacity: .35; pointer-events: none;
+  background-image: radial-gradient(#fff 1.5px, transparent 2.5px), radial-gradient(rgba(255,255,255,.5) 1px, transparent 2px);
+  background-size: 160px 160px, 90px 90px; background-position: 0 0, 40px 60px;
+  animation: drift 180s linear infinite; }
+@keyframes drift { to { background-position: 160px 160px, 130px 150px; } }
+@media (prefers-reduced-motion: reduce) { .bg-stars { animation: none; } }
+.wrap { position: relative; z-index: 1; padding: 0 20px; }
+/* --- 공통 타이포 --- */
+.sec-title { font-size: 22px; font-weight: 900; text-align: center; margin-bottom: 11px; word-break: keep-all; }
+.sec-sub { font: 400 13.5px/1.6 'Noto Sans KR', sans-serif; color: #a18cd1; text-align: center; margin-bottom: 24px; word-break: keep-all; }
+.gold { color: var(--gold-light); text-shadow: 0 0 22px rgba(212,175,55,.5); }
+/* --- 1. HERO --- */
+/* 🚨 아래 여백 34px → 76px
+   배경 그래픽을 깔면서 히어로 높이가 줄었는데 아래 여백은 그대로여서
+   라우터가 히어로에 붙어 보였다. 배경이 절대위치라 시각적 경계도 흐려졌다.
+   히어로(브랜드 선언)와 라우터(상품 선택)는 역할이 다르므로
+   숨 쉴 자리를 두어 "여기서부터 고르는 구간" 임을 알려야 한다. */
+.hero { padding: 54px 0 76px; text-align: center; }
+.badge { display: inline-block; padding: 7px 16px; border-radius: 24px;
+  background: rgba(255,59,48,.1); border: 1px solid var(--red); color: var(--red);
+  font: 800 12px/1 'Noto Sans KR', sans-serif; letter-spacing: .5px;
+  margin-bottom: 22px; animation: pulseRed 2s infinite; }
+@keyframes pulseRed {
+  0% { box-shadow: 0 0 0 0 rgba(255,59,48,.4); }
+  70% { box-shadow: 0 0 0 10px rgba(255,59,48,0); }
+  100% { box-shadow: 0 0 0 0 rgba(255,59,48,0); }
+}
+.brand { font: 700 13px 'Cinzel', serif; letter-spacing: 6px; color: rgba(212,175,55,.75); margin-bottom: 16px; }
+h1 { font-size: 30px; font-weight: 900; line-height: 1.42; word-break: keep-all; margin-bottom: 20px; }
+.hero-desc { background: var(--card); border: 1px solid var(--line);
+  padding: 24px 20px; border-radius: 16px; backdrop-filter: blur(8px);
+  font-size: 15px; line-height: 1.7; color: #e8e8e8; word-break: keep-all; text-align: left; }
+.hero-desc strong { color: var(--lav); font-weight: 700; }
+/* --- 2. 차트 휠 --- */
+.wheel-sec { padding: 42px 0 6px; text-align: center; }
+.wheel-box { position: relative; display: inline-block; }
+.wheel-glow { position: absolute; inset: -30px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(212,175,55,.16) 0%, transparent 68%); }
+.wheel-svg { position: relative; animation: wheelSpin 1.6s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes wheelSpin { from { transform: rotate(-40deg); opacity: 0; } to { transform: rotate(0); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .wheel-svg { animation: none; } }
+/* 태그를 휠 바깥 아래로 빼서 VII 숫자를 가리지 않게 하고, ▲ 꼬리가 7하우스를 가리킴 */
+.wheel-tag { position: absolute; right: -4px; top: calc(61% + 44px);
+  background: linear-gradient(135deg, var(--gold-light), var(--purple));
+  color: #050505; font: 900 13px 'Noto Sans KR', sans-serif;
+  padding: 7px 14px; border-radius: 24px; white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(212,175,55,.35); z-index: 3;
+  animation: tagFloat 2s ease-in-out infinite; }
+.wheel-tag::before { content: ''; position: absolute; top: -7px; right: 38px;
+  border-left: 7px solid transparent; border-right: 7px solid transparent;
+  border-bottom: 8px solid var(--gold-light); }
+@keyframes tagFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .wheel-tag { animation: none; } }
+.wheel-cap { margin-top: 18px; font: 500 14px/1.6 'Noto Sans KR', sans-serif; color: #a89bd0; word-break: keep-all; }
+.wheel-cap b { color: var(--gold-light); }
+/* --- 3. 메커니즘 --- */
+.phil { margin: 42px 0 46px; }
+.phil-quote { font: 700 13px 'Cinzel', serif; color: var(--gold); letter-spacing: 3px; text-align: center; margin-bottom: 14px; }
+.phil-box { background: linear-gradient(145deg, rgba(22,20,26,.92), rgba(10,10,12,.92));
+  border-left: 3px solid var(--gold); border-radius: 0 14px 14px 0; padding: 26px 20px; }
+.phil-box p { font-size: 15px; color: #ddd; line-height: 1.75; word-break: keep-all; margin-bottom: 15px; }
+.phil-box p:last-child { margin-bottom: 0; }
+.phil-box strong { color: #fff; font-weight: 800; }
+/* --- 4. 리포트 미리보기 --- */
+.preview-card { background: rgba(18,14,24,.85); border: 1px solid rgba(212,175,55,.28);
+  border-radius: 20px; padding: 28px 24px; margin-bottom: 50px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.5); }
+.pv-head { text-align: center; border-bottom: 1px solid rgba(255,255,255,.08); padding-bottom: 18px; margin-bottom: 6px; }
+.pv-head b { font: 700 17px 'Noto Serif KR', serif; color: #fff; display: block; margin-bottom: 5px; }
+.pv-head span { font: 400 12px 'Noto Sans KR', sans-serif; color: #8f83ab; }
+.pv-row { padding: 17px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+.pv-row:last-child { border-bottom: none; }
+.pv-label { font: 700 14px 'Noto Sans KR', sans-serif; color: var(--gold); margin-bottom: 7px; }
+.pv-value { font: 500 17px 'Noto Serif KR', serif; color: #eee; }
+.blur { color: transparent; text-shadow: 0 0 14px rgba(230,230,230,.9); user-select: none; filter: blur(6px); }
+.open-v { color: #f5e6b8; font-weight: 900; }
+/* --- 5. 구성품 --- */
+.spec { background: linear-gradient(145deg, rgba(30,22,40,.9), rgba(12,8,16,.9));
+  border: 1.5px solid rgba(212,175,55,.4); border-radius: 20px;
+  padding: 28px 24px; margin-bottom: 50px; }
+.spec-title { text-align: center; font: 700 16px 'Noto Serif KR', serif; color: var(--gold-light); margin-bottom: 18px; }
+.spec-row { display: flex; gap: 12px; align-items: flex-start; padding: 13px 0; border-top: 1px solid rgba(255,255,255,.07); }
+.spec-row:first-of-type { border-top: none; }
+.spec-ico { font-size: 20px; flex-shrink: 0; }
+.spec-row b { display: block; font: 700 14.5px 'Noto Sans KR', sans-serif; color: #fff; margin-bottom: 4px; }
+.spec-row p { font: 400 13px/1.55 'Noto Sans KR', sans-serif; color: #999; word-break: keep-all; }
+/* --- 6. 목차 --- */
+.toc { margin-bottom: 50px; }
+.toc-item { display: flex; gap: 15px; align-items: flex-start;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 15px; padding: 19px; margin-bottom: 11px;
+  transition: border-color .3s, transform .3s; }
+.toc-item:hover { border-color: rgba(212,175,55,.45); transform: translateY(-2px); }
+.toc-n { font: 900 20px 'Cinzel', serif; color: var(--gold); min-width: 30px; padding-top: 2px; text-shadow: 0 0 10px rgba(212,175,55,.2); }
+.toc-item b { display: block; font-size: 15.5px; font-weight: 700; color: #fff; margin-bottom: 6px; letter-spacing: -.3px; }
+.toc-item p { font: 300 13.5px/1.55 'Noto Sans KR', sans-serif; color: #a5a5a5; word-break: keep-all; }
+/* --- 7. 진행 방법 --- */
+.howto { margin-bottom: 26px; }
+.how-step { display: flex; gap: 14px; align-items: flex-start;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 14px; padding: 17px; margin-bottom: 10px; }
+.how-n { font: 900 19px 'Cinzel', serif; color: var(--gold); min-width: 26px; padding-top: 2px; }
+.how-step b { display: block; font: 700 14.5px 'Noto Sans KR', sans-serif; color: #fff; margin-bottom: 4px; }
+.how-step p { font: 400 13px/1.55 'Noto Sans KR', sans-serif; color: #999; word-break: keep-all; }
+.how-step p strong { color: var(--lav); font-weight: 700; }
+/* --- 8. 필수 정보 --- */
+.need { background: rgba(212,175,55,.07); border: 1px dashed rgba(212,175,55,.5);
+  border-radius: 14px; padding: 20px; margin-bottom: 50px; }
+.need b { display: block; font: 900 14.5px 'Noto Sans KR', sans-serif; color: var(--gold-light); margin-bottom: 10px; }
+.need ul { list-style: none; }
+.need li { font: 400 13.5px/1.9 'Noto Sans KR', sans-serif; color: #ddd; padding-left: 18px; position: relative; }
+.need li::before { content: '✦'; position: absolute; left: 0; color: var(--gold); font-size: 11px; }
+.need .tip { margin-top: 10px; font: 300 12px/1.6 'Noto Sans KR', sans-serif; color: #888; word-break: keep-all; }
+/* --- 9. 이런 분께 --- */
+.fit { margin-bottom: 50px; }
+.fit-item { display: flex; gap: 11px; align-items: flex-start; padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+.fit-item:last-child { border-bottom: none; }
+.fit-check { color: var(--gold-light); font-weight: 900; flex-shrink: 0; }
+.fit-item p { font: 500 14px/1.6 'Noto Sans KR', sans-serif; color: #ddd; word-break: keep-all; }
+/* --- 10. 가격 --- */
+.price-sec { text-align: center; margin-bottom: 50px; }
+.price-box { background: linear-gradient(145deg, rgba(30,22,40,.9), rgba(12,8,16,.9));
+  border: 1.5px solid rgba(212,175,55,.4); border-radius: 20px; padding: 34px 24px; }
+.price-line { font: 400 14px 'Noto Sans KR', sans-serif; color: #999; margin-bottom: 8px; }
+.price-big { font: 900 46px 'Noto Sans KR', sans-serif; color: var(--gold-light); text-shadow: 0 0 26px rgba(212,175,55,.4); }
+.price-big small { font-size: 22px; font-weight: 700; }
+.price-note { margin-top: 14px; font: 400 13px/1.6 'Noto Sans KR', sans-serif; color: #888; word-break: keep-all; }
+
+/* --- 12. FAQ --- */
+.faq { margin-bottom: 52px; }
+.faq-item { border: 1px solid var(--line); border-radius: 14px; margin-bottom: 10px; background: var(--card); overflow: hidden; }
+.faq-q { width: 100%; text-align: left; background: none; border: none; cursor: pointer;
+  padding: 18px 20px; color: #fff; font: 700 14.5px 'Noto Sans KR', sans-serif;
+  display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.faq-q .arrow { color: var(--gold); transition: transform .3s; font-size: 13px; flex-shrink: 0; }
+.faq-item.open .arrow { transform: rotate(180deg); }
+.faq-a { max-height: 0; overflow: hidden; transition: max-height .35s ease; }
+.faq-a p { padding: 0 20px 18px; font: 400 13.5px/1.7 'Noto Sans KR', sans-serif; color: #aaa; word-break: keep-all; }
+.faq-a strong { color: var(--lav); }
+/* --- 13. VIP --- */
+.vip { display: block; margin: 0 0 56px; padding: 40px 22px; text-decoration: none;
+  background: linear-gradient(145deg, #1f0505, #0a0000);
+  border: 2px solid var(--red); border-radius: 18px; text-align: center;
+  box-shadow: 0 14px 30px rgba(255,59,48,.18);
+  transition: transform .35s, box-shadow .35s; }
+.vip:active, .vip:hover { transform: translateY(-4px); box-shadow: 0 20px 40px rgba(212,175,55,.35); }
+.vip-badge { display: inline-block; padding: 6px 14px; border-radius: 22px;
+  background: rgba(255,59,48,.16); border: 1px solid var(--red); color: var(--red);
+  font: 900 11px 'Cinzel', serif; letter-spacing: 1px; margin-bottom: 18px; }
+.vip h4 { font-size: 22px; font-weight: 900; color: #fff; line-height: 1.45; margin-bottom: 14px; word-break: keep-all; }
+.vip h4 strong { color: var(--red); }
+.vip p { font-size: 14.5px; line-height: 1.75; color: #ccc; word-break: keep-all; }
+.vip p b { color: var(--gold-light); font-weight: 700; }
+.vip-cta { display: inline-block; margin-top: 22px; padding: 15px 26px;
+  background: var(--red); color: #fff; border-radius: 12px;
+  font: 900 15px 'Noto Sans KR', sans-serif; }
+/* --- 마지막 푸시 --- */
+.final { text-align: center; padding: 6px 0 26px; }
+.final h3 { font-size: 23px; font-weight: 900; line-height: 1.5; word-break: keep-all; margin-bottom: 13px; }
+.final p { font: 400 14px/1.7 'Noto Sans KR', sans-serif; color: #a89bd0; word-break: keep-all; }
+/* --- 푸터 --- */
+.footer { padding: 40px 20px 110px; text-align: center; border-top: 1px solid rgba(255,255,255,.05); }
+.f-links { margin-bottom: 20px; }
+.f-links a { color: #999; font: 400 13px 'Noto Sans KR', sans-serif; text-decoration: none; margin: 0 8px; }
+.f-links a:hover { color: var(--gold); }
+.biz { font: 400 12px/1.85 'Noto Sans KR', sans-serif; color: #666; word-break: keep-all; }
+.biz strong { color: #888; font-weight: 500; }
+.disclaimer { margin-top: 16px; font: 300 11px/1.7 'Noto Sans KR', sans-serif; color: #555; word-break: keep-all; }
+.copy { display: block; margin-top: 14px; font: 400 11px 'Cinzel', serif; color: #555; }
+
+    /* ══════════ 상품 라우터 ══════════ */
+    .router { margin-bottom: 54px; }
+    .router-q { text-align: center; margin-bottom: 22px; padding-top: 4px; }
+    .router-q .rq-t { font: 900 23px/1.4 'Noto Serif KR', serif; color: #fff;
+      letter-spacing: -1.2px; word-break: keep-all; margin-bottom: 9px; }
+    .router-q .rq-t .g { color: var(--gold-light); text-shadow: 0 0 20px rgba(212,175,55,.45); }
+    .router-q .rq-s { font: 500 13.5px 'Noto Sans KR', sans-serif; color: #a18cd1;
+      letter-spacing: -.5px; word-break: keep-all; }
+
+    .rt-card { display: block; text-decoration: none; border-radius: 18px;
+      padding: 20px 18px; margin-bottom: 11px; position: relative; overflow: hidden;
+      transition: transform .15s ease; }
+    .rt-card:active { transform: scale(.985); }
+    .rt-tag { display: inline-block; font: 800 11px 'Noto Sans KR', sans-serif;
+      letter-spacing: -.3px; padding: 5px 11px; border-radius: 13px; margin-bottom: 11px; }
+    .rt-t { display: block; font: 900 18px 'Noto Serif KR', serif; color: #fff;
+      letter-spacing: -1px; margin-bottom: 7px; word-break: keep-all; }
+    .rt-d { display: block; font: 400 13px/1.65 'Noto Sans KR', sans-serif; color: #b5b5b5;
+      letter-spacing: -.45px; word-break: keep-all; margin-bottom: 13px; }
+    .rt-p { display: flex; align-items: baseline; gap: 8px; }
+    .rt-p .now { font: 900 20px 'Noto Sans KR', sans-serif; color: var(--gold-light); letter-spacing: -.6px; }
+    .rt-p .was { font: 400 13px 'Noto Sans KR', sans-serif; color: #777; text-decoration: line-through; }
+    .rt-p .go { margin-left: auto; font: 800 13px 'Noto Sans KR', sans-serif; color: var(--gold); letter-spacing: -.3px; }
+
+    /* 진입 미끼 — 가장 가볍게 */
+    .rt-card.entry { background: linear-gradient(135deg, rgba(30,45,80,.55), rgba(10,12,22,.9));
+      border: 1px solid rgba(120,160,255,.32); }
+    .rt-card.entry .rt-tag { background: rgba(74,125,255,.16); color: #9fb4e8; border: 1px solid rgba(120,160,255,.35); }
+
+    /* 궁합 — 주력 */
+    .rt-card.couple { background: linear-gradient(135deg, rgba(60,25,70,.6), rgba(14,8,18,.92));
+      border: 1.5px solid rgba(212,175,55,.55); }
+    .rt-card.couple .rt-tag { background: rgba(212,175,55,.15); color: var(--gold-light); border: 1px solid rgba(212,175,55,.45); }
+    .rt-card.couple::after { content: ''; position: absolute; top: 0; left: -120%;
+      width: 55%; height: 100%; pointer-events: none;
+      background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,.055) 50%, transparent 80%);
+      animation: rtShine 4.5s ease-in-out infinite; }
+    @keyframes rtShine { 0% { left: -120%; } 55% { left: 130%; } 100% { left: 130%; } }
+
+    /* 배우자 — 기존 주력 */
+    .rt-card.spouse { background: linear-gradient(135deg, rgba(40,30,60,.55), rgba(12,9,18,.9));
+      border: 1px solid rgba(179,157,219,.35); }
+    .rt-card.spouse .rt-tag { background: rgba(142,36,170,.2); color: #c9b6e8; border: 1px solid rgba(179,157,219,.4); }
+
+    .rt-more { display: block; text-align: center; text-decoration: none;
+      font: 600 13px 'Noto Sans KR', sans-serif; color: #8a8a8a; letter-spacing: -.4px;
+      padding: 14px; margin-top: 4px; }
+    .rt-more b { color: var(--gold); }
+
+    /* ══════════════════════════════════════════════════════════════════
+       ★추가 : 양육설명서(17번) 라우터 카드
+       ------------------------------------------------------------------
+       라우터 안에 들어가므로 기존 .rt-card 문법을 그대로 따른다.
+       배지 / 태그 / 제목 / 설명 / 가격 다섯 줄 구조를 깨지 않는다.
+       타임라인 같은 강한 시각물은 상세페이지 몫이다.
+       라우터는 '고르는 곳'이지 '설득하는 곳'이 아니다.
+       ══════════════════════════════════════════════════════════════════ */
+    .rt-card.kid { background: linear-gradient(135deg, rgba(58,40,22,.66), rgba(13,10,16,.93));
+      border: 1.5px solid rgba(212,175,55,.48); }
+    .rt-card.kid .rt-tag { background: rgba(212,175,55,.13); color: #e8c766;
+      border: 1px solid rgba(212,175,55,.42); }
+    .rt-card.kid::after { content: ''; position: absolute; top: 0; left: -120%;
+      width: 55%; height: 100%; pointer-events: none;
+      background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,.05) 50%, transparent 80%);
+      animation: rtShine 4.5s ease-in-out infinite 1.6s; }
+    .b-kid { background: rgba(212,175,55,.18); color: var(--gold-light);
+      border: 1px solid rgba(212,175,55,.55); }
+
+    /* 런칭가 라벨 — 취소선 대신 쓴다. 이유는 파일 맨 아래 [주의 2] 참고 */
+    .rt-p .lnc { font: 700 11px 'Noto Sans KR', sans-serif; color: #9a9a9a;
+      letter-spacing: -.3px; padding: 3px 8px; border-radius: 9px;
+      background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); }
+
+    /* 🚨 iOS 가 "24,900" 을 전화번호로 인식해 &lt;a href="tel:"&gt; 로 감싸면
+       브라우저 기본 링크색(파랑)이 입혀진다. <head> 의 format-detection 메타가
+       근본 해결이고, 여기서 한 겹 더 막는다. 전 상품 가격에 공통 적용된다. */
+    a[href^="tel"], a[href^="TEL"] { color: inherit !important; text-decoration: none !important; }
+
+    /* ══════════ 전문가 스토리 ══════════ */
+    .story { background: linear-gradient(180deg, rgba(22,16,30,.85), rgba(8,6,12,.92));
+      border: 1px solid rgba(212,175,55,.22); border-radius: 20px;
+      padding: 32px 20px; margin-bottom: 54px; }
+    .story-badge { display: inline-block; font: 700 11px 'Cinzel', serif; letter-spacing: 3px;
+      color: rgba(212,175,55,.8); border: 1px solid rgba(212,175,55,.35);
+      padding: 6px 14px; border-radius: 16px; margin-bottom: 18px; }
+    .story h3 { font: 900 21px/1.45 'Noto Serif KR', serif; color: #fff;
+      letter-spacing: -1.1px; word-break: keep-all; margin-bottom: 18px; }
+    .story h3 .g { color: var(--gold-light); }
+    .story p { font: 400 14.5px/1.85 'Noto Sans KR', sans-serif; color: #c5c5c5;
+      letter-spacing: -.5px; word-break: keep-all; margin-bottom: 15px; }
+    .story p:last-child { margin-bottom: 0; }
+    .story p b { color: var(--gold-light); font-weight: 700; }
+    .story .hl { background: linear-gradient(transparent 58%, rgba(212,175,55,.32) 58%);
+      font-weight: 800; color: #fff; padding: 0 2px; }
+    .story-quote { border-left: 2px solid rgba(212,175,55,.5); padding: 4px 0 4px 15px;
+      margin: 20px 0; font: 500 14.5px/1.8 'Noto Serif KR', serif; color: #ddd;
+      letter-spacing: -.5px; word-break: keep-all; }
+
+    @media (max-width: 400px) {
+      .router-q .rq-t { font-size: 20px; }
+      .rt-t { font-size: 16.5px; }
+      .story h3 { font-size: 19px; }
+      .story p { font-size: 13.5px; }
+    }
+
+    .rq-ladder { display: inline-block; margin-top: 8px; font-size: 12.5px; color: #8a8a8a;
+      letter-spacing: -.4px; }
+    .rq-ladder b { color: var(--gold); font-weight: 800; }
+
+    /* --- 실제 리포트 문장 (말이 아니라 실물) --- */
+    .main-ex { margin-bottom: 50px; }
+    .mx-card { background: linear-gradient(180deg, rgba(24,18,32,.88), rgba(10,8,14,.92));
+      border: 1px solid rgba(212,175,55,.22); border-radius: 16px;
+      padding: 20px 18px; margin-bottom: 11px; }
+    .mx-from { font: 700 11px 'Cinzel', serif; letter-spacing: 2px;
+      color: rgba(212,175,55,.7); margin-bottom: 11px; }
+    .mx-q { font: 400 14.5px/1.85 'Noto Serif KR', serif; color: #dcdcdc;
+      letter-spacing: -.5px; word-break: keep-all; }
+    .mx-q b { color: #f0d77b; font-weight: 700; }
+    .mx-d { display: block; color: #ff8a80 !important; font-weight: 900 !important;
+      font-family: 'Noto Sans KR', sans-serif; font-size: 14.5px; margin-bottom: 7px; }
+    .mx-how { display: inline-block; margin-top: 8px; color: #9fb4e8;
+      font: 400 13.5px/1.75 'Noto Sans KR', sans-serif; letter-spacing: -.45px; }
+    .mx-how b { color: #cfe0ff !important; }
+    .mx-note { text-align: center; margin-top: 20px; font: 600 13.5px/1.75 'Noto Sans KR', sans-serif;
+      color: #a18cd1; letter-spacing: -.45px; word-break: keep-all; }
+    .mx-note b { color: #f0d77b; }
+    .mx-tiny { text-align: center; margin-top: 10px; font: 400 11px 'Noto Sans KR', sans-serif;
+      color: #6a6a6a; letter-spacing: -.3px; }
+
+
+
+    /* ══════════════════════════════════════════════════════════════
+       리포트별 수록 내용 — "무엇을 알게 되나"
+       --------------------------------------------------------------
+       예시 문장을 나열하던 자리를 목차형으로 바꿨다.
+       문장은 읽어야 알지만, 항목은 훑기만 해도 들어온다.
+       손님이 상품을 고르기 직전에 보는 자리이므로 속도가 중요하다.
+       ══════════════════════════════════════════════════════════════ */
+    .mx-card .mx-list { list-style: none; padding: 0; margin: 12px 0 0; }
+    .mx-card .mx-list li { position: relative; padding-left: 17px;
+      font: 500 14px/1.95 'Noto Sans KR', sans-serif; color: #c8c8c8;
+      letter-spacing: -.45px; word-break: keep-all; }
+    .mx-card .mx-list li::before { content: ''; position: absolute; left: 2px; top: 12px;
+      width: 5px; height: 5px; border-radius: 50%; background: var(--dot, #d4af37); opacity: .85; }
+    .mx-card .mx-list li b { color: var(--hi, #f0d77b); font-weight: 800; }
+    .mx-card .mx-list li .mx-em { background: linear-gradient(transparent 58%, rgba(212,175,55,.3) 58%);
+      color: #fff; font-weight: 800; padding: 0 2px; }
+
+    /* 상품별 색 — 라우터 카드와 같은 색 계열로 맞춰 연결감을 준다 */
+    .mx-card.p-spouse { --dot:#b39ddb; --hi:#c9b6e8; }
+    .mx-card.p-couple { --dot:#d4af37; --hi:#e8c766; }
+    .mx-card.p-kid    { --dot:#d4af37; --hi:#f0d77b; }
+    .mx-card.p-month  { --dot:#7d9aec; --hi:#9fb4e8; }
+
+    .mx-card .mx-name { display: block; font: 900 17px 'Noto Serif KR', serif;
+      color: #fff; letter-spacing: -.9px; margin-bottom: 2px; }
+    .mx-card .mx-price { font: 700 12.5px 'Noto Sans KR', sans-serif;
+      color: #8a8a8a; letter-spacing: -.3px; }
+
+    /* 궁합 카드 안에 들어간 시너스트리 그림 */
+    .mx-card .sv-svg { max-width: 280px; margin: 14px auto 8px; }
+    .mx-card .sv-cap { text-align: center; }
+    .mx-card .sv-txt { text-align: center; font-size: 12.5px; }
+
+
+    /* 전체 장수 표기 — 위 목록이 '전부'가 아니라 '발췌'임을 알린다.
+       이게 없으면 4~5줄만 보고 분량이 적다고 오해한다.
+       실제로는 배우자 7장, 궁합·양육 9장, 30일 8장이다. */
+    .mx-card .mx-vol { font-style: normal; font-weight: 800; color: var(--hi, #f0d77b);
+      margin-left: 7px; padding: 2px 8px; border-radius: 9px;
+      background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); }
+    .mx-card .mx-more { color: #8a8a8a !important; font-size: 13px !important;
+      font-style: normal; margin-top: 4px; }
+    .mx-card .mx-more::before { background: transparent !important;
+      content: '＋' !important; left: 0 !important; top: 0 !important;
+      width: auto !important; height: auto !important;
+      color: #6f6f6f; font-weight: 700; font-size: 11px; }
+
+    /* --- 후기 캐러셀 (옆으로 넘기기) --- */
+    .reviews { margin-bottom: 50px; }
+    .rv-hint { text-align: center; font: 600 12.5px 'Noto Sans KR', sans-serif;
+      color: #8a8a8a; letter-spacing: -.4px; margin-bottom: 14px;
+      animation: rvNudge 1.6s ease-in-out infinite; }
+    @keyframes rvNudge { 0%,100% { transform: translateX(0); } 50% { transform: translateX(7px); } }
+
+    .rv-track { display: flex; gap: 12px; overflow-x: auto;
+      scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
+      padding: 2px 0 14px; margin: 0 -20px; padding-left: 20px; padding-right: 20px;
+      scrollbar-width: none; -ms-overflow-style: none; }
+    .rv-track::-webkit-scrollbar { display: none; }
+
+    .rv-card { flex: 0 0 86%; scroll-snap-align: center;
+      background: linear-gradient(180deg, rgba(24,19,32,.9), rgba(11,9,15,.94));
+      border: 1px solid rgba(179,157,219,.2); border-radius: 18px;
+      padding: 22px 18px; }
+    .rv-card.best { border-color: rgba(212,175,55,.45); }
+    .rv-head { display: flex; justify-content: space-between; align-items: center;
+      gap: 10px; margin-bottom: 11px; }
+    .rv-who { font: 700 13.5px 'Noto Sans KR', sans-serif; color: #ddd; letter-spacing: -.4px; }
+    .rv-star { font-size: 13px; color: var(--gold); letter-spacing: 1px; flex-shrink: 0; }
+    .rv-txt { font: 400 14px/1.8 'Noto Sans KR', sans-serif; color: #c2c2c2;
+      letter-spacing: -.45px; word-break: keep-all; margin-top: 4px; }
+    .rv-txt strong { color: var(--gold-light); font-weight: 700; }
+
+    .rv-dots { display: flex; justify-content: center; gap: 7px; margin-top: 4px; }
+    .rv-dots i { width: 7px; height: 7px; border-radius: 50%;
+      background: rgba(255,255,255,.18); transition: all .25s; display: block; }
+    .rv-dots i.on { background: var(--gold); width: 20px; border-radius: 4px; }
+
+    @media (max-width: 400px) { .rv-card { flex-basis: 89%; } }
+
+
+    /* --- 정밀함 3줄 + 스펙 바 --- */
+    .trust { background: rgba(255,255,255,.02); border: 1px solid rgba(179,157,219,.16);
+      border-radius: 18px; padding: 24px 18px 20px; margin-bottom: 22px; }
+    .tr-row { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 18px; }
+    .tr-row:last-of-type { margin-bottom: 20px; }
+    .tr-ico { flex-shrink: 0; font-size: 19px; padding-top: 1px; }
+    .tr-row b { display: block; font: 800 15px 'Noto Sans KR', sans-serif; color: var(--gold-light);
+      margin-bottom: 6px; letter-spacing: -.6px; word-break: keep-all; }
+    .tr-row p { font: 500 13.5px/1.68 'Noto Sans KR', sans-serif; color: #b8b8b8;
+      letter-spacing: -.45px; word-break: keep-all; }
+    .tr-hl { background: linear-gradient(transparent 58%, rgba(212,175,55,.32) 58%);
+      font-weight: 800; color: #fff; padding: 0 2px; }
+    .spec-bar { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
+      padding-top: 16px; border-top: 1px solid rgba(255,255,255,.06); }
+    .spec-bar span { font: 600 11px 'Noto Sans KR', sans-serif; color: #8a8a8a;
+      letter-spacing: -.3px; padding: 5px 10px; border-radius: 11px;
+      background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.07); }
+
+    /* --- 시너스트리 시각화 --- */
+    .syn-viz { text-align: center; margin-bottom: 50px;
+      background: linear-gradient(180deg, rgba(20,15,30,.6), rgba(8,6,12,.85));
+      border: 1px solid rgba(212,175,55,.2); border-radius: 18px; padding: 24px 16px 22px; }
+    .sv-cap { font: 700 11px 'Cinzel', serif; letter-spacing: 3px;
+      color: rgba(212,175,55,.75); margin-bottom: 6px; }
+    .sv-svg { width: 100%; max-width: 320px; height: auto; display: block; margin: 0 auto 10px; }
+    .sv-txt { font: 500 13.5px/1.72 'Noto Sans KR', sans-serif; color: #c0c0c0;
+      letter-spacing: -.45px; word-break: keep-all; }
+    .sv-txt b { color: var(--gold-light); font-weight: 800; }
+
+    /* --- 라우터 배지 --- */
+    .rt-badge { position: absolute; top: 14px; right: 14px; z-index: 2;
+      font: 900 10.5px 'Noto Sans KR', sans-serif; letter-spacing: -.2px;
+      padding: 4px 9px; border-radius: 10px; }
+    .b-entry { background: rgba(120,160,255,.16); color: #9fb4e8; border: 1px solid rgba(120,160,255,.4); }
+    .b-new   { background: rgba(179,157,219,.2);  color: #d3c3f0; border: 1px solid rgba(179,157,219,.5); }
+    .b-best  { background: rgba(212,175,55,.18);  color: var(--gold-light); border: 1px solid rgba(212,175,55,.55); }
+    .b-sig   { background: rgba(255,59,48,.16);   color: #ff8a80; border: 1px solid rgba(255,90,80,.5); }
+
+    /* --- 후기 상품 라벨 --- */
+    .rv-tag { display: inline-block; font: 800 10.5px 'Noto Sans KR', sans-serif;
+      letter-spacing: -.2px; padding: 4px 9px; border-radius: 10px; margin-bottom: 10px; }
+    .t-couple { background: rgba(212,175,55,.15); color: var(--gold-light); border: 1px solid rgba(212,175,55,.4); }
+    .t-spouse { background: rgba(179,157,219,.15); color: #c9b6e8; border: 1px solid rgba(179,157,219,.35); }
+    .t-vvip   { background: rgba(255,59,48,.13);  color: #ff8a80; border: 1px solid rgba(255,90,80,.35); }
+    /* ★추가 : 양육 후기 라벨 (실제 후기 쌓이면 사용) */
+    .t-child  { background: rgba(212,175,55,.15); color: var(--gold-light); border: 1px solid rgba(212,175,55,.4); }
+
+
+    /* --- VVIP 라우터 카드 (빨강 강조) --- */
+    .rt-card.vvip { background: linear-gradient(135deg, rgba(70,18,18,.62), rgba(16,8,10,.94));
+      border: 1.5px solid rgba(255,80,70,.55); }
+    .rt-card.vvip .rt-tag { background: rgba(255,59,48,.15); color: #ff8a80;
+      border: 1px solid rgba(255,90,80,.45); }
+    .rt-card.vvip .rd { color: #ff6b60; text-shadow: 0 0 18px rgba(255,59,48,.45); }
+    .rt-card.vvip .now.rd-p { color: #ff8a80; }
+    .rt-card.vvip .go.rd-go { color: #ff6b60; }
+    .rt-card.vvip::after { content: ''; position: absolute; top: 0; left: -120%;
+      width: 55%; height: 100%; pointer-events: none;
+      background: linear-gradient(100deg, transparent 20%, rgba(255,140,130,.07) 50%, transparent 80%);
+      animation: rtShine 5s ease-in-out infinite .6s; }
+
+    /* --- 딥다이브 첫 화면으로 내려온 배우자 히어로 --- */
+    .spouse-hero { padding-top: 0 !important; }
+    .spouse-hero h1 { font-size: 27px; }
+    @media (max-width: 400px) { .spouse-hero h1 { font-size: 23px; } }
+
+
+    /* --- 주력 상품 안내선 --- */
+    .anchor-line { text-align: center; margin-bottom: 40px; }
+    .al-line { width: 1px; height: 46px; margin: 0 auto 20px;
+      background: linear-gradient(180deg, transparent, rgba(212,175,55,.6)); }
+    .al-txt { font: 700 11px 'Cinzel', serif; letter-spacing: 3.5px;
+      color: rgba(212,175,55,.75); margin-bottom: 12px; }
+    .al-title { font: 900 22px/1.4 'Noto Serif KR', serif; color: #fff;
+      letter-spacing: -1.1px; word-break: keep-all; }
+
+/* --- 하단 고정 CTA (상세설명에 붙일 땐 이 블록 삭제) --- */
+.sticky { opacity: 0; visibility: hidden; pointer-events: none;
+  transition: opacity .45s ease, transform .45s ease;
+  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%) translateY(14px);
+  width: 100%; max-width: 500px; z-index: 100;
+  padding: 16px 20px 26px;
+  background: linear-gradient(to top, rgba(5,5,5,1) 72%, rgba(5,5,5,0));
+  text-align: center; }
+.sticky.show { opacity: 1; visibility: visible; pointer-events: auto;
+  transform: translateX(-50%) translateY(0); }
+.cta-btn { width: 100%; border: none; cursor: pointer;
+  background: linear-gradient(135deg, var(--gold-light), var(--purple));
+  color: #fff; padding: 19px 10px; border-radius: 16px;
+  font: 900 18px 'Noto Sans KR', sans-serif;
+  display: flex; justify-content: center; align-items: center; gap: 10px;
+  box-shadow: 0 8px 26px rgba(142,36,170,.42);
+  transition: transform .15s; }
+.cta-btn:active { transform: scale(.96); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #fff; animation: blink 1s infinite; }
+@keyframes blink { 50% { opacity: .25; } }
+.cta-sub { margin-top: 9px; font: 400 12px 'Noto Sans KR', sans-serif; color: #999; }
+.cta-sub b { color: var(--gold); }
+/* ══════════════════════════════════════════════════════════════════
+   🌌 히어로 행성 연결망
+   ------------------------------------------------------------------
+   90초에 한 바퀴 아주 천천히 돌고, 각도선을 따라 빛이 흐른다.
+   빠르면 싸구려로 보이므로 일부러 느리게 잡았다.
+   transform 과 opacity 만 써서 GPU 가속을 받는다.
+   ══════════════════════════════════════════════════════════════════ */
+/* ── 히어로 행성망 v2 ─────────────────────────────────────────── */
+.hw2 { position: relative; width: 100%; max-width: 440px; margin: 0 auto 20px; }
+.hw2 svg { width: 100%; height: auto; display: block; overflow: visible; }
+
+/* ① 전체 회전 — 느릴수록 고급스럽다. 90초에 한 바퀴. */
+@keyframes hw2Spin { to { transform: rotate(360deg); } }
+.hw2-spin { transform-origin: 220px 200px; animation: hw2Spin 90s linear infinite; }
+
+/* ② 궤도 링 — 서로 반대 방향, 서로 다른 속도로 겹쳐 깊이를 만든다 */
+@keyframes hw2RingA { to { transform: rotate(360deg); } }
+@keyframes hw2RingB { to { transform: rotate(-360deg); } }
+.hw2-ring1 { transform-origin: 220px 200px; animation: hw2RingA 120s linear infinite; }
+.hw2-ring2 { transform-origin: 220px 200px; animation: hw2RingB 80s linear infinite; }
+.hw2-ring3 { transform-origin: 220px 200px; animation: hw2RingA 200s linear infinite; }
+
+/* ③ 노드 맥동 — 코어와 후광이 같은 박자 */
+@keyframes hw2Core { 0%,100% { r: var(--r0); } 50% { r: var(--r1); } }
+@keyframes hw2Halo { 0%,100% { r: var(--h0); opacity: .4; } 50% { r: var(--h1); opacity: 1; } }
+.hw2-core { animation: hw2Core 8s ease-in-out infinite; }
+.hw2-halo { animation: hw2Halo 8s ease-in-out infinite; }
+
+/* ④ 노드 표류 — 제자리에서 아주 조금 흔들린다. 죽은 그림이 되지 않게. */
+@keyframes hw2Drift {
+  0%, 100% { transform: translate(0, 0); }
+  25%      { transform: translate(2.5px, -1.5px); }
+  50%      { transform: translate(-1.5px, 2px); }
+  75%      { transform: translate(1px, 1.5px); }
+}
+.hw2-drift { animation: hw2Drift 14s ease-in-out infinite; }
+
+/* ⑤ 선 밝기 */
+@keyframes hw2Line { 0%,100% { opacity: var(--o0); } 50% { opacity: var(--o1); } }
+.hw2-line { animation: hw2Line 8s ease-in-out infinite; }
+
+/* ⑥ 선을 타고 흐르는 빛 ★ 이게 역동성의 핵심
+   짧은 점선 하나를 선 위에서 계속 밀어낸다.
+   힘이 한 행성에서 다른 행성으로 건너가는 것처럼 보인다. */
+@keyframes hw2Flow { to { stroke-dashoffset: -400; } }
+.hw2-flow {
+  stroke: #ffeeb0;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-dasharray: 14 386;
+  animation: hw2Flow 4.5s linear infinite;
+  opacity: .85;
+}
+
+/* ⑦ 배경 별 반짝임 */
+@keyframes hw2Tw { 0%,100% { opacity: .16; } 50% { opacity: .44; } }
+.hw2-star { animation: hw2Tw 6s ease-in-out infinite; }
+
+/* ⑧ 중심 코어의 숨쉬기 */
+@keyframes hw2Breathe { 0%,100% { opacity: .35; transform: scale(1); } 50% { opacity: .7; transform: scale(1.12); } }
+.hw2-center { transform-origin: 220px 200px; animation: hw2Breathe 10s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hw2 * { animation: none !important; }
+}
+@media (max-width: 400px) { .hw2 { margin-bottom: 14px; } }
+
+
+/* ══════════════════════════════════════════════════════════════════
+   히어로 배경 레이어
+   ------------------------------------------------------------------
+   그래픽을 글 뒤로 깔아 히어로 높이를 약 260px 줄인다.
+   그만큼 라우터 카드(이 페이지의 실제 CTA)가 빨리 보인다.
+
+   ▣ 읽기를 지키는 세 가지 장치
+     ① opacity .42       — 배경은 배경이어야 한다. 진하면 글을 잡아먹는다.
+     ② 중앙 어둡게 덮기   — 글자가 놓이는 자리만 radial-gradient 로 눌러
+                            대비를 확보한다. 가장자리는 그대로 밝다.
+     ③ pointer-events:none — 배경이 클릭·스크롤을 가로채지 않게 한다.
+
+   ▣ 왜 opacity 를 SVG 안이 아니라 컨테이너에 걸었나
+     안쪽 요소마다 조절하면 발광 그라디언트가 뭉개진다.
+     레이어 전체에 한 번 거는 쪽이 깨끗하다.
+   ══════════════════════════════════════════════════════════════════ */
+.hero { position: relative; }
+
+.hero-bg { position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 128%; max-width: 560px;
+  opacity: .42; pointer-events: none; z-index: 0;
+  /* 가장자리를 부드럽게 지워 사각 경계가 보이지 않게 한다 */
+  -webkit-mask-image: radial-gradient(ellipse 70% 66% at 50% 50%, #000 40%, transparent 84%);
+          mask-image: radial-gradient(ellipse 70% 66% at 50% 50%, #000 40%, transparent 84%); }
+.hero-bg .hw2 { margin: 0; max-width: none; }
+
+/* 글자가 놓이는 중앙만 어둡게 눌러 대비를 확보한다 */
+.hero-bg::after { content: ''; position: absolute; inset: -6%;
+  background: radial-gradient(ellipse 58% 46% at 50% 50%,
+    rgba(5,5,5,.72) 0%, rgba(5,5,5,.34) 46%, transparent 74%);
+  pointer-events: none; }
+
+.hero-fg { position: relative; z-index: 1; }
+
+@media (max-width: 480px) {
+  .hero-bg { width: 142%; opacity: .38; }
+  /* 모바일은 화면이 좁아 같은 px 여백이 더 크게 느껴진다.
+     데스크톱 76px 그대로 두면 빈 화면만 스크롤하게 된다. */
+  .hero { padding-bottom: 58px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-bg { opacity: .3; }
+}
+
+/* --- 스크롤 리빌 --- */
+.reveal { opacity: 0; transform: translateY(24px); transition: opacity .7s ease, transform .7s ease; }
+.reveal.on { opacity: 1; transform: translateY(0); }
+@media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } }
+
+/* ===== 실시간 열람자 수 ===== */
+.live-count { display: flex; align-items: center; justify-content: center; gap: 7px;
+  width: fit-content; margin: 18px auto 0;
+  background: rgba(74,222,128,0.08); border: 1px solid rgba(74,222,128,0.3);
+  border-radius: 22px; padding: 7px 16px;
+  font: 600 12.5px 'Noto Sans KR', sans-serif; color: #8fe8a8; }
+.live-count .lc-dot { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; flex-shrink: 0; animation: ltPulse 1.6s infinite; }
+.live-count b { color: #b6f2c6; }
+@keyframes ltPulse { 0%{box-shadow:0 0 0 0 rgba(74,222,128,.6);} 70%{box-shadow:0 0 0 7px rgba(74,222,128,0);} 100%{box-shadow:0 0 0 0 rgba(74,222,128,0);} }
+/* ===== 실시간 결제 팝업 ===== */
+.live-toast { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%) translateY(20px);
+  z-index: 200; width: calc(100% - 32px); max-width: 420px;
+  background: rgba(22,16,28,0.96); border: 1px solid rgba(212,175,55,0.45); border-radius: 14px;
+  padding: 12px 15px; display: flex; align-items: center; gap: 11px;
+  box-shadow: 0 12px 34px rgba(0,0,0,0.55); opacity: 0; pointer-events: none;
+  transition: opacity .5s ease, transform .5s ease; backdrop-filter: blur(8px); }
+.live-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.live-toast .lt-ico { width: 36px; height: 36px; flex-shrink: 0; border-radius: 50%;
+  background: linear-gradient(135deg, #d4af37, #8e24aa); display: flex; align-items: center; justify-content: center; font-size: 18px; }
+.live-toast .lt-body { flex: 1; min-width: 0; text-align: left; }
+.live-toast .lt-main { font: 700 13px/1.4 'Noto Sans KR', sans-serif; color: #fff; }
+.live-toast .lt-main b { color: #f0d77b; }
+.live-toast .lt-sub { font: 400 11px 'Noto Sans KR', sans-serif; color: #9a8fb5; margin-top: 2px; }
+.live-toast .lt-dot { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; flex-shrink: 0; animation: ltPulse 1.6s infinite; }
+@media (max-width:480px){ .live-toast{ bottom: 90px; } }
+</style></div>
+<div class="app" data-ez="module-0kg39oa-1" data-ez-module="user-defined/1" data-ez-name="USER DEFINED" data-ez-type="plain">
+  <div class="bg-stars"></div>
+  <div class="bg-glow"></div>
+  <div class="live-toast" id="liveToast">
+    <div class="lt-ico">✨</div>
+    <div class="lt-body">
+      <div class="lt-main" id="ltMain"><b>서울</b>의 김○○님이 방금 결제했어요</div>
+      <div class="lt-sub" id="ltSub">2분 전 · 미래 배우자 추적 리포트</div>
+    </div>
+    <div class="lt-dot"></div>
+  </div>
+  <!-- ============ 1. 브랜드 HERO ============ -->
+  <section class="wrap hero">
+    <!-- ★배경 레이어 : 히어로 안에서만 뒤에 깔린다.
+         position:absolute 라서 높이를 차지하지 않는다.
+         세로로 쌓았을 때보다 히어로가 약 260px 짧아지고,
+         그만큼 라우터 카드가 빨리 보인다. -->
+    <div class="hero-bg">
+    <div class="hw2" aria-hidden="true">
+      <svg viewBox="0 0 440 400" preserveAspectRatio="xMidYMid meet" role="img" aria-label="행성들이 각도로 연결되어 회전하는 출생 차트">
+        <defs>
+          <radialGradient id="hw2Halo" cx="50%" cy="50%">
+            <stop offset="0%" stop-color="#f7e7a8" stop-opacity=".55"></stop>
+            <stop offset="60%" stop-color="#d4af37" stop-opacity=".14"></stop>
+            <stop offset="100%" stop-color="#d4af37" stop-opacity="0"></stop>
+          </radialGradient>
+          <radialGradient id="hw2Core" cx="34%" cy="32%">
+            <stop offset="0%" stop-color="#ffffff"></stop>
+            <stop offset="40%" stop-color="#fff3c9"></stop>
+            <stop offset="100%" stop-color="#d4af37"></stop>
+          </radialGradient>
+          <radialGradient id="hw2Purple" cx="34%" cy="32%">
+            <stop offset="0%" stop-color="#efe6ff"></stop>
+            <stop offset="45%" stop-color="#c9b6e8"></stop>
+            <stop offset="100%" stop-color="#8e24aa"></stop>
+          </radialGradient>
+          <radialGradient id="hw2Bg" cx="50%" cy="50%">
+            <stop offset="0%" stop-color="#8e24aa" stop-opacity=".2"></stop>
+            <stop offset="55%" stop-color="#3a1a4a" stop-opacity=".08"></stop>
+            <stop offset="100%" stop-color="#050505" stop-opacity="0"></stop>
+          </radialGradient>
+          <radialGradient id="hw2Mid" cx="50%" cy="50%">
+            <stop offset="0%" stop-color="#f0d77b" stop-opacity=".3"></stop>
+            <stop offset="100%" stop-color="#d4af37" stop-opacity="0"></stop>
+          </radialGradient>
+        </defs>
+    
+        <!-- 배경 발광 -->
+        <ellipse cx="220" cy="200" rx="230" ry="205" fill="url(#hw2Bg)"></ellipse>
+    
+        <!-- 고정 배경 별 : 회전하지 않는다. 이게 있어야 위 레이어가 도는 게 느껴진다 -->
+        <g fill="#ffffff">
+          <circle class="hw2-star" cx="34" cy="52" r="1" style="animation-delay:0s"></circle>
+          <circle class="hw2-star" cx="120" cy="24" r=".8" style="animation-delay:1.3s"></circle>
+          <circle class="hw2-star" cx="352" cy="34" r="1.1" style="animation-delay:2.6s"></circle>
+          <circle class="hw2-star" cx="414" cy="112" r=".8" style="animation-delay:.7s"></circle>
+          <circle class="hw2-star" cx="20" cy="176" r=".9" style="animation-delay:3.4s"></circle>
+          <circle class="hw2-star" cx="424" cy="266" r="1" style="animation-delay:2s"></circle>
+          <circle class="hw2-star" cx="52" cy="330" r=".8" style="animation-delay:3s"></circle>
+          <circle class="hw2-star" cx="212" cy="378" r=".9" style="animation-delay:.4s"></circle>
+          <circle class="hw2-star" cx="368" cy="352" r="1" style="animation-delay:4.1s"></circle>
+          <circle class="hw2-star" cx="164" cy="46" r=".7" style="animation-delay:4.8s"></circle>
+          <circle class="hw2-star" cx="290" cy="382" r=".7" style="animation-delay:1.7s"></circle>
+          <circle class="hw2-star" cx="14" cy="256" r=".8" style="animation-delay:5.5s"></circle>
+        </g>
+    
+        <!-- 궤도 링 3개 : 서로 반대로, 서로 다른 속도로 돈다 -->
+        <g class="hw2-ring3" fill="none" stroke="#d4af37" stroke-opacity=".07">
+          <circle cx="220" cy="200" r="178" stroke-width=".8" stroke-dasharray="1 13"></circle>
+        </g>
+        <g class="hw2-ring1" fill="none" stroke="#d4af37" stroke-opacity=".11">
+          <circle cx="220" cy="200" r="146" stroke-width=".9" stroke-dasharray="3 9"></circle>
+        </g>
+        <g class="hw2-ring2" fill="none" stroke="#b39ddb" stroke-opacity=".13">
+          <circle cx="220" cy="200" r="112" stroke-width=".8" stroke-dasharray="2 16"></circle>
+        </g>
+    
+        <!-- 중심 발광 -->
+        <circle class="hw2-center" cx="220" cy="200" r="66" fill="url(#hw2Mid)"></circle>
+    
+        <!-- ══════ 여기서부터 통째로 회전 ══════ -->
+        <g class="hw2-spin">
+    
+          <!-- 각도선 (바탕) -->
+          <g stroke="#d4af37" fill="none" stroke-linecap="round">
+            <line class="hw2-line" x1="220" y1="72" x2="332" y2="136" stroke-width="1" style="--o0:.26; --o1:.8;  animation-delay:0s"></line>
+            <line class="hw2-line" x1="220" y1="72" x2="112" y2="148" stroke-width="1" style="--o0:.24; --o1:.76; animation-delay:0s"></line>
+            <line class="hw2-line" x1="220" y1="72" x2="220" y2="200" stroke-width=".8" style="--o0:.18; --o1:.5;  animation-delay:0s"></line>
+            <line class="hw2-line" x1="332" y1="136" x2="312" y2="266" stroke-width="1" style="--o0:.24; --o1:.8;  animation-delay:1.6s"></line>
+            <line class="hw2-line" x1="332" y1="136" x2="220" y2="200" stroke-width=".8" style="--o0:.2;  --o1:.62; animation-delay:1.6s"></line>
+            <line class="hw2-line" x1="112" y1="148" x2="134" y2="278" stroke-width="1" style="--o0:.24; --o1:.78; animation-delay:3.2s"></line>
+            <line class="hw2-line" x1="112" y1="148" x2="220" y2="200" stroke-width=".8" style="--o0:.2;  --o1:.62; animation-delay:3.2s"></line>
+            <line class="hw2-line" x1="220" y1="200" x2="312" y2="266" stroke-width=".9" style="--o0:.22; --o1:.72; animation-delay:4.8s"></line>
+            <line class="hw2-line" x1="220" y1="200" x2="134" y2="278" stroke-width=".9" style="--o0:.22; --o1:.72; animation-delay:4.8s"></line>
+            <line class="hw2-line" x1="134" y1="278" x2="228" y2="322" stroke-width=".9" style="--o0:.22; --o1:.74; animation-delay:6.4s"></line>
+            <line class="hw2-line" x1="312" y1="266" x2="228" y2="322" stroke-width=".9" style="--o0:.22; --o1:.74; animation-delay:6.4s"></line>
+            <!-- 약한 배경 각 : 맥동하지 않는다. 그물이 아니라 성근 망으로 보이게 -->
+            <line x1="112" y1="148" x2="332" y2="136" stroke-width=".6" opacity=".1"></line>
+            <line x1="220" y1="72" x2="312" y2="266" stroke-width=".6" opacity=".09"></line>
+            <line x1="220" y1="72" x2="134" y2="278" stroke-width=".6" opacity=".09"></line>
+          </g>
+    
+          <!-- ★ 선을 타고 흐르는 빛 -->
+          <g fill="none">
+            <line class="hw2-flow" x1="220" y1="72" x2="332" y2="136" style="animation-delay:0s"></line>
+            <line class="hw2-flow" x1="332" y1="136" x2="312" y2="266" style="animation-delay:1.1s"></line>
+            <line class="hw2-flow" x1="312" y1="266" x2="228" y2="322" style="animation-delay:2.2s"></line>
+            <line class="hw2-flow" x1="228" y1="322" x2="134" y2="278" style="animation-delay:3.3s"></line>
+            <line class="hw2-flow" x1="134" y1="278" x2="112" y2="148" style="animation-delay:4.4s"></line>
+            <line class="hw2-flow" x1="112" y1="148" x2="220" y2="72" style="animation-delay:5.5s"></line>
+            <line class="hw2-flow" x1="220" y1="72" x2="220" y2="200" style="animation-delay:2.7s" stroke="#e8d5ff"></line>
+            <line class="hw2-flow" x1="220" y1="200" x2="312" y2="266" style="animation-delay:6.1s" stroke="#e8d5ff"></line>
+          </g>
+    
+          <!-- 행성 노드 8개 -->
+          <g class="hw2-drift" style="animation-delay:0s">
+            <circle class="hw2-halo" cx="220" cy="72" fill="url(#hw2Halo)" style="--h0:22; --h1:34; animation-delay:0s"></circle>
+            <circle class="hw2-core" cx="220" cy="72" fill="url(#hw2Core)" style="--r0:6.5; --r1:10.5; animation-delay:0s"></circle>
+          </g>
+          <g class="hw2-drift" style="animation-delay:2.1s">
+            <circle class="hw2-halo" cx="332" cy="136" fill="url(#hw2Halo)" style="--h0:18; --h1:29; animation-delay:1.6s"></circle>
+            <circle class="hw2-core" cx="332" cy="136" fill="url(#hw2Core)" style="--r0:5.5; --r1:9; animation-delay:1.6s"></circle>
+          </g>
+          <g class="hw2-drift" style="animation-delay:4.2s">
+            <circle class="hw2-halo" cx="112" cy="148" fill="url(#hw2Halo)" style="--h0:18; --h1:29; animation-delay:3.2s"></circle>
+            <circle class="hw2-core" cx="112" cy="148" fill="url(#hw2Core)" style="--r0:5.5; --r1:9; animation-delay:3.2s"></circle>
+          </g>
+          <g class="hw2-drift" style="animation-delay:6.3s">
+            <circle class="hw2-halo" cx="220" cy="200" fill="url(#hw2Halo)" style="--h0:20; --h1:31; animation-delay:4.8s"></circle>
+            <circle class="hw2-core" cx="220" cy="200" fill="url(#hw2Core)" style="--r0:6; --r1:9.8; animation-delay:4.8s"></circle>
+          </g>
+          <g class="hw2-drift" style="animation-delay:1.4s">
+            <circle class="hw2-halo" cx="312" cy="266" fill="url(#hw2Halo)" style="--h0:16; --h1:26; animation-delay:6.4s"></circle>
+            <circle class="hw2-core" cx="312" cy="266" fill="url(#hw2Core)" style="--r0:5; --r1:8.4; animation-delay:6.4s"></circle>
+          </g>
+          <g class="hw2-drift" style="animation-delay:3.5s">
+            <circle class="hw2-halo" cx="134" cy="278" fill="url(#hw2Halo)" style="--h0:16; --h1:26; animation-delay:6.4s"></circle>
+            <circle class="hw2-core" cx="134" cy="278" fill="url(#hw2Core)" style="--r0:5; --r1:8.4; animation-delay:6.4s"></circle>
+          </g>
+          <g class="hw2-drift" style="animation-delay:5.6s">
+            <circle class="hw2-halo" cx="228" cy="322" fill="url(#hw2Halo)" style="--h0:14; --h1:23; animation-delay:4s"></circle>
+            <circle class="hw2-core" cx="228" cy="322" fill="url(#hw2Core)" style="--r0:4.5; --r1:7.5; animation-delay:4s"></circle>
+          </g>
+    
+          <!-- 바깥 보라 위성 2개 : 전부 금색이면 단조롭다. 리듬을 끊어준다 -->
+          <g class="hw2-drift" style="animation-delay:7s">
+            <circle class="hw2-halo" cx="386" cy="206" fill="url(#hw2Halo)" style="--h0:11; --h1:18; animation-delay:2.4s"></circle>
+            <circle class="hw2-core" cx="386" cy="206" fill="url(#hw2Purple)" style="--r0:3.8; --r1:6; animation-delay:2.4s"></circle>
+          </g>
+          <g class="hw2-drift" style="animation-delay:8.4s">
+            <circle class="hw2-halo" cx="58" cy="220" fill="url(#hw2Halo)" style="--h0:11; --h1:18; animation-delay:5.2s"></circle>
+            <circle class="hw2-core" cx="58" cy="220" fill="url(#hw2Purple)" style="--r0:3.8; --r1:6; animation-delay:5.2s"></circle>
+          </g>
+          <g stroke="#b39ddb" stroke-width=".55" opacity=".14">
+            <line x1="386" y1="206" x2="332" y2="136"></line>
+            <line x1="58" y1="220" x2="112" y2="148"></line>
+          </g>
+    
+        </g>
+        <!-- ══════ 회전 끝 ══════ -->
+      </svg>
+    </div>
+    </div>
+
+    <div class="hero-fg">
+    <div class="badge">사주로는 여기까지 못 봅니다</div>
+    <div class="brand">A S T R A N O T E</div>
+    <h1>사주는 네 글자,<br><span class="gold">네이탈 차트는 행성 열 개</span></h1>
+
+
+    <div class="hero-desc">
+      사주는 태어난 <strong>연·월·일·시</strong>로 사람을 읽습니다.
+      저희는 그 순간 하늘에 있던 <strong>행성 열 개의 정확한 좌표</strong>를 계산합니다.<br><br>
+      <strong>같은 날 같은 시에 태어나도, 서울과 부산은 다른 차트입니다.</strong>
+    </div>
+    <div class="live-count"><span class="lc-dot"></span>지금 <b id="live-viewers">17</b>명이 자신의 운명을 확인하고 있어요</div>
+    </div>
+  </section>
+
+  <!-- ============ 1-B. 상품 라우터 ============
+       선택지를 한 화면에 늘어놓으면 아무도 못 고른다.
+       "무엇이 궁금한가"로 갈라줘야 손님이 스스로 자기 상품을 찾는다.
+
+       ★v4 : 양육설명서를 3번째에 넣었다. 이유는 아래 세 가지다.
+         1) 궁합·배우자는 손님이 검색어를 갖고 찾아오지만
+            양육설명서는 존재를 모른다. 아래 있으면 영영 발견되지 않는다.
+         2) 기존 주력(30일운세·궁합)의 자리를 뺏지 않는다.
+         3) 아이 없는 손님에게 드는 비용은 배지 한 줄 읽는 0.5초뿐이다.
+       ============================================ -->
+  <section class="wrap router reveal">
+    <div class="router-q">
+      <div class="rq-t">지금 가장 궁금한 건<br><span class="g">무엇인가요?</span></div>
+      <p class="rq-s">궁금한 것 하나만 고르시면 됩니다<br>
+      <span class="rq-ladder">처음이시면 <b>1,900원</b>으로 먼저 확인해 보셔도 됩니다</span></p>
+    </div>
+
+    <a class="rt-card entry" href="/product/detail.html?product_no=14">
+      <span class="rt-badge b-entry">부담없이</span>
+      <span class="rt-tag">좋은 날은 잡고, 나쁜 날은 피하고</span>
+      <span class="rt-t">오늘부터 30일, 나에게 무슨 일이</span>
+      <span class="rt-d">지금 이 순간의 행성 위치를 내 차트에 겹쳐 계산합니다. 움직여야 할 날과 조심할 날을 <b style="color:#9fb4e8">날짜로</b> 짚어드립니다.</span>
+      <span class="rt-p"><span class="now">1,900원</span><span class="go">보러 가기 →</span></span>
+    </a>
+
+    <a class="rt-card couple" href="/product/detail.html?product_no=15">
+      <span class="rt-badge b-new">NEW</span>
+      <span class="rt-tag">우리 관계가 궁금하다면</span>
+      <span class="rt-t">우리 궁합, A부터 Z까지</span>
+      <span class="rt-d">두 사람의 출생 차트를 겹쳐 <b style="color:#e8c766">64개 조합의 실제 각도</b>를 계산합니다. 어디서 맞물리고 어디서 부딪히는지가 숫자로 나옵니다.</span>
+      <span class="rt-p"><span class="was">19,900원</span><span class="now">14,900원</span><span class="go">보러 가기 →</span></span>
+    </a>
+
+    <!-- ★추가 : 양육설명서(17번) -->
+    <a class="rt-card kid" href="/product/detail.html?product_no=17">
+      <span class="rt-badge b-kid">아이 키우는 분이라면</span>
+      <span class="rt-tag">아는 만큼 편해집니다</span>
+      <span class="rt-t">📘 우리 아이 양육설명서</span>
+      <span class="rt-d">아이 기질 네 축과, <b style="color:#e8c766">언제 무슨 시기가 오는지</b>를 계산합니다. 이미 지나간 시기부터 맞혀 드리니 맞는지 먼저 확인해 보세요.</span>
+      <span class="rt-p"><span class="now">24,900원</span><span class="lnc">런칭가</span><span class="go">보러 가기 →</span></span>
+    </a>
+
+    <a class="rt-card spouse" href="/product/detail.html?product_no=9">
+      <span class="rt-badge b-best">BEST</span>
+      <span class="rt-tag">아직 만나지 못했다면</span>
+      <span class="rt-t">내 배우자는 어떤 사람일까</span>
+      <span class="rt-d">7하우스(결혼의 방)를 열어 앞으로 만날 사람의 <b style="color:#c9b6e8">외모·직업·성격</b>, 그리고 만나는 시기를 읽습니다.</span>
+      <span class="rt-p"><span class="now">9,900원</span><span class="go">보러 가기 →</span></span>
+    </a>
+
+    <a class="rt-card vvip" href="/product/detail.html?product_no=11">
+      <span class="rt-badge b-sig">시그니처</span>
+      <span class="rt-tag">인생 전체를 다시 설계하고 싶다면</span>
+      <span class="rt-t">내가 반복해서 넘어지는 <span class="rd">진짜 이유</span></span>
+      <span class="rt-d">무의식의 방해 공작, 타고난 재능과 <b style="color:#ff8a80">두각을 나타낼 직군 3가지</b>, 운이 뚫리는 골든타임, 그리고 10대~80대 인생 점수표까지.</span>
+      <span class="rt-p"><span class="was">1:1 상담 150,000원</span><span class="now rd-p">29,900원</span><span class="go rd-go">보러 가기 →</span></span>
+    </a>
+  </section>
+
+
+  <!-- ============ 1-B1. 후기 (라우터 직후) ============
+       ⚠️ 반드시 실제 구매 고객의 후기만 사용하세요. -->
+  <section class="wrap reviews reveal">
+    <h2 class="sec-title">최신 베스트 후기 <span class="gold"></span></h2>
+    <p class="sec-sub">런칭 한달만에 재방문률 1위</p>
+    <div class="rv-hint">옆으로 슥 넘겨보세요 👉</div>
+    <div class="rv-track">
+    <div class="rv-card best">
+      <div class="rv-head"><span class="rv-who">최**님 (33세, 여)</span><span class="rv-star">★★★★★</span></div>
+      <span class="rv-tag t-couple">궁합 리포트</span>
+      <p class="rv-txt">"친구 추천으로 반신반의하면서 봤는데 생각보다 너무 소름 돋았어요. 서로 왜 자꾸 <strong>같은 문제로 부딪히는지</strong>, 누가 먼저 다가가는 스타일인지까지 구체적으로 나오더라고요. 특히 '잘 맞지만 <strong>감정 표현 방식이 달라 오해가 생긴다</strong>'는 부분이 저희랑 너무 똑같았어요. 잘 맞는다고만 하는 게 아니라 어떻게 하면 더 오래 갈지 <strong>조언까지</strong> 있어서 좋았습니다."</p>
+    </div>
+    <div class="rv-card">
+      <div class="rv-head"><span class="rv-who">박**님 (34세, 여)</span><span class="rv-star">★★★★★</span></div>
+      <span class="rv-tag t-spouse">배우자 리포트</span>
+      <p class="rv-txt">"가족들도 찐친들도 모르게 결정사 가입하기 직전이었습니다. 처음엔 반신반의했는데, 그동안의 연애패턴과 평소에 묘하게 끌리던 스타일도 잡아내고 무엇보다 저에 대한 <strong>분석결과</strong>가 너무 똑같아서 소름 돋았습니다. 제가 늘 실패하던 연애 패턴을 정확히 짚어내고, 내년에 만날 사람의 <strong>직업과 분위기</strong>까지 상세히 알려주네요. <strong>만나는 시기 찍어주신 거</strong> 캘린더에 박아놨어요!"</p>
+    </div>
+    <div class="rv-card">
+      <div class="rv-head"><span class="rv-who">전**님 (42세, 남)</span><span class="rv-star">★★★★★</span></div>
+      <span class="rv-tag t-spouse">배우자 리포트</span>
+      <p class="rv-txt">"일단 개발자로서 잘 만들어져서 해봤고, 기대 안 했는데 <strong>우리 엄마랑 누나가 보던 신점보다 더 잘 맞춤</strong> ㅋ"</p>
+    </div>
+    <div class="rv-card">
+      <div class="rv-head"><span class="rv-who">이**님 (29세, 여)</span><span class="rv-star">★★★★★</span></div>
+      <span class="rv-tag t-vvip">VVIP 리포트</span>
+      <p class="rv-txt">"내 배우자는 도대체 어디있나 궁금해서 해봤고 1차 소름이었는데, <strong>1:1 인생 전략 컨설턴트</strong>까지 밥 한 끼 값이라 생각하고 봤어요. 지금 주변에 7명 넘게 추천하고 있습니다. 제가 긴가민가했던 재능으로 <strong>앞으로 어떻게 무슨 일을 해야 할지</strong> 그림이 그려집니다."</p>
+    </div>
+    <div class="rv-card">
+      <div class="rv-head"><span class="rv-who">최**님 (31세, 남)</span><span class="rv-star">★★★★★</span></div>
+      <span class="rv-tag t-spouse">배우자 리포트</span>
+      <p class="rv-txt">"남자지만 답답해서 봤습니다. 뜬구름 잡는 소리 안 하고 현실적으로 제 결핍을 채워줄 배우자상을 알려줘서 좋았습니다. 어설픈 사주 볼 바엔 무조건 이거 보세요."</p>
+    </div>
+    <!-- ★양육 후기가 쌓이면 여기 맨 앞에 아래 형태로 추가하세요 (실제 후기만!)
+    <div class="rv-card best">
+      <div class="rv-head"><span class="rv-who">○**님 (39세, 여)</span><span class="rv-star">★★★★★</span></div>
+      <span class="rv-tag t-child">양육설명서</span>
+      <p class="rv-txt">(실제 후기 원문)</p>
+    </div>
+    -->
+  </div>
+    <div class="rv-dots" id="rv-dots"></div>
+  </section>
+
+  <!-- ============ 1-B2. 정밀함 3줄 + 스펙 바 ============ -->
+  <section class="wrap trust reveal">
+    <div class="tr-row">
+      <span class="tr-ico">📐</span>
+      <div><b>홀사인(Whole Sign) 하우스 방식</b>
+      <p>헬레니즘 시대부터 쓰인 정통 방식입니다. 경계에 걸친 행성이 <span class="tr-hl">엉뚱한 방으로 잘못 배정되는 오류</span>가 없습니다.</p></div>
+    </div>
+    <div class="tr-row">
+      <span class="tr-ico">🛰️</span>
+      <div><b>실제 천체력(에페메리스) 계산</b>
+      <p>미리 써둔 원고를 꺼내 쓰지 않습니다. 태어난 순간의 <span class="tr-hl">행성 좌표를 그 자리에서 계산</span>해 1:1로 씁니다.</p></div>
+    </div>
+    <div class="tr-row">
+      <span class="tr-ico">🔒</span>
+      <div><b>모르는 건 지어내지 않습니다</b>
+      <p>태어난 시간을 모르면 그에 좌우되는 항목을 <span class="tr-hl">계산에서 뺍니다.</span> 정오를 몰래 넣고 아는 척하지 않습니다.</p></div>
+    </div>
+
+    <div class="spec-bar">
+      <span>홀사인 하우스</span><span>트로피컬 황도</span><span>실시간 궤도 계산</span><span>재현 가능한 결과</span>
+    </div>
+  </section>
+
+
+  <!-- ============ 1-C. 전문가 스토리 ============ -->
+  <section class="wrap story reveal">
+    <div class="story-badge">WHY ASTRANOTE</div>
+    <h3>사주를 오래 보다가,<br><span class="g">서양 점성술로 넘어온 이유</span></h3>
+
+    <p>저는 원래 <b>명리학(사주)</b>을 공부했습니다. 오래 봤습니다. 그런데 늘 걸리는 게 있었습니다. 사주는 태어난 <span class="hl">연·월·일·시 네 글자</span>로 사람을 읽습니다. 같은 시각에 태어난 사람은 같은 사주를 갖습니다.</p>
+
+    <p>서양 점성술은 다릅니다. 태어난 그 순간 하늘에 있던 <b>행성 열 개의 정확한 좌표</b>를 씁니다. 태어난 도시가 다르면 차트가 달라지고, 4분만 차이 나도 상승점이 1도 움직입니다.</p>
+
+    <div class="story-quote">
+      "같은 날 같은 시에 태어나도,<br>서울에서 태어난 사람과 부산에서 태어난 사람은<br>다른 차트를 갖습니다."
+    </div>
+
+    <p>이과 출신이라 그런지, 저는 이 <b>계산되는 정밀함</b>에 설득당했습니다. 그리고 3년쯤 전, 제 네이탈 차트의 7하우스를 다시 들여다봤습니다. 거기 적힌 배우자의 특징이 —</p>
+
+    <p><span class="hl">지금 제 옆에 있는 사람과 정확히 맞아떨어졌습니다.</span></p>
+
+    <p>그때부터 이 작업을 시작했습니다. 아스트라노트의 모든 리포트는 <b>실제 천체력(에페메리스) 계산</b> 위에서 만들어집니다. 감으로 쓰지 않고, <b>모르는 것은 지어내지 않습니다.</b></p>
+  </section>
+
+  <!-- ============ 1-C2. 리포트별 수록 내용 ============
+       ★위치 : "가장 많이 찾는 리포트" 안내선 바로 앞.
+
+       여기가 맞는 이유는, 이 아래부터 배우자 리포트 딥다이브가
+       시작되기 때문이다. 한 상품을 깊게 파기 직전에
+       "다른 상품엔 뭐가 들어 있는지" 를 한 번 정리해 주면
+       손님이 자기에게 맞는 것을 고르고 내려갈 수 있다.
+
+       ★내용 : 예시 문장 → 수록 항목 목차형으로 교체.
+       문장은 읽어야 알지만 항목은 훑기만 해도 들어온다.
+       상품을 고르기 직전 자리라 읽는 속도가 중요하다.
+
+       ★시너스트리 그림(행성 8개 × 8개)을 궁합 카드 안으로 넣었다.
+       원래 별도 섹션이었는데, 그림만 따로 떠 있으면 어느 상품 얘기인지
+       모른 채 지나간다. 궁합 카드 안에 있으면 그 상품의 근거가 된다.
+       ============================================ -->
+  <section class="wrap main-ex reveal">
+    <h2 class="sec-title">각 리포트 <span class="gold">주요 내용</span></h2>
+    <p class="sec-sub">아래는 일부입니다 · 두루뭉술한 덕담은 한 줄도 없습니다</p>
+
+    <div class="mx-card p-spouse">
+      <span class="mx-name">미래 배우자 추적 리포트</span>
+      <span class="mx-price">9,900원 <em class="mx-vol">전 7장</em></span>
+      <ul class="mx-list">
+        <li>그 사람을 <b>만나는 시기</b> — 연도와 계절까지</li>
+        <li>배우자의 <b>얼굴과 외모</b>, 첫인상의 분위기</li>
+        <li>그 사람의 <b>직업</b>과 사회적 위치</li>
+        <li>내 <b>연애운·결혼운이 정점에 오르는 시기</b></li>
+        <li><span class="mx-em">이 사람을 놓치지 않으려면 해야 할 것</span></li>
+        <li class="mx-more">그 외 내 안의 결핍과 반복되는 연애 패턴, 첫 만남의 장소, 그 사람이 사랑하는 방식 등</li>
+      </ul>
+    </div>
+
+    <div class="mx-card p-couple">
+      <span class="mx-name">그 사람과 나의 궁합 파헤치기</span>
+      <span class="mx-price">14,900원 <em class="mx-vol">전 9장</em></span>
+      <div class="sv-cap">두 사람의 차트를 겹치면</div>
+      <svg viewBox="0 0 320 190" class="sv-svg">
+      <defs>
+      <radialGradient id="svA" cx="50%" cy="50%">
+      <stop offset="60%" stop-color="rgba(179,157,219,0)"></stop><stop offset="100%" stop-color="rgba(179,157,219,.22)"></stop>
+      </radialGradient>
+      <radialGradient id="svB" cx="50%" cy="50%">
+      <stop offset="60%" stop-color="rgba(212,175,55,0)"></stop><stop offset="100%" stop-color="rgba(212,175,55,.22)"></stop>
+      </radialGradient>
+      </defs>
+      <circle cx="118" cy="95" r="66" fill="url(#svA)" stroke="rgba(179,157,219,.55)" stroke-width="1.2"></circle>
+      <circle cx="202" cy="95" r="66" fill="url(#svB)" stroke="rgba(212,175,55,.6)" stroke-width="1.2"></circle>
+      <g stroke="rgba(240,215,123,.55)" stroke-width=".9">
+      <line x1="70" y1="66" x2="245" y2="120"></line><line x1="82" y1="132" x2="238" y2="62"></line>
+      <line x1="118" y1="29" x2="202" y2="161"></line><line x1="118" y1="161" x2="202" y2="29"></line>
+      <line x1="60" y1="95" x2="260" y2="95"></line><line x1="76" y1="52" x2="230" y2="145"></line>
+      </g>
+      <g fill="#b39ddb">
+      <circle cx="70" cy="66" r="3.4"></circle><circle cx="82" cy="132" r="3.4"></circle>
+      <circle cx="118" cy="29" r="3.4"></circle><circle cx="118" cy="161" r="3.4"></circle>
+      <circle cx="60" cy="95" r="3.4"></circle><circle cx="76" cy="52" r="3.4"></circle>
+      </g>
+      <g fill="#f0d77b">
+      <circle cx="245" cy="120" r="3.4"></circle><circle cx="238" cy="62" r="3.4"></circle>
+      <circle cx="202" cy="29" r="3.4"></circle><circle cx="202" cy="161" r="3.4"></circle>
+      <circle cx="260" cy="95" r="3.4"></circle><circle cx="230" cy="145" r="3.4"></circle>
+      </g>
+      <ellipse cx="160" cy="95" rx="24" ry="60" fill="rgba(240,215,123,.07)" stroke="rgba(240,215,123,.3)" stroke-width=".8" stroke-dasharray="3 3"></ellipse>
+      </svg>
+      <div class="sv-txt"><b>행성 8개 × 8개, 64개 조합</b>의 실제 각도가 나옵니다.<br>어디서 맞물리고 어디서 부딪히는지가 숫자로 찍힙니다.</div>
+      <ul class="mx-list">
+        <li>두 사람이 <b>어디서 맞물리고 어디서 부딪히는지</b></li>
+        <li>반복해서 싸우는 지점 — <span class="mx-em">대사가 들릴 만큼 구체적으로</span></li>
+        <li>이 관계가 <b>어떤 종류의 인연</b>인가</li>
+        <li>관계가 흔들리거나 도약하는 <b>시기</b></li>
+        <li>연인·부부라면 <b>결혼생활까지</b></li>
+        <li class="mx-more">그 외 감정이 오가는 방식, 끌림의 정체, 이 사람 사용법, 지켜야 할 것 등</li>
+      </ul>
+    </div>
+
+    <div class="mx-card p-kid">
+      <span class="mx-name">📘 우리 아이 양육설명서</span>
+      <span class="mx-price">24,900원 <em class="mx-vol">전 9장</em></span>
+      <ul class="mx-list">
+        <li>이 아이의 <b>기질과 성격</b> — 네 축의 위치로</li>
+        <li>아이가 <b>두각을 보일 곳</b></li>
+        <li><span class="mx-em">아이와 나의 기질 차이에서 오는 오해</span></li>
+        <li>언제 어떤 시기가 오는지 — <b>성장 분기점</b></li>
+        <li class="mx-more">그 외 밖에서 보이는 얼굴, 이 아이의 속도, 칭찬이 닿는 통로, 앞으로 10년 등</li>
+      </ul>
+    </div>
+
+    <div class="mx-card p-month">
+      <span class="mx-name">이번 달 운세</span>
+      <span class="mx-price">1,900원 <em class="mx-vol">전 8장</em></span>
+      <ul class="mx-list">
+        <li>이번 달 <b>연애운</b></li>
+        <li>이번 달 <b>금전운</b></li>
+        <li>이번 달 <b>대인관계운</b></li>
+        <li><span class="mx-em">흐름을 바꾸는 개운법</span></li>
+        <li class="mx-more">그 외 일과 성취, 몸과 컨디션, 움직이면 좋은 날, 조심할 날 등</li>
+      </ul>
+    </div>
+
+    <p class="mx-note">항목마다 <b>당신의 차트에서 계산된 근거</b>가 붙습니다.<br>누구에게나 맞는 말은 쓰지 않습니다.</p>
+  </section>
+
+  <!-- ============ 1-D. 주력 상품 안내선 ============
+       여기서부터 페이지 끝까지는 배우자 리포트(9,900원) 상세 설명이다. -->
+  <section class="wrap anchor-line reveal">
+    <div class="al-line"></div>
+    <div class="al-txt">MOST POPULAR</div>
+    <div class="al-title">가장 많이 찾는 리포트</div>
+  </section>
+
+  <section class="wrap hero spouse-hero reveal">
+    <div class="badge">더 이상의 감정 소모는 끝내십시오</div>
+    <h1>당신의 배우자는<br><span class="gold">태어날 때 이미 정해져 있습니다</span></h1>
+    <div class="hero-desc">
+      아직도 언제 나타날지 모르는 인연을 기다리며 소개팅 어플과 무의미한 만남에 의존하십니까?<br><br>
+      서양 사주 속 당신의 출생 차트 <strong>[7하우스 : 결혼의 방]</strong>에는 당신이 만나게 될 <strong>마지막 인연의 외모, 직업, 시기</strong>가 이미 명확하게 새겨져 있습니다.
+    </div>
+  </section>
+
+  <!-- ============ 2. 차트 휠 ============ -->
+  <section class="wrap wheel-sec reveal">
+    <div class="wheel-box">
+      <div class="wheel-glow"></div>
+      <svg class="wheel-svg" width="300" height="300" viewBox="0 0 520 520">
+        <defs>
+          <radialGradient id="g7" cx="50%" cy="50%" r="65%">
+            <stop offset="0%" stop-color="#e8c766" stop-opacity=".55"></stop>
+            <stop offset="100%" stop-color="#e8c766" stop-opacity=".08"></stop>
+          </radialGradient>
+        </defs>
+        <circle cx="260" cy="260" r="252" fill="none" stroke="rgba(212,175,55,.3)" stroke-width="2"></circle>
+        <path d="M 10,260 A 250,250 0 0 0 43.5,135 L 130.1,185 A 150,150 0 0 1 110,260 Z" fill="rgba(255,255,255,.03)" stroke="rgba(212,175,55,.25)"></path>
+        <path d="M 43.5,135 A 250,250 0 0 0 135,43.5 L 185,130.1 A 150,150 0 0 1 130.1,185 Z" fill="rgba(255,255,255,.03)" stroke="rgba(212,175,55,.25)"></path>
+        <path d="M 135,43.5 A 250,250 0 0 0 260,10 L 260,110 A 150,150 0 0 1 185,130.1 Z" fill="rgba(255,255,255,.03)" stroke="rgba(212,175,55,.25)"></path>
+        <path d="M 260,10 A 250,250 0 0 0 385,43.5 L 335,130.1 A 150,150 0 0 1 260,110 Z" fill="rgba(255,255,255,.03)" stroke="rgba(212,175,55,.25)"></path>
+        <path d="M 385,43.5 A 250,250 0 0 0 476.5,135 L 389.9,185 A 150,150 0 0 1 335,130.1 Z" fill="rgba(255,255,255,.03)" stroke="rgba(212,175,55,.25)"></path>
+        <path d="M 476.5,135 A 250,250 0 0 0 510,260 L 410,260 A 150,150 0 0 1 389.9,185 Z" fill="rgba(255,255,255,.03)" stroke="rgba(212,175,55,.25)"></path>
+        <path d="M 510,260 A 250,250 0 0 0 476.5,385 L 389.9,335 A 150,150 0 0 1 410,260 Z" fill="url(#g7)" stroke="#e8c766" stroke-width="3"></path>
+        <path d="M 476.5,385 A 250,250 0 0 0 385,476.5 L 335,389.9 A 150,150 0 0 1 389.9,335 Z" fill="rgba(255,255,255,.03)" stroke="rgba(212,175,55,.25)"></path>
+        <path d="M 385,476.5 A 250,250 0 0 0 260,510 L 260,410 A 150,150 0 0 1 335,389.9 Z" fill="rgba(255,255,255,.03)" stroke="rgba(212,175,55,.25)"></path>
+        <path d="M 260,510 A 250,250 0 0 0 135,476.5 L 185,389.9 A 150,150 0 0 1 260,410 Z" fill="rgba(255,255,255,.03)" stroke="rgba(212,175,55,.25)"></path>
+        <path d="M 135,476.5 A 250,250 0 0 0 43.5,385 L 130.1,335 A 150,150 0 0 1 185,389.9 Z" fill="rgba(255,255,255,.03)" stroke="rgba(212,175,55,.25)"></path>
+        <path d="M 43.5,385 A 250,250 0 0 0 10,260 L 110,260 A 150,150 0 0 1 130.1,335 Z" fill="rgba(255,255,255,.03)" stroke="rgba(212,175,55,.25)"></path>
+        <text x="66.8" y="208.2" fill="rgba(255,255,255,.55)" font-size="15" font-weight="700" font-family="Cinzel,Georgia,serif" text-anchor="middle">I</text>
+        <text x="118.6" y="118.6" fill="rgba(255,255,255,.55)" font-size="15" font-weight="700" font-family="Cinzel,Georgia,serif" text-anchor="middle">II</text>
+        <text x="208.2" y="66.8" fill="rgba(255,255,255,.55)" font-size="15" font-weight="700" font-family="Cinzel,Georgia,serif" text-anchor="middle">III</text>
+        <text x="311.8" y="66.8" fill="rgba(255,255,255,.55)" font-size="15" font-weight="700" font-family="Cinzel,Georgia,serif" text-anchor="middle">IV</text>
+        <text x="401.4" y="118.6" fill="rgba(255,255,255,.55)" font-size="15" font-weight="700" font-family="Cinzel,Georgia,serif" text-anchor="middle">V</text>
+        <text x="453.2" y="208.2" fill="rgba(255,255,255,.55)" font-size="15" font-weight="700" font-family="Cinzel,Georgia,serif" text-anchor="middle">VI</text>
+        <text x="453.2" y="316" fill="#050505" font-size="22" font-weight="900" font-family="Cinzel,Georgia,serif" text-anchor="middle">VII</text>
+        <text x="401.4" y="401.4" fill="rgba(255,255,255,.55)" font-size="15" font-weight="700" font-family="Cinzel,Georgia,serif" text-anchor="middle">VIII</text>
+        <text x="311.8" y="453.2" fill="rgba(255,255,255,.55)" font-size="15" font-weight="700" font-family="Cinzel,Georgia,serif" text-anchor="middle">IX</text>
+        <text x="208.2" y="453.2" fill="rgba(255,255,255,.55)" font-size="15" font-weight="700" font-family="Cinzel,Georgia,serif" text-anchor="middle">X</text>
+        <text x="118.6" y="401.4" fill="rgba(255,255,255,.55)" font-size="15" font-weight="700" font-family="Cinzel,Georgia,serif" text-anchor="middle">XI</text>
+        <text x="66.8" y="311.8" fill="rgba(255,255,255,.55)" font-size="15" font-weight="700" font-family="Cinzel,Georgia,serif" text-anchor="middle">XII</text>
+        <circle cx="260" cy="260" r="150" fill="#0a0710" stroke="rgba(212,175,55,.3)" stroke-width="1.5"></circle>
+        <text x="260" y="252" fill="#e8c766" font-size="19" font-weight="700" font-family="'Noto Serif KR',serif" text-anchor="middle">7 HOUSE</text>
+        <text x="260" y="283" fill="rgba(255,255,255,.65)" font-size="16" font-family="'Noto Sans KR',sans-serif" text-anchor="middle">결혼의 방</text>
+      </svg>
+      <div class="wheel-tag">여기 있습니다</div>
+    </div>
+    <p class="wheel-cap">태어난 순간, 하늘의 행성 배치를 그대로 계산한<br>당신만의 출생 차트에서 <b>7하우스</b>를 정밀 해석합니다.</p>
+  </section>
+  <!-- ============ 3. 메커니즘 ============ -->
+  <section class="wrap phil reveal">
+    <div class="phil-quote">ASTROLOGY CHART</div>
+    <div class="phil-box">
+      <p><strong>"동양에 사주팔자가 있다면,<br>서양에는 네이탈 차트(Natal Chart)가 있습니다."</strong></p>
+      <p>단순한 통계가 아닙니다. 당신이 태어난 정확한 시간, 그 순간 우주의 행성들이 어느 위치에 있었는지를 수학적으로 계산하는 <strong>정밀 천체 공학</strong>입니다.</p>
+      <p>막연하게 "올해 결혼운 들어오네"가 아닙니다.<br><strong>"내년 가을, 전문직에 종사하는 선이 굵은 체형의 사람"</strong>이라고 외과의사의 핀셋처럼 짚어냅니다.</p>
+    </div>
+  </section>
+  <!-- ============ 4. 리포트 미리보기 ============ -->
+  <section class="wrap reveal">
+    <h2 class="sec-title">운명 리포트 <span class="gold">미리보기</span></h2>
+    <p class="sec-sub">결제 즉시 흐려진 부분이 모두 공개됩니다</p>
+    <div class="preview-card">
+      <div class="pv-head"><b>미래 배우자 분석 결과</b><span>SAMPLE REPORT · 7 HOUSE READING</span></div>
+      <div class="pv-row"><div class="pv-label">👁️ 외모 &amp; 첫인상</div><div class="pv-value blur">선이 굵고 눈매가 또렷한 편</div></div>
+      <div class="pv-row"><div class="pv-label">💼 직업 &amp; 사회적 위치</div><div class="pv-value blur">전문직 계열, 안정적인 재물운</div></div>
+      <div class="pv-row"><div class="pv-label">⏳ 결정적 만남의 시기</div><div class="pv-value open-v">20XX년 가을 🔓</div></div>
+      <div class="pv-row"><div class="pv-label">💫 그 사람이 사랑하는 방식</div><div class="pv-value blur">표현보다 행동으로 보여주는 편</div></div>
+    </div>
+  </section>
+
+  <!-- ============ 5. 구성품 ============ -->
+  <section class="wrap reveal">
+    <div class="spec">
+      <div class="spec-title">이 리포트에 담기는 것</div>
+      <div class="spec-row"><span class="spec-ico">📜</span><div><b>1:1 맞춤 심층 분석 리포트</b><p>결제 즉시 자동 생성되는 나만의 리포트를 화면에서 바로 확인하고, 고화질 이미지로 저장해 소장할 수 있습니다.</p></div></div>
+      <div class="spec-row"><span class="spec-ico">🔭</span><div><b>출생 순간 행성 배치 정밀 계산</b><p>생년월일시와 출생 지역 기준으로 네이탈 차트를 산출합니다.</p></div></div>
+      <div class="spec-row"><span class="spec-ico">💍</span><div><b>7하우스(결혼의 방) 집중 해석</b><p>배우자와 결혼을 관장하는 영역만 깊게 파고듭니다.</p></div></div>
+      <div class="spec-row"><span class="spec-ico">🎁</span><div><b>보너스 : 피해야 할 관계의 함정</b><p>이 인연을 지키기 위해 반드시 알아야 할 주의점을 담았습니다.</p></div></div>
+    </div>
+  </section>
+  <!-- ============ 6. 목차 ============ -->
+  <section class="wrap toc reveal">
+    <h2 class="sec-title">운명 리포트 심층 목차</h2>
+    <p class="sec-sub">결제 즉시 아래의 <strong style="color:#d4af37;">7가지 핵심 해답</strong>을 제공합니다</p>
+    <div class="toc-item"><div class="toc-n">01</div><div><b>시선을 빼앗는 그 사람의 외모</b><p>미래 배우자의 이목구비, 체형, 전반적인 분위기와 첫인상을 묘사합니다.</p></div></div>
+    <div class="toc-item"><div class="toc-n">02</div><div><b>내 안의 그림자와 무의식적 결핍</b><p>왜 당신의 연애는 늘 비슷한 패턴으로 무너졌을까요? 차트에 숨겨진 심리적 상처와 본질을 해부합니다.</p></div></div>
+    <div class="toc-item"><div class="toc-n">03</div><div><b>현실적인 직업군과 사회적 위치</b><p>재물운의 크기와 종사하는 구체적인 직업 분야, 사회적 지위를 짚어드립니다.</p></div></div>
+    <div class="toc-item"><div class="toc-n">04</div><div><b>운명이 교차하는 첫 만남의 장소</b><p>어떤 환경과 상황 속에서 두 사람의 눈이 마주치게 될지 예측합니다.</p></div></div>
+    <div class="toc-item"><div class="toc-n">05</div><div><b>결혼운이 폭발하는 결정적 시기</b><p>그 사람과 인연이 닿는 연도와 감정이 폭발하는 구체적 타이밍을 알려드립니다.</p></div></div>
+    <div class="toc-item"><div class="toc-n">06</div><div><b>그 사람의 진짜 성격과 사랑하는 방식</b><p>겉으로 보이는 모습 뒤의 내면, 애정을 표현하는 방식, 당신에게 끌리는 이유를 분석합니다.</p></div></div>
+    <div class="toc-item"><div class="toc-n">07</div><div><b>당신의 사랑을 위한 우주의 조언</b><p>이 인연을 온전히 내 것으로 만들기 위한 지침과, 반드시 피해야 할 관계의 함정을 담았습니다.</p></div></div>
+  </section>
+  <!-- ============ 7. 진행 방법 ============ -->
+  <section class="wrap howto reveal">
+    <h2 class="sec-title">주문은 이렇게 진행됩니다</h2>
+    <p class="sec-sub">정보 입력부터 리포트 수령까지 3단계</p>
+    <div class="how-step"><div class="how-n">1</div><div><b>출생 정보 입력</b><p>아래 버튼을 누르면 나오는 화면에서 <strong>생년월일 · 태어난 시간 · 지역</strong>을 입력해 주세요.</p></div></div>
+    <div class="how-step"><div class="how-n">2</div><div><b>안전 결제</b><p>카페24 보안 결제 시스템으로 안전하게 결제합니다.</p></div></div>
+    <div class="how-step"><div class="how-n">3</div><div><b>리포트 즉시 수령</b><p>결제 완료 화면에서 리포트가 <strong>즉시 자동 생성</strong>됩니다. 이미지 저장 버튼으로 평생 소장하세요.</p></div></div>
+  </section>
+  <!-- ============ 8. 필수 정보 ============ -->
+  <section class="wrap reveal">
+    <div class="need">
+      <b>📌 분석에 꼭 필요한 정보</b>
+      <ul>
+        <li>생년월일 (양력 기준)</li>
+        <li>태어난 시간 (모르면 대략적인 시간대라도)</li>
+        <li>태어난 지역 (시/군 단위)</li>
+      </ul>
+      <p class="tip">💡 출생 시간은 가족관계등록부(출생신고서)나 태어난 병원 기록에서 확인할 수 있어요. 정확할수록 리포트가 정밀해집니다.</p>
+    </div>
+  </section>
+  <!-- ============ 9. 이런 분께 ============ -->
+  <section class="wrap fit reveal">
+    <h2 class="sec-title">이런 분께 필요합니다</h2>
+    <p class="sec-sub">하나라도 해당된다면, 차트를 열어볼 때입니다</p>
+    <div class="fit-item"><span class="fit-check">✓</span><p>연애가 매번 비슷한 패턴으로 끝나는 분</p></div>
+    <div class="fit-item"><span class="fit-check">✓</span><p>결혼정보회사 가입을 고민 중인 분</p></div>
+    <div class="fit-item"><span class="fit-check">✓</span><p>"내 인연은 대체 언제, 어디서?"가 궁금한 분</p></div>
+    <div class="fit-item"><span class="fit-check">✓</span><p>사주는 여러 번 봤지만 답을 못 얻은 분</p></div>
+  </section>
+  <!-- ============ 10. 가격 ============ -->
+  <section class="wrap price-sec reveal">
+    <div class="price-box">
+      <div class="price-line">7가지 심층 분석이 담긴 운명 리포트</div>
+      <div class="price-big">9,900<small>원</small></div>
+      <p class="price-note">커피 두 잔 값으로, 몇 년째 답이 없던<br>연애의 방향을 확인해 보세요.</p>
+    </div>
+  </section>
+  <!-- ============ 12. FAQ ============ -->
+  <section class="wrap faq reveal">
+    <h2 class="sec-title">자주 묻는 질문</h2>
+    <p class="sec-sub">결제 전 궁금한 점을 확인하세요</p>
+    <div class="faq-item">
+      <button class="faq-q" type="button">상품이 여러 개인데 뭘 골라야 하나요?<span class="arrow">▼</span></button>
+      <!-- ★수정 : 양육설명서 안내 추가 -->
+      <div class="faq-a"><p>지금 가장 궁금한 것 하나만 고르시면 됩니다. <strong>처음이시라면 1,900원 30일 운세</strong>로 리포트가 어떤 수준인지 먼저 확인해 보시는 분이 많습니다. 마음에 걸리는 사람이 있으면 <strong>궁합</strong>, 아직 만나지 못했다면 <strong>배우자 분석</strong>, <strong>아이를 키우고 계신다면 우리 아이 양육설명서</strong>가 맞습니다.</p></div>
+    </div>
+    <!-- ★추가 : 양육 FAQ -->
+    <div class="faq-item">
+      <button class="faq-q" type="button">아이 리포트는 아이한테 안 좋은 얘기가 나오나요?<span class="arrow">▼</span></button>
+      <div class="faq-a"><p>아닙니다. <strong>아이를 진단하거나 규정하지 않습니다.</strong> 어떤 병명도, "문제아" 같은 표현도 쓰지 않습니다. 기질에는 좋고 나쁨이 없고 다루는 방법만 다릅니다. 부딪히는 지점을 말할 때도 아이 탓으로 쓰지 않고 <strong>부모와 아이 두 차트의 각도</strong>로 씁니다.</p></div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" type="button">궁합은 상대방 정보가 꼭 필요한가요?<span class="arrow">▼</span></button>
+      <div class="faq-a"><p>상대방의 <strong>생년월일과 태어난 지역</strong>이 필요합니다. 태어난 시간은 모르셔도 됩니다. 다만 그 경우 시간에 좌우되는 항목은 <strong>계산에서 빼고</strong> 드립니다. 모르는 것을 추측해서 채우지 않습니다.</p></div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" type="button">태어난 시간을 정확히 모르면 어떻게 하나요?<span class="arrow">▼</span></button>
+      <div class="faq-a"><p>출생 시간은 <strong>가족관계등록부(출생신고서)</strong> 또는 태어난 병원 기록에서 확인할 수 있습니다. 대략적인 시간대(예: 새벽, 오전)만 알아도 분석이 가능하며, 정확할수록 리포트의 정밀도가 올라갑니다.</p></div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" type="button">리포트는 결제 후 언제 받을 수 있나요?<span class="arrow">▼</span></button>
+      <div class="faq-a"><p>결제가 완료되면 결과 화면에서 <strong>즉시 자동 생성</strong>됩니다. 보통 1~2분 안에 전체 리포트가 열리며, 고화질 이미지로 저장하실 수 있습니다. 화면이 꺼져도 재접속하면 다시 보실 수 있습니다.</p></div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" type="button">환불이 가능한가요?<span class="arrow">▼</span></button>
+      <div class="faq-a"><p>1:1 맞춤형 디지털 콘텐츠 특성상 <strong>결제 즉시 분석이 시작</strong>되어, 리포트가 생성·제공된 이후에는 환불이 어렵습니다. 단, 시스템 오류로 리포트가 정상 제공되지 않은 경우에는 <strong>재발송 또는 전액 환불</strong>해 드립니다. 자세한 규정은 하단의 <strong>환불 및 취소 규정</strong>을 확인해 주세요.</p></div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" type="button">사주와는 뭐가 다른가요?<span class="arrow">▼</span></button>
+      <div class="faq-a"><p>사주는 연·월·일·시 네 기둥으로 보지만, 네이탈 차트는 태어난 순간 <strong>실제 하늘의 행성 위치를 좌표로 계산</strong>해 12개의 하우스로 삶의 영역을 나눠 읽습니다. 그중 7하우스가 배우자와 결혼을 관장하는 영역입니다.</p></div>
+    </div>
+  </section>
+  <!-- ============ 13. VIP 업셀 ============ -->
+  <div class="wrap reveal">
+    <a href="/product/detail.html?product_no=11" class="vip">
+      <span class="vip-badge">👑 1:1 PRIVATE CONSULTING</span>
+      <h4>노력해도 제자리인 당신을 위한<br><strong>나만의 '1:1 인생 전략 컨설턴트'</strong></h4>
+      <p>내 삶을 갉아먹는 무의식의 흉터 <b>[진단]</b>부터<br>
+      결핍을 돈과 권력으로 바꾸는 <b>[1급비밀]</b>,<br>
+      대운이 폭발하는 결정적 <b>[타이밍과 행동 전략]</b>까지.<br><br>
+      단돈 29,900원으로 내 앞에<br>운명 전략가를 고용하십시오.</p>
+      <span class="vip-cta">🗝️ 내 전속 VVIP 컨설턴트 고용하기</span>
+    </a>
+  </div>
+  <!-- ============ 마지막 푸시 ============ -->
+  <section class="wrap final reveal">
+    <h3>당신의 인연은<br><span class="gold">이미 차트 위에 있습니다</span></h3>
+    <p>커피 두 잔 값, 9,900원.<br>몇 년째 답이 없던 질문의 방향을 확인해 보세요.</p>
+  </section>
+  <!-- ============ 푸터 ============ -->
+  <footer class="footer">
+    <div class="f-links">
+      <a href="/member/mall_agreement.html" target="_blank">이용약관</a> |
+      <a href="/member/privacy.html" target="_blank"><strong>개인정보처리방침</strong></a> |
+      <a href="/shopinfo/guide.html" target="_blank">환불 및 취소 규정</a>
+    </div>
+    <div class="biz">
+      <strong>상호명</strong> : 아스트라노트 | <strong>대표</strong> : 고재인<br>
+      <strong>사업자등록번호</strong> : 747-24-02248<br>
+      <strong>통신판매업신고번호</strong> : 통신판매업 신고중<br>
+      <strong>사업장 소재지</strong> : 경기도 용인시 기흥구 중동1139 209<br>
+      <strong>고객센터</strong> : 01055079037 | <strong>astranote7700@gmail.com</strong>
+    </div>
+    <p class="disclaimer">본 서비스는 서양 점성술 이론에 근거한 해석 콘텐츠로, 미래에 대한 사실적 보증을 제공하지 않습니다.</p>
+    <span class="copy">© 2026 ASTRANOTE. ALL RIGHTS RESERVED.</span>
+  </footer>
+  <!-- ============ 하단 고정 CTA ============
+       🚨 이 버튼은 배우자 리포트(9,900원) 전용이다.
+       라우터·궁합·양육·30일운세를 읽는 동안 떠 있으면 가격이 헷갈리고 잘못 산다.
+       그래서 배우자 딥다이브 구간에 들어왔을 때만 나타나게 한다. -->
+  <div class="sticky" id="sticky-cta">
+    <button class="cta-btn" type="button" onclick="goToProduct(this)">
+      <span class="dot"></span> 내 운명의 얼굴 확인하기
+    </button>
+    <p class="cta-sub">단돈 <b>9,900원</b>으로 인생의 해답을 찾으십시오.</p>
+  </div>
+</div>
+<div data-ez-module="user-defined/1" data-ez-name="USER DEFINED" data-ez-type="plain" data-ez="module-1tr5v8w-1"><script>
+/* 후기 캐러셀 : 넘길 때 아래 점이 따라 움직인다 */
+(function () {
+  function initReviewDots() {
+    var track = document.querySelector('.rv-track');
+    var dots = document.getElementById('rv-dots');
+    if (!track || !dots) return;
+
+    var cards = track.querySelectorAll('.rv-card');
+    if (!cards.length) return;
+
+    for (var i = 0; i < cards.length; i++) {
+      var b = document.createElement('i');
+      if (i === 0) b.className = 'on';
+      dots.appendChild(b);
+    }
+    var marks = dots.querySelectorAll('i');
+
+    /* 스크롤 위치로 몇 번째 카드인지 계산 */
+    function sync() {
+      var w = cards[0].offsetWidth + 12;              // 카드 폭 + 간격
+      var idx = Math.round(track.scrollLeft / w);
+      if (idx < 0) idx = 0;
+      if (idx > marks.length - 1) idx = marks.length - 1;
+      for (var i = 0; i < marks.length; i++) {
+        marks[i].className = (i === idx) ? 'on' : '';
+      }
+    }
+    track.addEventListener('scroll', sync, { passive: true });
+    window.addEventListener('resize', sync);
+
+    /* 한 번이라도 넘기면 안내 문구는 할 일을 다 했다 */
+    var hint = document.querySelector('.rv-hint');
+    track.addEventListener('scroll', function once() {
+      if (hint) { hint.style.opacity = '0'; hint.style.transition = 'opacity .4s'; }
+      track.removeEventListener('scroll', once);
+    }, { passive: true, once: true });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initReviewDots);
+  else initReviewDots();
+})();
+
+/* 🚨 하단 고정 CTA 노출 제어
+   배우자 딥다이브(1-D 안내선) 아래로 내려왔을 때만 버튼을 띄운다.
+   그 위 구간에서는 라우터 카드 자체가 CTA이므로 9,900원 버튼이 떠 있으면 안 된다. */
+(function () {
+  function initStickyGate() {
+    var sticky = document.getElementById('sticky-cta');
+    var anchor = document.querySelector('.anchor-line');
+    if (!sticky) return;
+    if (!anchor) { sticky.classList.add('show'); return; }   // 안내선이 없으면 그냥 노출
+
+    function update() {
+      var top = anchor.getBoundingClientRect().top;
+      if (top < window.innerHeight * 0.6) sticky.classList.add('show');
+      else sticky.classList.remove('show');
+    }
+    update();
+    window.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initStickyGate);
+  else initStickyGate();
+})();
+
+/* 상품(결제) 페이지 이동 */
+function goToProduct(btn) {
+  btn.innerHTML = "우주의 문을 여는 중... 🚪";
+  btn.style.opacity = ".9";
+  setTimeout(function () {
+    location.href = "https://jaeinko.cafe24.com/product/detail.html?product_no=9";
+  }, 600);
+}
+/* FAQ 아코디언 */
+document.querySelectorAll(".faq-q").forEach(function (q) {
+  q.addEventListener("click", function () {
+    var item = q.parentElement;
+    var ans = item.querySelector(".faq-a");
+    var isOpen = item.classList.contains("open");
+    document.querySelectorAll(".faq-item.open").forEach(function (o) {
+      o.classList.remove("open");
+      o.querySelector(".faq-a").style.maxHeight = null;
+    });
+    if (!isOpen) {
+      item.classList.add("open");
+      ans.style.maxHeight = ans.scrollHeight + "px";
+    }
+  });
+});
+/* 스크롤 리빌 */
+(function () {
+  var els = document.querySelectorAll(".reveal");
+  if (!("IntersectionObserver" in window)) {
+    els.forEach(function (e) { e.classList.add("on"); });
+    return;
+  }
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) {
+      if (en.isIntersecting) { en.target.classList.add("on"); io.unobserve(en.target); }
+    });
+  }, { threshold: 0.12 });
+  els.forEach(function (e) { io.observe(e); });
+})();
+</script></div>
+<div data-ez-module="user-defined/1" data-ez-name="USER DEFINED" data-ez-type="plain" data-ez="module-07p11hc-1"><script>
+(function () {
+  if (window.__astroBarLoaded) return;
+  window.__astroBarLoaded = true;
+  var BAR_H = 54;      // 바 높이(px)
+  var BAR_H_M = 48;    // 모바일 높이
+  function init() {
+    if (document.getElementById('astro-headbar')) return;
+    var back = encodeURIComponent(location.pathname + location.search);
+    var css = document.createElement('style');
+    css.textContent =
+      '#astro-headbar{position:fixed!important;top:0;left:0;right:0;width:100%;' +
+      'height:' + BAR_H + 'px;z-index:2147483000!important;' +
+      'display:flex!important;align-items:center;justify-content:space-between;' +
+      'padding:0 16px;box-sizing:border-box;' +
+      'background:rgba(10,7,18,.92);backdrop-filter:blur(10px);' +
+      'border-bottom:1px solid rgba(212,175,55,.28);' +
+      "font-family:'Noto Sans KR','Apple SD Gothic Neo',sans-serif;}" +
+      '#astro-headbar .ab-brand{color:#d4af37;font-size:15px;font-weight:800;' +
+      'letter-spacing:1px;text-decoration:none;white-space:nowrap;}' +
+      '#astro-headbar .ab-right{display:flex;gap:8px;align-items:center;}' +
+      '#astro-headbar .ab-right a{display:inline-block;text-decoration:none!important;' +
+      'white-space:nowrap;padding:8px 15px;border-radius:18px;' +
+      'font-size:12.5px;font-weight:700;letter-spacing:-.3px;transition:transform .15s;}' +
+      '#astro-headbar .ab-right a:active{transform:scale(.95);}' +
+      '#ab-login{color:#ddd4ef!important;background:transparent;' +
+      'border:1px solid rgba(179,157,219,.45);}' +
+      '#ab-vault{color:#fff!important;background:linear-gradient(135deg,#d4af37,#8e24aa);' +
+      'border:1px solid rgba(212,175,55,.55);}' +
+      'body{padding-top:' + BAR_H + 'px!important;}' +
+      '@media screen and (max-width:480px){' +
+      '#astro-headbar{height:' + BAR_H_M + 'px;padding:0 12px;}' +
+      '#astro-headbar .ab-brand{font-size:13px;letter-spacing:.5px;}' +
+      '#astro-headbar .ab-right{gap:6px;}' +
+      '#astro-headbar .ab-right a{padding:7px 11px;font-size:11px;border-radius:16px;}' +
+      'body{padding-top:' + BAR_H_M + 'px!important;}}';
+    document.head.appendChild(css);
+    var bar = document.createElement('div');
+    bar.id = 'astro-headbar';
+    bar.innerHTML =
+      '<a class="ab-brand" href="/">🌙 ASTRANOTE</a>' +
+      '<div class="ab-right">' +
+        '<a id="ab-login" href="/member/login.html?returnUrl=' + back + '">로그인</a>' +
+        '<a id="ab-vault" href="/myshop/order/list.html">📜 내 보관소</a>' +
+      '</div>';
+    document.body.insertBefore(bar, document.body.firstChild);
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script></div>
+<div data-ez-module="user-defined/1" data-ez-name="USER DEFINED" data-ez-type="plain" data-ez="module-live0pop-1"><script>
+(function(){
+  var regions=['서울','경기','부산','인천','대구','대전','광주','울산','수원','성남','청주','전주','제주','창원','천안','고양','용인'];
+  var surnames=['김','이','박','최','정','강','조','윤','장','임','한','오','서','신','권','황','안','송'];
+  var products=[
+    {n:'미래 배우자 추적 리포트',w:38},
+    {n:'오늘부터 30일 운세',w:30},
+    {n:'그 사람과 나의 궁합',w:16},
+    {n:'VVIP 심층 리포트',w:9},
+    {n:'우리아이 양육설명서',w:7}
+  ];
+  function pick(a){return a[Math.floor(Math.random()*a.length)];}
+  function pickP(){var r=Math.random()*100,s=0;for(var i=0;i<products.length;i++){s+=products[i].w;if(r<s)return products[i].n;}return products[0].n;}
+  var toast=document.getElementById('liveToast'),m=document.getElementById('ltMain'),sub=document.getElementById('ltSub');
+  function show(){
+    if(!toast||!m||!sub)return;
+    m.innerHTML='<b>'+pick(regions)+'</b>의 '+pick(surnames)+'○○님이 방금 결제했어요';
+    sub.textContent=pick(['방금','1분 전','2분 전','3분 전','5분 전'])+' · '+pickP();
+    toast.classList.add('show');
+    setTimeout(function(){toast.classList.remove('show');},4200);
+  }
+  function loop(){show();setTimeout(loop,17000+Math.random()*15000);}
+  setTimeout(loop,5000);
+  var v=document.getElementById('live-viewers');
+  if(v){var n=17;setInterval(function(){n+=(Math.random()<0.5?-1:1)*(Math.random()<0.3?2:1);if(n<12)n=12;if(n>27)n=27;v.textContent=n;},4000);}
+})();
+</script></div>
+<!--#ez="1/3"-->
