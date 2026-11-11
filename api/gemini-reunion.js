@@ -66,10 +66,10 @@ function normPerson(p, fallbackName) {
 
 /* ── 프롬프트 ─────────────────────────────────────────────── */
 const CONTACT_GUIDE = {
-  '완전히 끊김': '지금 연락이 완전히 끊겨 있다. 7장은 "먼저 연락한다면 언제, 어떤 말로"를 다루되, 연락하지 않는 선택도 똑같이 존중하라.',
-  '가끔 연락': '지금도 가끔 연락이 오간다. 7장은 "이 연락을 관계로 다시 바꿀 때인가, 정리할 때인가"를 다뤄라.',
-  '차단된 상태': '🚨 지금 연락이 차단된 상태다. 상대가 거리를 원한다는 뜻이다. 다른 계정·새 번호·지인을 통하거나 찾아가는 방법은 단 한 글자도 쓰지 마라. 7장은 "상대가 먼저 손을 내민다면 받아도 되는 때"와 "내가 정리하기 좋은 때"로 바꿔 써라.',
-  '친구처럼 지냄': '지금 친구처럼 지내고 있다. 7장은 "선을 다시 넘어도 되는 때인가"를 다뤄라. 친구 관계까지 잃을 위험을 정직하게 짚어라.'
+  '완전히 끊김': '지금 연락이 완전히 끊겨 있다. 8장은 "먼저 연락한다면 언제, 어떤 말로"를 다루되, 연락하지 않는 선택도 똑같이 존중하라.',
+  '가끔 연락': '지금도 가끔 연락이 오간다. 8장은 "이 연락을 관계로 다시 바꿀 때인가, 정리할 때인가"를 다뤄라.',
+  '차단된 상태': '🚨 지금 연락이 차단된 상태다. 상대가 거리를 원한다는 뜻이다. 다른 계정·새 번호·지인을 통하거나 찾아가는 방법은 단 한 글자도 쓰지 마라. 8장은 "상대가 먼저 손을 내민다면 받아도 되는 때"와 "내가 정리하기 좋은 때"로 바꿔 써라.',
+  '친구처럼 지냄': '지금 친구처럼 지내고 있다. 8장은 "선을 다시 넘어도 되는 때인가"를 다뤄라. 친구 관계까지 잃을 위험을 정직하게 짚어라.'
 };
 const INIT_GUIDE = {
   '내가': '손님이 먼저 끝냈다. 후회와 미안함이 섞여 있다. 죄책감을 키우지 말고, 그때 왜 그 선택을 했는지를 차트로 설명해 줘라.',
@@ -97,11 +97,14 @@ ${v.correction}
 3. 상대를 움직이는 기술을 가르치지 마라. 밀당, 질투 유발, 일부러 늦게 답하기, 새 사람이 있는 척하기 — 전부 금지.
 4. 있지도 않은 제3자를 지어내지 마라. "${B.name}님에게 새 사람이 생겼습니다" 같은 말은 차트에서 나올 수 없다.
 5. 미래를 저주하지 마라. "평생 혼자", "다시는 사랑하지 못합니다" 금지.
+5-1. "${B.name}님에게서 연락이 옵니다"를 절대 쓰지 마라. 연락은 그 사람의 마음과 선택이고, 차트는 그것을 정할 수 없다.
+   ❌ 2월에 ${B.name}님에게서 연락이 올 것입니다
+   ✅ 2월은 ${B.name}님 쪽 하늘이 옛 연락처를 다시 열어 보기 쉬운 쪽으로 열리는 때입니다
 6. 손님을 깎지 마라. 이 관계가 끝난 건 누가 부족해서가 아니라 두 기질이 어긋나서다.
 
 [상황]
 ${A.name}님(${A.gender})이 ${B.name}님(${B.gender})과의 재회를 고민하고 있다.
-헤어진 지: ${v.stage} / 끝낸 쪽: ${v.initiator} / 지금 연락 상태: ${v.contact}
+헤어진 지: ${v.breakup ? v.breakup.label + ' (' + v.breakup.ym + '에 헤어짐)' : v.stage} / 끝낸 쪽: ${v.initiator} / 지금 연락 상태: ${v.contact}
 ${INIT_GUIDE[v.initiator] || INIT_GUIDE['애매함']}
 ${CONTACT_GUIDE[v.contact] || CONTACT_GUIDE['완전히 끊김']}
 
@@ -150,24 +153,16 @@ ${GR.KO_STYLE}
   "keyword_1": "(6자 이내) 관계 키워드. 셋 중 하나는 불편한 진실",
   "keyword_2": "(6자 이내)",
   "keyword_3": "(6자 이내)",
-  "ch1_title": "(16자 이내) 1장 제목",
-  "ch1_ended": "(최소 1000자) [1장 · 이 관계는 왜 끝났는가] 위 갈등 축을 근거로. 누가 잘못했는지가 아니라 두 기질이 어디서 어긋났는지. 끝나는 장면이 들리도록 구체적으로.",
-  "ch2_title": "(16자 이내)",
-  "ch2_remains": "(최소 1000자) [2장 · 지금도 남아 있는 것] 남아 있는 끌림과 깊은 결속의 근거. 왜 시간이 지나도 생각나는지.",
-  "ch3_title": "(16자 이내)",
-  "ch3_love_or_inertia": "(최소 1600자) [3장 · 못 놓는 이유는 사랑인가 관성인가] ★이 상품의 심장\\n     위 확정 판정의 다섯 성분과 비율을 그대로 쓰고, 이것이 확률이 아니라 '이 관계가 사람을 붙잡는 힘의 성분'이라고 먼저 밝혀라.\\n     【정】【성장】【익숙함】【책임감】【집착】 다섯 소제목을 이 순서로. 각 성분이 이 두 사람에게 실제로 어떤 장면으로 나타나는지 근거와 함께.\\n     비율이 낮은 성분은 짧게, 높은 성분은 길게. 마지막에 판정 문장을 금색으로 한 번.\\n     노스노드 접촉은 '앞으로 가게 하는 인연', 사우스노드 접촉은 '이미 아는 것 같은, 뒤로 끌어당기는 인연'으로 풀어 써라. '노드'라는 단어는 한 번만 쉽게 설명하고 써라.",
-  "ch4_title": "(16자 이내)",
-  "ch4_repeat": "(최소 1000자) [4장 · 다시 만나면 반복될 것] 같은 각도는 다시 만나도 그대로 작동한다. 반복될 장면을 두 개 이상, 대사가 들릴 만큼 구체적으로. 가장 위험한 하나는 빨간 글씨로.",
-  "ch5_title": "(16자 이내)",
-  "ch5_changed": "(최소 1000자) [5장 · 다시 만나면 달라질 것] 위 '헤어질 무렵 하늘 vs 지금 하늘'만 근거로. 풀린 것·새로 생긴 것을 정직하게. 바뀐 게 없으면 그렇게 말하라.",
-  "ch6_title": "(16자 이내)",
-  "ch6_their_now": "(최소 800자) [6장 · ${B.name}님은 지금 어떤 시기를 지나고 있나] 속마음이 아니라 '시기의 성격'만. 첫 단락에서 '차트는 마음이 아니라 시기를 보여준다'는 한계를 한 문장으로 먼저 밝혀라.",
-  "ch7_title": "(16자 이내)",
-  "ch7_timing": "(최소 1300자) [7장 · ${v.contact === '차단된 상태' ? '마음을 정리하기 좋은 때, 다시 손을 잡아도 되는 때' : '연락한다면 언제'}] ★\\n     위 확정 시기만 그대로 인용. '가장 좋은 문'을 먼저, 그다음 '옛 감정이 되살아나는 때', 마지막에 '조심할 때'.\\n     각 시기마다 그때 할 것과 하지 말 것을 행동 단위로.${v.contact === '차단된 상태' ? ' 🚨 연락을 시도하라는 말은 쓰지 마라. 차단은 상대의 선택이다.' : '\\n     마지막에 【보낸다면 이렇게】 — 실제로 보낼 수 있는 첫 메시지 예시 2개를 따옴표로. 부담을 주지 않고, 답을 강요하지 않는 문장으로.'}",
-  "ch8_title": "(16자 이내)",
-  "ch8_letgo": "(최소 1200자) [8장 · 놓아야 한다면, 그 근거] ★ 반드시 쓴다. 위 확정 근거를 그대로 인용. 근거가 없다고 나왔으면 【이런 일이 다시 생기면 그때는 놓으세요】 판단 기준 3가지를 행동 단위로 줘라.\\n     재회를 원하는 손님에게도 이 장이 있어야 이 리포트를 믿는다.",
-  "ch9_title": "(16자 이내)",
-  "ch9_verdict": "(최소 1000자) [9장 · 결론] 위 확정 결론 방향을 첫 단락에서 그대로 밝혀라. 뒤집지 마라.\\n     '무엇이 지켜지면 무엇이 가능한가'의 조건부로. 어느 쪽이든 ${A.name}님이 자기 이유로 결정할 수 있게. 마지막 문장은 ${A.name}님에 대한 것으로.",
+  "ch1_ended": "(최소 1000자) [1장 · 우리가 끝난 진짜 이유] 위 갈등 축을 근거로. 누가 잘못했는지가 아니라 두 기질이 어디서 어긋났는지. 끝나는 장면이 들리도록 구체적으로.",
+  "ch2_remains": "(최소 1000자) [2장 · 그런데 왜, 아직도 생각날까] 남아 있는 끌림과 깊은 결속의 근거. 왜 시간이 지나도 생각나는지.",
+  "ch3_love_or_inertia": "(최소 1600자) [3장 · 못 놓는 이유, 사랑일까 관성일까] ★이 상품의 심장\\n     위 확정 판정의 다섯 성분과 비율을 그대로 쓰고, 이것이 확률이 아니라 '이 관계가 사람을 붙잡는 힘의 성분'이라고 먼저 밝혀라.\\n     【정】【성장】【익숙함】【책임감】【집착】 다섯 소제목을 이 순서로. 각 성분이 이 두 사람에게 실제로 어떤 장면으로 나타나는지 근거와 함께.\\n     비율이 낮은 성분은 짧게, 높은 성분은 길게. 마지막에 판정 문장을 금색으로 한 번.\\n     노스노드 접촉은 '앞으로 가게 하는 인연', 사우스노드 접촉은 '이미 아는 것 같은, 뒤로 끌어당기는 인연'으로 풀어 써라. '노드'라는 단어는 한 번만 쉽게 설명하고 써라.",
+  "ch4_repeat": "(최소 1000자) [4장 · 다시 만나면 또 부딪힐 그 자리] 같은 각도는 다시 만나도 그대로 작동한다. 반복될 장면을 두 개 이상, 대사가 들릴 만큼 구체적으로. 가장 위험한 하나는 빨간 글씨로.",
+  "ch5_changed": "(최소 1000자) [5장 · 그때와 지금, 달라진 흐름] 위 '헤어질 무렵 하늘 vs 지금 하늘'만 근거로. ${v.breakup ? v.breakup.ym + '이라는 실제 시기를 한 번 짚어라. ' : ''}풀린 것·새로 생긴 것을 정직하게. 바뀐 게 없으면 그렇게 말하라.",
+  "ch6_their_now": "(최소 800자) [6장 · 그 사람은 지금 어떤 계절을 지나고 있을까] 속마음이 아니라 '시기의 성격'만. 첫 단락에서 '차트는 마음이 아니라 시기를 보여준다'는 한계를 한 문장으로 먼저 밝혀라.",
+  "ch7_their_sky": "(최소 1000자) [7장 · 그 사람 쪽 하늘이 열리는 날] ★\\n     첫 단락에서 이렇게 못 박아라: '이 장은 ${B.name}님이 연락할지 말지를 말하지 않습니다. 그건 ${B.name}님의 마음이 정합니다. 다만 ${B.name}님의 하늘이 연락하기 쉬운 쪽으로 열리는 때는 계산할 수 있습니다.'\\n     위 '${B.name}님 쪽 하늘이 열리는 날' 확정 날짜만 인용. 강한 시기를 먼저, 각 시기가 ${B.name}님에게 어떤 계절인지 쉬운 말로.\\n     그다음 【두 사람의 하늘이 같이 열리는 날】 소제목으로 겹치는 날을 금색으로. 없으면 '두 분의 문은 서로 다른 때 열린다'고 정직하게.\\n     마지막 단락: 이 날들을 '기다리는 날'로 쓰지 말고 '내 마음을 점검하는 날'로 쓰라고 권하라.",
+  "ch8_timing": "(최소 1300자) [8장 · ${v.contact === '차단된 상태' ? '마음을 정리하기 좋은 때, 다시 손을 잡아도 되는 때' : '내가 연락한다면, 그날'}] ★\\n     위 8장 확정 시기만 그대로 인용. '가장 좋은 문'을 먼저, 그다음 '옛 감정이 되살아나는 때', 마지막에 '조심할 때'. 7장의 '같이 열리는 날'과 겹치면 그 사실을 한 번 짚어라.\\n     각 시기마다 그때 할 것과 하지 말 것을 행동 단위로.${v.contact === '차단된 상태' ? ' 🚨 연락을 시도하라는 말은 쓰지 마라. 차단은 상대의 선택이다.' : '\\n     마지막에 【보낸다면 이렇게】 — 실제로 보낼 수 있는 첫 메시지 예시 2개를 따옴표로. 부담을 주지 않고, 답을 강요하지 않는 문장으로.'}",
+  "ch9_letgo": "(최소 1200자) [9장 · 놓아야 한다면, 그 이유] ★ 반드시 쓴다. 위 확정 근거를 그대로 인용. 근거가 없다고 나왔으면 【이런 일이 다시 생기면 그때는 놓으세요】 판단 기준 3가지를 행동 단위로 줘라.\\n     재회를 원하는 손님에게도 이 장이 있어야 이 리포트를 믿는다.",
+  "ch10_verdict": "(최소 1000자) [10장 · 그래서, 우리는] 위 확정 결론 방향을 첫 단락에서 그대로 밝혀라. 뒤집지 마라.\\n     '무엇이 지켜지면 무엇이 가능한가'의 조건부로. 어느 쪽이든 ${A.name}님이 자기 이유로 결정할 수 있게.\\n     마지막 단락은 위 '맨 끝 큰 글씨 결론 문구'로 자연스럽게 이어지게 써라. 그 문구 자체를 그대로 옮겨 적지는 마라 (리포트 맨 끝에 따로 크게 나간다).",
   "closing": "(최소 300자) 맺음말. ${A.name}님에게 건네는 말. 감상에 빠지지 말고 이 리포트의 핵심을 한 번 더 못 박아라. 마지막 한 문장은 <blockquote> 태그로.",
   "teaser": "(3문장) 이 리포트는 '두 사람 사이'만 본 것이다. ${A.name}님이 관계에서 반복하는 패턴의 뿌리는 ${A.name}님 개인 차트에 있다는 점을 짚어라. 이번에 드러난 배치 하나를 지목하고 질문으로 끝내라. 가격·강매 금지."
 }`;
@@ -181,12 +176,13 @@ const SPEC = [
   { key: 'ch4_repeat', min: 1000 },
   { key: 'ch5_changed', min: 1000 },
   { key: 'ch6_their_now', min: 800 },
-  { key: 'ch7_timing', min: 1300 },
-  { key: 'ch8_letgo', min: 1200 },
-  { key: 'ch9_verdict', min: 1000 },
+  { key: 'ch7_their_sky', min: 1000 },
+  { key: 'ch8_timing', min: 1300 },
+  { key: 'ch9_letgo', min: 1200 },
+  { key: 'ch10_verdict', min: 1000 },
   { key: 'closing', min: 300 }
 ];
-const TITLE_KEYS = ['ch1_title', 'ch2_title', 'ch3_title', 'ch4_title', 'ch5_title', 'ch6_title', 'ch7_title', 'ch8_title', 'ch9_title'];
+/* 장 제목은 상세페이지 목차와 같게 코드에 고정한다 (public/reunion.js CH) — AI 는 본문만 쓴다 */
 const TEXT_KEYS = ['headline'].concat(SPEC.map(s => s.key));
 
 const BANNED = /undefined|\bnull\b|NaN|다이제스트|확정 판정|5요인|합성 금성|합성 태양|합성 달|정보 완전도/i;
@@ -209,7 +205,9 @@ function unsafeRules(A, B, contact) {
     { why: `있지도 않은 제3자를 지어냈다. ${B.name}님에게 새 사람이 생겼다는 말은 차트에서 나올 수 없다. 전부 빼라.`,
       re: new RegExp(b + '(님)?(은|는|이|가|에게|께)\\s*[^.。!?\\n]{0,20}(새로운 사람|다른 사람|새 연인|새 애인)[^.。!?\\n]{0,10}(생겼|만나고 있|있습니다)') },
     { why: '미래를 저주하는 문장이 있다. "평생 혼자", "다시는 사랑하지 못합니다" 같은 말을 전부 빼라.',
-      re: /(평생\s*(혼자|외롭|불행)|다시는\s*[^.。!?\n]{0,8}(사랑하지 못|행복하지 못|만나지 못)|절대\s*행복할 수 없|불행해집니다)/ }
+      re: /(평생\s*(혼자|외롭|불행)|다시는\s*[^.。!?\n]{0,8}(사랑하지 못|행복하지 못|만나지 못)|절대\s*행복할 수 없|불행해집니다)/ },
+    { why: `${B.name}님에게서 연락이 온다고 예언했다. 연락은 그 사람의 선택이라 차트로 정할 수 없다. "${B.name}님 쪽 하늘이 연락하기 쉬운 쪽으로 열리는 때"로만 다시 써라.`,
+      re: new RegExp('(연락이\\s*(옵니다|올 것입니다|올 겁니다|올 거예요|오게 됩니다|반드시 옵|꼭 옵|올 가능성이 높))|(반드시\\s*연락(이|을|해))|(' + b + '(님)?(은|는|이|가|께서|에게서)\\s*[^.。!?\\n]{0,20}(먼저\\s*)?연락(을|해)?\\s*(해\\s*올 것|해\\s*옵니다|해올 것|할 것입니다|하게 됩니다|해\\s*올 겁니다))') }
   ];
   if (contact === '차단된 상태') {
     rules.push({ why: '차단된 상태인데 우회 연락을 권했다. 다른 계정·새 번호·지인을 통하거나 찾아가는 방법은 상대의 선택을 무시하는 것이다. 전부 빼라.',
@@ -235,7 +233,6 @@ function validate(c, A, B, ctx, isLast) {
     if (v.length < need) return { msg: `${sp.key} 분량 부족 (${v.length}자 / 최소 ${need}자)` };
   }
   if (!String(c.headline || '').trim()) return { msg: '필수 항목 누락: headline' };
-  for (const k of TITLE_KEYS) if (!String(c[k] || '').trim()) return { msg: '필수 항목 누락: ' + k };
 
   const body = TEXT_KEYS.map(k => String(c[k] || '')).join(' ');
   if (BANNED.test(body)) return { msg: '시스템 용어 노출 (' + (body.match(BANNED) || [''])[0] + ')' };
@@ -343,7 +340,9 @@ const handler = async (req, res) => {
     if (!A || !src.me) return res.status(400).json({ error: '내 정보를 다시 확인해주세요. (생년월일·태어난 시간)', needInput: true });
     if (!B || !src.ex) return res.status(400).json({ error: '상대 정보를 다시 확인해주세요. (생년월일·태어난 시간)', needInput: true });
     if (A.name === B.name) B.name = B.name + '(상대)';
-    const stage = RU.STAGES.includes(src.stage) ? src.stage : '3개월';
+    /* 헤어진 시기 — 새 상세페이지는 년·월(YYYY-MM), 예전 입력폼은 단계 칩 */
+    const breakup = RU.breakupInfo(src.breakup, GR.seoulToday()) ? String(src.breakup) : null;
+    const stage = breakup ? RU.breakupInfo(breakup, GR.seoulToday()).stage : (RU.STAGES.includes(src.stage) ? src.stage : '3개월');
     const initiator = RU.INITIATORS.includes(src.initiator) ? src.initiator : '애매함';
     const contact = RU.CONTACTS.includes(src.contact) ? src.contact : '완전히 끊김';
 
@@ -353,7 +352,7 @@ const handler = async (req, res) => {
     if (orderId) {
       try {
         await kv.set(INTAKE_PREFIX + orderId, {
-          product: NO, me: A, ex: B, stage, initiator, contact, at: Date.now()
+          product: NO, me: A, ex: B, stage, breakup, initiator, contact, at: Date.now()
         }, { ex: YEAR_SEC });
       } catch (e) { console.log('⚠️ [재회] intake 저장 실패(생성은 계속):', e.message); }
 
@@ -373,15 +372,15 @@ const handler = async (req, res) => {
     /* ── 5. 재회 전용 계산 ── */
     const todayYmd = GR.seoulToday();
     const [ty, tm, td] = todayYmd.split('-').map(Number);
-    const D = RU.buildReunionDigest(nA, nB, A.name, B.name, { todayYmd, stage });
-    console.log(`✅ [재회] 계산 — 사랑 ${D.ff.love}% / 관성 ${D.ff.inertia}% / 방향 ${D.direction.dir}(${D.direction.s}) / 문 ${D.win.open.length}개 / 근거 ${D.letgo.length}개`);
+    const D = RU.buildReunionDigest(nA, nB, A.name, B.name, { todayYmd, stage, breakup });
+    console.log(`✅ [재회] 계산 — 사랑 ${D.ff.love}% / 관성 ${D.ff.inertia}% / 방향 ${D.direction.dir}(${D.direction.s}) / 문 ${D.win.open.length}개 / 근거 ${D.letgo.length}개 / 그 사람 쪽 ${D.exw.list.length}개 · 같이 ${D.exw.together.length}개`);
 
     /* ── 6. 원고 ── */
     const ctx = { contact, share: D.ff.share };
     const run = await GR.runWithBudget({
       tag: '[재회 ' + (orderId || '-') + ']',
       buildPrompt: correction => buildPrompt({
-        A, B, D, stage, initiator, contact, correction,
+        A, B, D, stage, initiator, contact, correction, breakup: D.breakup,
         todayStr: `${ty}년 ${tm}월 ${td}일`
       }),
       validate: (c, isLast) => validate(c, A, B, ctx, isLast),
@@ -398,7 +397,7 @@ const handler = async (req, res) => {
     const payload = {
       status: 'completed',
       generatedAt: Date.now(),
-      version: 1,
+      version: 2,
       product: NO,
       meta: {
         nameA: A.name, nameB: B.name, stage, initiator, contact,
@@ -407,6 +406,10 @@ const handler = async (req, res) => {
         best: win.best ? pickW(win.best) : null,
         windows: win.all.map(pickW),
         letgo: D.letgo.slice(0, 5).map(x => ({ kind: x.kind, meaning: x.meaning })),
+        breakup: D.breakup ? { ym: D.breakup.ym, label: D.breakup.label } : null,
+        exWindows: D.exw.list.filter(w => w.weight >= 0.8).concat(D.exw.list.filter(w => w.weight < 0.8 && w.kind === 'venus')).slice(0, 8).map(pickW),
+        together: D.exw.together.slice(0, 4).map(w => ({ start: w.start, end: w.end, when: w.when, why: w.why })),
+        verdict: D.verdict,
         timeUnknown: A.timeUnknown || B.timeUnknown,
         today: todayYmd,
         degraded: run.usedFallback || undefined

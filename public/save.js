@@ -72,7 +72,7 @@
     /* 재회운 (16) — reunion.js 결과화면 */
     '16': {
       root: '#rnn',
-      order: ['.rnn-cover', '.rnn-hero', '.rnn-mix', '.rnn-card', '.rnn-close'],
+      order: ['.rnn-cover', '.rnn-hero', '.rnn-mix', '.rnn-card', '.rnn-close', '.rnn-vd'],
       hideInClone: ['#rnn-save-wrap', '.rnn-teaser'],
       unhide: '.rnn-card',
       grad: ['#2a1a33', '#0A0C16', '#050308'],

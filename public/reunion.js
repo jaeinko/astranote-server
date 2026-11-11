@@ -160,6 +160,24 @@
 '#rnn-save-wrap{text-align:center;margin-top:26px;}',
 '#rnn-save-btn{background:linear-gradient(135deg,#E7CE8E,#C9A24B);color:#1a1206;border:none;border-radius:12px;padding:16px 36px;',
 '  font:900 15px "Noto Sans KR",sans-serif;cursor:pointer;}',
+/* 그 사람 쪽 하늘 */
+'.rnn-ex{margin-top:22px;font-family:"Noto Sans KR",sans-serif;}',
+'.rnn-ex .note{color:#8b829e;font:500 11.5px/1.65 "Noto Sans KR",sans-serif;margin:0 0 14px;word-break:keep-all;}',
+'.rnn-ex .tg{border:1px solid #C9A24B;background:linear-gradient(135deg,rgba(201,162,75,.16),rgba(160,127,176,.12));border-radius:14px;padding:15px 16px;margin-top:6px;}',
+'.rnn-ex .tg .k{color:#E7CE8E;font:800 11px "Noto Sans KR",sans-serif;letter-spacing:.18em;margin-bottom:8px;}',
+'.rnn-ex .tg .w{color:#fff;font:900 15px/1.55 "Noto Sans KR",sans-serif;word-break:keep-all;}',
+'.rnn-ex .tg .y{color:#b9b5c8;font:500 12px/1.55 "Noto Sans KR",sans-serif;margin:2px 0 8px;word-break:keep-all;}',
+'.rnn-ex .tg .y:last-child{margin-bottom:0;}',
+/* 맨 끝 큰 결론 */
+'.rnn-vd{margin:34px 0 6px;padding:44px 22px 46px;border-radius:22px;text-align:center;position:relative;overflow:hidden;',
+'  background:radial-gradient(120% 90% at 50% 0%,rgba(201,162,75,.22),rgba(15,17,32,0) 62%),linear-gradient(170deg,#1d1530,#0b0d18);border:1px solid rgba(201,162,75,.55);}',
+'.rnn-vd .t{color:#C9A24B;font:800 11px "Noto Sans KR",sans-serif;letter-spacing:.34em;margin-bottom:22px;}',
+'.rnn-vd .ld{color:#d9cfe6;font:500 19px/1.6 "Noto Serif KR",serif;word-break:keep-all;margin-bottom:12px;}',
+'.rnn-vd .ln{font:900 29px/1.5 "Noto Serif KR",serif;letter-spacing:-.03em;word-break:keep-all;color:#F3DFA6;}',
+'.rnn-vd.wait .ln{color:#cfdcff;}.rnn-vd.let .ln{color:#f0c8da;}',
+'.rnn-vd .ln em{font-style:normal;display:block;}',
+'.rnn-vd .nm{color:#8b829e;font:500 12px "Noto Sans KR",sans-serif;margin-top:24px;letter-spacing:.06em;}',
+'@media(max-width:480px){.rnn-vd .ln{font-size:25px;}.rnn-vd .ld{font-size:17px;}}',
 '.rnn-foot{text-align:center;color:#565368;font:500 11px "Noto Sans KR",sans-serif;letter-spacing:.22em;margin-top:36px;}'
   ].join('');
 
@@ -257,10 +275,12 @@
   /* ══════════════ 렌더 ══════════════ */
   var rendered = false;
   var CH = [
-    ['01', 'ch1_ended', '이 관계는 왜 끝났는가'], ['02', 'ch2_remains', '지금도 남아 있는 것'],
-    ['03', 'ch3_love_or_inertia', '못 놓는 이유는 사랑인가 관성인가'], ['04', 'ch4_repeat', '다시 만나면 반복될 것'],
-    ['05', 'ch5_changed', '다시 만나면 달라질 것'], ['06', 'ch6_their_now', '그 사람은 지금 어떤 시기인가'],
-    ['07', 'ch7_timing', '연락한다면 언제'], ['08', 'ch8_letgo', '놓아야 한다면, 그 근거'], ['09', 'ch9_verdict', '결론']
+    /* 상세페이지 목차와 같은 제목 — 서버(api/gemini-reunion.js) 프롬프트의 [n장 · 제목]과도 같다 */
+    ['01', 'ch1_ended', '우리가 끝난 진짜 이유'], ['02', 'ch2_remains', '그런데 왜, 아직도 생각날까'],
+    ['03', 'ch3_love_or_inertia', '못 놓는 이유, 사랑일까 관성일까', 1], ['04', 'ch4_repeat', '다시 만나면 또 부딪힐 그 자리'],
+    ['05', 'ch5_changed', '그때와 지금, 달라진 흐름'], ['06', 'ch6_their_now', '그 사람은 지금 어떤 계절을 지나고 있을까'],
+    ['07', 'ch7_their_sky', '그 사람 쪽 하늘이 열리는 날', 1], ['08', 'ch8_timing', '내가 연락한다면, 그날', 1],
+    ['09', 'ch9_letgo', '놓아야 한다면, 그 이유', 1], ['10', 'ch10_verdict', '그래서, 우리는']
   ];
   var FACT = [
     ['정', '#E7CE8E', '함께 있으면 편하고 따뜻했던 힘'],
@@ -306,6 +326,33 @@
     });
     return html + '</div>';
   }
+  var EXC = { soften: '#E7CE8E', retro: '#a07fb0', venus: '#c78ba8' };
+  function exHTML(meta, B) {
+    var ws = meta.exWindows || [], tg = meta.together || [];
+    if (!ws.length && !tg.length) return '';
+    var html = '<div class="rnn-ex"><div class="note">' + h(B) + '님이 연락할지는 ' + h(B) + '님의 마음이 정해요. 아래는 ' + h(B) +
+      '님의 차트로 계산한, 하늘이 연락하기 쉬운 쪽으로 열리는 때예요.</div><div class="rnn-tl">';
+    ws.forEach(function (w) {
+      var c = EXC[w.kind] || '#a07fb0';
+      html += '<div class="it"><span class="dt" style="background:' + c + '"></span><div class="lb" style="color:' + c + '">' + h(w.label) + '</div>' +
+        '<div class="wh">' + h(w.when) + '</div><div class="wy">' + h(w.why) + '</div></div>';
+    });
+    html += '</div>';
+    if (tg.length) {
+      html += '<div class="tg"><div class="k">★ 두 사람의 하늘이 같이 열리는 날</div>' + tg.map(function (w) {
+        return '<div class="w">' + h(w.when) + '</div><div class="y">' + h(w.why) + '</div>';
+      }).join('') + '</div>';
+    }
+    return html + '</div>';
+  }
+  function verdictHTML(meta, A, B) {
+    var v = meta.verdict; if (!v || !v.line) return '';
+    /* "이제는… 놓아줘야 할 때" — 말줄임표 뒤에서 한 번 쉬게 줄을 나눈다 */
+    var line = h(v.line).replace(/…\s*/, '…</em><em>').replace(/,\s*/, ',</em><em>');
+    return '<div class="rnn-vd ' + h(v.key || '') + '"><div class="t">' + h(A) + '님의 결론</div>' +
+      '<div class="ld">' + h(v.lead) + '</div><div class="ln"><em>' + line + '</em></div>' +
+      '<div class="nm">' + h(A) + ' · ' + h(B) + '</div></div>';
+  }
   function letgoHTML(meta) {
     var L = meta.letgo || [];
     if (!L.length) return '';
@@ -331,26 +378,29 @@
       var P = [];
       P.push('<div class="rnn-cover"><div class="lb">ASTRANOTE REUNION REPORT</div>' +
         '<h1><em>' + h(A) + '</em>님과 <em>' + h(B) + '</em>님,<br>다시 만나도 될까</h1>' +
-        '<div class="who">헤어진 지 <b>' + h(meta.stage || '') + '</b> · ' + h(meta.contact || '') + '</div><div class="rnn-line"></div></div>');
+        '<div class="who">헤어진 지 <b>' + h(meta.breakup ? meta.breakup.label : (meta.stage || '')) + '</b> · ' + h(meta.contact || '') + '</div><div class="rnn-line"></div></div>');
       P.push('<div class="rnn-hero"><div class="t">이 관계를 한 문장으로</div><div class="h">' + safe(rep.headline) + '</div>' +
         '<div class="rnn-kw">' + [rep.keyword_1, rep.keyword_2, rep.keyword_3].filter(Boolean).map(function (k) { return '<span>' + h(k) + '</span>'; }).join('') + '</div></div>');
       P.push(mixHTML(meta));
 
       CH.forEach(function (c, i) {
         var body = rep[c[1]]; if (!body) return;
-        var title = rep['ch' + (i + 1) + '_title'] || c[2];
+        var title = c[2];
+        if (c[1] === 'ch8_timing' && meta.contact === '차단된 상태') title = '마음을 정리할 때, 다시 손잡아도 될 때';
         var extra = '', pre = '';
-        if (c[1] === 'ch7_timing') extra = timelineHTML(meta);
-        if (c[1] === 'ch8_letgo') extra = letgoHTML(meta);
-        if (c[1] === 'ch9_verdict') pre = dirHTML(meta);
-        var key = (c[0] === '03' || c[0] === '07' || c[0] === '08') ? ' key' : '';
+        if (c[1] === 'ch7_their_sky') extra = exHTML(meta, B);
+        if (c[1] === 'ch8_timing') extra = timelineHTML(meta);
+        if (c[1] === 'ch9_letgo') extra = letgoHTML(meta);
+        if (c[1] === 'ch10_verdict') pre = dirHTML(meta);
+        var key = c[3] ? ' key' : '';
         P.push('<div class="rnn-card' + key + '"><div class="rnn-no">CHAPTER ' + c[0] + '</div><div class="rnn-tt">' + h(title) + '</div>' +
           pre + '<div class="rnn-ct">' + safe(body) + '</div>' + extra + '</div>');
       });
 
-      if (rep.closing) P.push('<div class="rnn-close"><div class="t">마지막으로</div><div class="c">' + safe(rep.closing) + '</div></div>');
       if (rep.teaser) P.push('<div class="rnn-teaser">' + safe(rep.teaser) +
         '<a href="/product/detail.html?product_no=11">내 차트 전체 보기 — VVIP 운명 리포트</a></div>');
+      if (rep.closing) P.push('<div class="rnn-close"><div class="t">마지막으로</div><div class="c">' + safe(rep.closing) + '</div></div>');
+      P.push(verdictHTML(meta, A, B));
       P.push('<div id="rnn-save-wrap"><button id="rnn-save-btn">📥 리포트 이미지로 저장하기</button></div>');
       P.push('<div class="rnn-foot">ASTRANOTE · WESTERN ASTROLOGY</div>');
 
@@ -440,7 +490,7 @@
         needInput();
         return;
       }
-      var body = { me: DATA.me, ex: DATA.ex, stage: DATA.stage, initiator: DATA.initiator, contact: DATA.contact };
+      var body = { me: DATA.me, ex: DATA.ex, breakup: DATA.breakup, stage: DATA.stage, initiator: DATA.initiator, contact: DATA.contact };
       if (ORDER_ID) body.orderId = ORDER_ID;
       return post(body);
     }).catch(function (e) {
